@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: Phase 1.5 완료 (테스트 + HIGH/MEDIUM 수정)
+## 현재 상태: Phase 2 완료 (HWP 제어 문자 파싱 + 메타데이터)
 
 ### 완료
 
@@ -34,6 +34,15 @@
   - M8: parse_heading_style 끝 숫자 추출
   - M10: encoding_rs, serde_yaml 미사용 의존성 제거
   - 리뷰 수정: keyword escape, height clamp, 인라인 서식 라운드트립 테스트
+- [x] Phase 2 (14694df + 77db271):
+  - HWP 제어 문자 파싱: 테이블(CTRL_TABLE+LIST_HEADER), 이미지(GSHAPE+GSOTYPE), 각주/미주
+  - Level-aware subtree 탐색 (find_children_end)
+  - read_section_stream 인덱스 기반 루프 리팩토링
+  - M7: OLE2 SummaryInformation 메타데이터 추출 (title/author/subject/keywords)
+  - M9: BIN 스트림 doc_info.bin_data_entries 기반 최적화, fallback 100 cap
+  - H4: --style 파라미터 tracing::warn 경고
+  - 리뷰 수정: checked_mul 오버플로우 가드, 행 인덱스 10K cap, gshape/gsotype 테스트 5건
+  - 130 테스트 (116 unit + 14 integration, 0 failures)
 
 ### 진행 중
 
@@ -41,7 +50,7 @@
 
 ### 미착수
 
-- [ ] Phase 2: HWP 파싱 고도화 (테이블, 이미지, 하이퍼링크, 각주, 수식)
+- [ ] Phase 2b: HWP 파싱 고도화 (하이퍼링크 URL 추출, EQEDIT→LaTeX 고도화, DRM 감지)
 - [ ] Phase 3: HWPX 파싱 고도화 (스타일, colspan, BinData)
 - [ ] Phase 4: Markdown 렌더러 고도화 (GFM 검증, 이미지 옵션)
 - [ ] Phase 5: HWPX 라이터 고도화 (스타일, 이미지, 템플릿)
@@ -67,23 +76,28 @@
 - [x] M6: YAML escape \n/\r/\t 추가
 - [x] M8: `parse_heading_style` 끝 숫자 추출
 - [x] M10: encoding_rs, serde_yaml 제거
-- [ ] M7: HWP OLE2 SummaryInformation 스트림에서 메타데이터(제목/저자) 추출
-- [ ] M9: BIN 스트림 탐색 — doc_info bin_data_entries 기반으로 최적화
-- [ ] H4: `--style` 파라미터 구현 또는 CLI에서 제거
+- [x] M7: HWP OLE2 SummaryInformation 메타데이터 추출 ✅ (14694df)
+- [x] M9: BIN 스트림 doc_info.bin_data_entries 기반 최적화 ✅ (14694df)
+- [x] H4: `--style` 파라미터 tracing::warn 경고 ✅ (14694df)
 
 ## 장기 개선 로드맵 (Phase 2~6)
 
 ### 아키텍처
+- [ ] reader.rs 분할 (현재 2000+ lines → table/image/summary 서브모듈)
 - [ ] ParseContext 19필드 → 타입 상태 패턴 또는 빌더 분리
 - [ ] Reader/Writer trait 정의 (HWP/HWPX/MD 공통 인터페이스)
-- [ ] HwpDocument → IR 변환에서 제어 문자 파싱 (테이블/이미지/각주)
+- [x] HwpDocument → IR 변환에서 제어 문자 파싱 (테이블/이미지/각주) ✅
 
-### HWP 파서 (Phase 2)
-- [ ] CTRL_TABLE + LIST_HEADER 레코드로 테이블 구조 파싱
-- [ ] BinData 참조 해결 → 이미지 인라인 삽입
-- [ ] CTRL_FOOTNOTE/ENDNOTE 파싱
+### HWP 파서 (Phase 2) — 완료 항목
+- [x] CTRL_TABLE + LIST_HEADER 레코드로 테이블 구조 파싱 ✅
+- [x] BinData 참조 해결 → 이미지 인라인 삽입 ✅
+- [x] CTRL_FOOTNOTE/ENDNOTE 파싱 ✅
+
+### HWP 파서 (Phase 2b) — 남은 항목
+- [ ] 하이퍼링크 URL 추출 (CTRL_HEADER에서 URL 바이트 파싱)
 - [ ] EQEDIT 스크립트 → LaTeX 변환 고도화
 - [ ] DRM/암호화 감지 메시지 개선
+- [ ] read_summary_info 단위 테스트 (OLE2 바이트 버퍼 기반)
 
 ### 배포 (Phase 6)
 - [ ] GitHub Actions CI (build + test + clippy)
@@ -91,6 +105,23 @@
 - [ ] 배치 변환 CLI 옵션
 
 ## 변경 이력
+
+### 2026-04-22 — Phase 2: HWP 제어 문자 파싱 (14694df + 77db271)
+
+**구현 내용**:
+- HWP 5.0 제어 문자 파싱 6개 함수: find_children_end, extract_paragraphs_from_range, parse_table_ctrl, parse_gshape_ctrl, find_gsotype_bin_id, parse_ctrl_header_at
+- 테이블: CTRL_TABLE + LIST_HEADER 레코드에서 행/열/셀 구조 추출, 셀→행 그룹핑
+- 이미지: GSHAPE + GSOTYPE에서 BinData ID/크기 추출, IR→Markdown 이미지 블록 생성
+- 각주/미주: CTRL_FOOTNOTE/ENDNOTE 본문 단락 추출
+- OLE2 SummaryInformation 메타데이터 추출 (M7)
+- BIN 스트림 최적화 (M9), --style 경고 (H4)
+
+**리뷰 수정**:
+- checked_mul/checked_add으로 32비트 정수 오버플로우 방지
+- 행 인덱스 10,000 cap으로 할당 폭발 방지
+- gshape/gsotype 테스트 5건 추가
+
+**검증**: cargo check 0 에러, clippy 0 경고, 130 테스트 (116 unit + 14 integration)
 
 ### 2026-04-21 — 보안/정확도 수정 (99a1bc6)
 
