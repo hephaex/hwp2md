@@ -280,10 +280,7 @@ fn collect_inlines_recursive<'a>(
             }
             NodeValue::Math(math) => {
                 let delim = if math.display_math { "$$" } else { "$" };
-                inlines.push(ir::Inline::plain(format!(
-                    "{delim}{}{delim}",
-                    math.literal
-                )));
+                inlines.push(ir::Inline::plain(format!("{delim}{}{delim}", math.literal)));
             }
             _ => {
                 collect_inlines_recursive(child, inlines, style.clone());
@@ -302,7 +299,10 @@ mod tests {
     // -----------------------------------------------------------------------
 
     fn first_section_blocks(doc: &ir::Document) -> &[ir::Block] {
-        doc.sections.first().map(|s| s.blocks.as_slice()).unwrap_or(&[])
+        doc.sections
+            .first()
+            .map(|s| s.blocks.as_slice())
+            .unwrap_or(&[])
     }
 
     // -----------------------------------------------------------------------
@@ -387,7 +387,10 @@ mod tests {
         let blocks = first_section_blocks(&doc);
         if let ir::Block::Paragraph { inlines } = &blocks[0] {
             let bold_inline = inlines.iter().find(|i| i.bold);
-            assert!(bold_inline.is_some(), "no bold inline found; inlines: {inlines:?}");
+            assert!(
+                bold_inline.is_some(),
+                "no bold inline found; inlines: {inlines:?}"
+            );
         } else {
             panic!("expected Paragraph");
         }
@@ -399,7 +402,10 @@ mod tests {
         let blocks = first_section_blocks(&doc);
         if let ir::Block::Paragraph { inlines } = &blocks[0] {
             let italic = inlines.iter().find(|i| i.italic);
-            assert!(italic.is_some(), "no italic inline found; inlines: {inlines:?}");
+            assert!(
+                italic.is_some(),
+                "no italic inline found; inlines: {inlines:?}"
+            );
         } else {
             panic!("expected Paragraph");
         }
@@ -458,7 +464,13 @@ mod tests {
     fn parse_markdown_ordered_list() {
         let doc = parse_markdown("1. first\n2. second\n");
         let blocks = first_section_blocks(&doc);
-        if let ir::Block::List { ordered, start, items, .. } = &blocks[0] {
+        if let ir::Block::List {
+            ordered,
+            start,
+            items,
+            ..
+        } = &blocks[0]
+        {
             assert!(ordered);
             assert_eq!(*start, 1);
             assert_eq!(items.len(), 2);
@@ -480,9 +492,9 @@ mod tests {
         // We accept either representation.
         let found = blocks.iter().any(|b| match b {
             ir::Block::Image { src, alt } => src == "cat.png" && alt == "a cat",
-            ir::Block::Paragraph { inlines } => inlines.iter().any(|i| {
-                i.text.contains("cat.png") && i.text.contains("a cat")
-            }),
+            ir::Block::Paragraph { inlines } => inlines
+                .iter()
+                .any(|i| i.text.contains("cat.png") && i.text.contains("a cat")),
             _ => false,
         });
         assert!(found, "image not found in blocks: {blocks:?}");
@@ -497,7 +509,9 @@ mod tests {
         let md = "Text[^note].\n\n[^note]: The footnote.\n";
         let doc = parse_markdown(md);
         let blocks = first_section_blocks(&doc);
-        let has_fn = blocks.iter().any(|b| matches!(b, ir::Block::Footnote { id, .. } if id == "note"));
+        let has_fn = blocks
+            .iter()
+            .any(|b| matches!(b, ir::Block::Footnote { id, .. } if id == "note"));
         assert!(has_fn, "footnote not found; blocks: {blocks:?}");
     }
 
@@ -515,12 +529,13 @@ mod tests {
         // when comrak wraps it in a paragraph, as an inline whose text contains "$$".
         let has_display_math = blocks.iter().any(|b| match b {
             ir::Block::Math { display: true, .. } => true,
-            ir::Block::Paragraph { inlines } => {
-                inlines.iter().any(|i| i.text.contains("$$"))
-            }
+            ir::Block::Paragraph { inlines } => inlines.iter().any(|i| i.text.contains("$$")),
             _ => false,
         });
-        assert!(has_display_math, "display math not found; blocks: {blocks:?}");
+        assert!(
+            has_display_math,
+            "display math not found; blocks: {blocks:?}"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -531,7 +546,9 @@ mod tests {
     fn parse_markdown_blockquote() {
         let doc = parse_markdown("> quoted text\n");
         let blocks = first_section_blocks(&doc);
-        let has_bq = blocks.iter().any(|b| matches!(b, ir::Block::BlockQuote { .. }));
+        let has_bq = blocks
+            .iter()
+            .any(|b| matches!(b, ir::Block::BlockQuote { .. }));
         assert!(has_bq, "blockquote not found; blocks: {blocks:?}");
     }
 

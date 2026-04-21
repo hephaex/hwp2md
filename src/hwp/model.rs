@@ -6,6 +6,10 @@ pub struct HwpDocument {
     pub doc_info: DocInfo,
     pub sections: Vec<HwpSection>,
     pub bin_data: HashMap<u16, Vec<u8>>,
+    pub summary_title: Option<String>,
+    pub summary_author: Option<String>,
+    pub summary_subject: Option<String>,
+    pub summary_keywords: Vec<String>,
 }
 
 #[derive(Debug, Default)]
@@ -33,7 +37,11 @@ pub struct HwpVersion {
 
 impl std::fmt::Display for HwpVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}.{}.{}.{}", self.major, self.minor, self.micro, self.extra)
+        write!(
+            f,
+            "{}.{}.{}.{}",
+            self.major, self.minor, self.micro, self.extra
+        )
     }
 }
 

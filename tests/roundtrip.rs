@@ -17,7 +17,10 @@ fn make_doc(blocks: Vec<ir::Block>) -> ir::Document {
 }
 
 fn first_blocks(doc: &ir::Document) -> &[ir::Block] {
-    doc.sections.first().map(|s| s.blocks.as_slice()).unwrap_or(&[])
+    doc.sections
+        .first()
+        .map(|s| s.blocks.as_slice())
+        .unwrap_or(&[])
 }
 
 // -----------------------------------------------------------------------
@@ -35,8 +38,13 @@ fn roundtrip_ir_to_md_to_ir_heading() {
     let parsed = parse_markdown(&md);
 
     let blocks = first_blocks(&parsed);
-    let found = blocks.iter().any(|b| matches!(b, ir::Block::Heading { level: 2, .. }));
-    assert!(found, "heading level 2 not found after roundtrip; md: {md:?}");
+    let found = blocks
+        .iter()
+        .any(|b| matches!(b, ir::Block::Heading { level: 2, .. }));
+    assert!(
+        found,
+        "heading level 2 not found after roundtrip; md: {md:?}"
+    );
 }
 
 #[test]
@@ -130,7 +138,11 @@ fn roundtrip_ir_to_md_to_ir_unordered_list() {
     let parsed = parse_markdown(&md);
 
     let found = first_blocks(&parsed).iter().any(|b| match b {
-        ir::Block::List { ordered: false, items, .. } => items.len() == 2,
+        ir::Block::List {
+            ordered: false,
+            items,
+            ..
+        } => items.len() == 2,
         _ => false,
     });
     assert!(found, "unordered list not preserved; md: {md:?}");
@@ -161,7 +173,11 @@ fn roundtrip_ir_to_md_to_ir_ordered_list() {
     let parsed = parse_markdown(&md);
 
     let found = first_blocks(&parsed).iter().any(|b| match b {
-        ir::Block::List { ordered: true, items, .. } => items.len() == 2,
+        ir::Block::List {
+            ordered: true,
+            items,
+            ..
+        } => items.len() == 2,
         _ => false,
     });
     assert!(found, "ordered list not preserved; md: {md:?}");
@@ -205,10 +221,7 @@ fn roundtrip_ir_to_md_to_ir_gfm_table() {
             is_header: false,
         },
     ];
-    let original = make_doc(vec![ir::Block::Table {
-        rows,
-        col_count: 2,
-    }]);
+    let original = make_doc(vec![ir::Block::Table { rows, col_count: 2 }]);
 
     let md = write_markdown(&original, false);
     let parsed = parse_markdown(&md);
@@ -312,9 +325,7 @@ fn roundtrip_mixed_content() {
     let has_code = blocks
         .iter()
         .any(|b| matches!(b, ir::Block::CodeBlock { .. }));
-    let has_list = blocks
-        .iter()
-        .any(|b| matches!(b, ir::Block::List { .. }));
+    let has_list = blocks.iter().any(|b| matches!(b, ir::Block::List { .. }));
 
     assert!(has_h1, "H1 missing; md: {md:?}");
     assert!(has_code, "CodeBlock missing; md: {md:?}");
@@ -359,9 +370,14 @@ fn roundtrip_ir_inline_flags_survive() {
 
     if let Some(ir::Block::Paragraph { inlines }) = first_blocks(&parsed).first() {
         let has_bold = inlines.iter().any(|i| i.bold && i.text.contains("bold"));
-        let has_italic = inlines.iter().any(|i| i.italic && i.text.contains("italic"));
+        let has_italic = inlines
+            .iter()
+            .any(|i| i.italic && i.text.contains("italic"));
         assert!(has_bold, "bold flag not preserved; inlines: {inlines:?}");
-        assert!(has_italic, "italic flag not preserved; inlines: {inlines:?}");
+        assert!(
+            has_italic,
+            "italic flag not preserved; inlines: {inlines:?}"
+        );
     } else {
         panic!("Expected Paragraph block");
     }

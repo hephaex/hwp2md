@@ -141,7 +141,10 @@ fn generate_section_xml(section: &ir::Section, _index: usize) -> Result<String> 
     Ok(String::from_utf8(buf.into_inner()).unwrap_or_default())
 }
 
-fn write_block<W: Write>(writer: &mut Writer<W>, block: &ir::Block) -> Result<(), quick_xml::Error> {
+fn write_block<W: Write>(
+    writer: &mut Writer<W>,
+    block: &ir::Block,
+) -> Result<(), quick_xml::Error> {
     match block {
         ir::Block::Heading { level, inlines } => {
             let mut p = BytesStart::new("hp:p");

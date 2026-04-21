@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::error::Hwp2MdError;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::Read;
@@ -18,6 +20,8 @@ pub const HWPTAG_CTRL_HEADER: u16 = HWPTAG_BEGIN + 54;
 pub const HWPTAG_LIST_HEADER: u16 = HWPTAG_BEGIN + 55;
 pub const HWPTAG_TABLE: u16 = HWPTAG_BEGIN + 57;
 pub const HWPTAG_EQEDIT: u16 = HWPTAG_BEGIN + 71;
+/// GSOType record — contains picture/OLE shape specifics including BinData reference.
+pub const HWPTAG_GSOTYPE: u16 = HWPTAG_BEGIN + 67;
 
 pub const CTRL_SECTION_DEF: u32 = ctrl_id(b"secd");
 pub const CTRL_TABLE: u32 = ctrl_id(b"tbl ");
@@ -57,6 +61,7 @@ impl Record {
             HWPTAG_LIST_HEADER => "LIST_HEADER",
             HWPTAG_TABLE => "TABLE",
             HWPTAG_EQEDIT => "EQEDIT",
+            HWPTAG_GSOTYPE => "GSOTYPE",
             _ => "UNKNOWN",
         }
     }

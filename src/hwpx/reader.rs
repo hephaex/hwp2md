@@ -7,8 +7,8 @@ use std::path::Path;
 
 pub fn read_hwpx(path: &Path) -> Result<ir::Document, anyhow::Error> {
     let file = std::fs::File::open(path)?;
-    let mut archive = zip::ZipArchive::new(file)
-        .map_err(|e| Hwp2MdError::HwpxParse(format!("ZIP open: {e}")))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| Hwp2MdError::HwpxParse(format!("ZIP open: {e}")))?;
 
     let mut doc = ir::Document::new();
 
@@ -37,7 +37,9 @@ pub fn read_hwpx(path: &Path) -> Result<ir::Document, anyhow::Error> {
     Ok(doc)
 }
 
-fn read_metadata(archive: &mut zip::ZipArchive<std::fs::File>) -> Result<ir::Metadata, Hwp2MdError> {
+fn read_metadata(
+    archive: &mut zip::ZipArchive<std::fs::File>,
+) -> Result<ir::Metadata, Hwp2MdError> {
     let mut meta = ir::Metadata::default();
 
     let xml = read_zip_entry(archive, "Contents/header.xml")
@@ -114,11 +116,12 @@ fn find_section_files(archive: &mut zip::ZipArchive<std::fs::File>) -> Vec<Strin
                             if key == "href" || key == "hp:href" {
                                 let val = attr.unescape_value().unwrap_or_default().to_string();
                                 if val.contains("section") || val.contains("Section") {
-                                    let full_path = if val.starts_with("Contents/") || val.starts_with('/') {
-                                        val.trim_start_matches('/').to_string()
-                                    } else {
-                                        format!("Contents/{val}")
-                                    };
+                                    let full_path =
+                                        if val.starts_with("Contents/") || val.starts_with('/') {
+                                            val.trim_start_matches('/').to_string()
+                                        } else {
+                                            format!("Contents/{val}")
+                                        };
                                     sections.push(full_path);
                                 }
                             }
@@ -401,10 +404,7 @@ fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &mut ir::Sec
         "equation" | "hp:equation" | "eqEdit" | "hp:eqEdit" => {
             if !ctx.equation_text.is_empty() {
                 let tex = std::mem::take(&mut ctx.equation_text);
-                section.blocks.push(ir::Block::Math {
-                    display: true,
-                    tex,
-                });
+                section.blocks.push(ir::Block::Math { display: true, tex });
             }
             ctx.in_equation = false;
         }
@@ -449,8 +449,7 @@ fn handle_empty_element(
             }
             if !src.is_empty() {
                 if ctx.in_cell {
-                    ctx.cell_blocks
-                        .push(ir::Block::Image { src, alt });
+                    ctx.cell_blocks.push(ir::Block::Image { src, alt });
                 } else {
                     section.blocks.push(ir::Block::Image { src, alt });
                 }

@@ -171,11 +171,9 @@ fn write_table(out: &mut String, rows: &[ir::TableRow], col_count: usize) {
         return;
     }
 
-    let has_complex = rows.iter().any(|r| {
-        r.cells
-            .iter()
-            .any(|c| c.colspan > 1 || c.rowspan > 1)
-    });
+    let has_complex = rows
+        .iter()
+        .any(|r| r.cells.iter().any(|c| c.colspan > 1 || c.rowspan > 1));
 
     if has_complex {
         write_html_table(out, rows);
@@ -245,13 +243,7 @@ fn cell_to_text(cell: &ir::TableCell) -> String {
     texts.join(" ").replace('|', "\\|")
 }
 
-fn write_list(
-    out: &mut String,
-    items: &[ir::ListItem],
-    ordered: bool,
-    start: u32,
-    indent: usize,
-) {
+fn write_list(out: &mut String, items: &[ir::ListItem], ordered: bool, start: u32, indent: usize) {
     let prefix_str: String = "  ".repeat(indent);
     for (i, item) in items.iter().enumerate() {
         let marker = if ordered {

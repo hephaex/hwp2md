@@ -64,12 +64,16 @@ pub fn to_hwpx(input: &Path, output: Option<&Path>, style: Option<&Path>) -> Res
         bail!("Expected .md or .markdown file, got .{ext}");
     }
 
+    if style.is_some() {
+        tracing::warn!("--style option is not yet implemented and will be ignored");
+    }
+
     let content = fs::read_to_string(input)?;
     let doc = md::parse_markdown(&content);
 
-    let out_path = output.map(|p| p.to_path_buf()).unwrap_or_else(|| {
-        input.with_extension("hwpx")
-    });
+    let out_path = output
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| input.with_extension("hwpx"));
 
     if let Some(parent) = out_path.parent() {
         fs::create_dir_all(parent)?;
@@ -105,7 +109,12 @@ pub fn show_info(input: &Path) -> Result<()> {
 
 fn print_info(doc: &ir::Document, path: &Path) {
     println!("File: {}", path.display());
-    println!("Format: {}", path.extension().and_then(|e| e.to_str()).unwrap_or("unknown"));
+    println!(
+        "Format: {}",
+        path.extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("unknown")
+    );
 
     if let Some(ref title) = doc.metadata.title {
         println!("Title: {title}");
@@ -136,11 +145,9 @@ fn count_chars(block: &ir::Block) -> usize {
         }
         ir::Block::CodeBlock { code, .. } => code.len(),
         ir::Block::BlockQuote { blocks } => blocks.iter().map(count_chars).sum(),
-        ir::Block::List { items, .. } => items
-            .iter()
-            .flat_map(|i| &i.blocks)
-            .map(count_chars)
-            .sum(),
+        ir::Block::List { items, .. } => {
+            items.iter().flat_map(|i| &i.blocks).map(count_chars).sum()
+        }
         ir::Block::Table { rows, .. } => rows
             .iter()
             .flat_map(|r| &r.cells)

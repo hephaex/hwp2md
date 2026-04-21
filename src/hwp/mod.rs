@@ -1,6 +1,6 @@
 mod model;
-mod record;
 mod reader;
+mod record;
 
 pub use model::*;
 pub use reader::read_hwp;

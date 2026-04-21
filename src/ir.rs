@@ -110,7 +110,6 @@ impl Inline {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableRow {
     pub cells: Vec<TableCell>,
