@@ -1,3 +1,4 @@
+use crate::hwp::eqedit::eqedit_to_latex;
 use crate::hwp::model::*;
 use crate::ir;
 
@@ -141,11 +142,10 @@ pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<
             })
         }
         HwpControl::Equation { script } => {
-            // Already captured as Math block in `paragraph_to_blocks` via EQEDIT.
-            // But if it surfaces here via controls, emit it.
+            let tex = eqedit_to_latex(script);
             Some(ir::Block::Math {
                 display: false,
-                tex: script.clone(),
+                tex,
             })
         }
         HwpControl::FootnoteEndnote {

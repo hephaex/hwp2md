@@ -1,3 +1,4 @@
+use crate::hwp::eqedit::eqedit_to_latex;
 use crate::hwp::model::*;
 use crate::hwp::reader::{extract_paragraph_text, parse_char_shape_refs};
 use crate::hwp::record::*;
@@ -61,7 +62,8 @@ pub(crate) fn extract_paragraphs_from_range(
                 if let Some(ref mut p) = current {
                     let (script, _) = read_utf16le_str(&rec.data, 2);
                     if !script.is_empty() {
-                        p.controls.push(HwpControl::Equation { script });
+                        let tex = eqedit_to_latex(&script);
+                        p.controls.push(HwpControl::Equation { script: tex });
                     }
                 }
                 idx += 1;

@@ -1,5 +1,6 @@
 mod control;
 mod convert;
+pub(crate) mod eqedit;
 mod model;
 mod reader;
 mod record;
