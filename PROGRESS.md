@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: Phase 2b 완료 (서브모듈 분할 + 하이퍼링크 + DRM)
+## 현재 상태: Phase 2c 완료 (EQEDIT→LaTeX + GitHub Actions CI)
 
 ### 완료
 
@@ -50,6 +50,14 @@
   - parse_summary_bytes 분리 + OLE2 바이트 버퍼 테스트 4건
   - DRM/암호화 감지 (has_drm 비트 검사 + Hwp2MdError)
   - 142 테스트 (128 unit + 14 integration, 0 failures)
+
+- [x] Phase 2c: EQEDIT→LaTeX + CI (37d2645 + da92270):
+  - eqedit.rs: 토크나이저 + 멀티패스 변환기 (분수/그리스문자/연산자/매트릭스/파일/루트/구분자)
+  - convert.rs에서 Equation control → eqedit_to_latex → IR Math 블록
+  - MAX_RECURSION_DEPTH=32 스택 오버플로우 방지
+  - GitHub Actions CI: cargo check + clippy + fmt + test (Rust 1.75.0 MSRV)
+  - 42 EQEDIT 테스트 추가
+  - 187 테스트 (173 unit + 14 integration, 0 failures)
 
 ### 진행 중
 
@@ -102,16 +110,36 @@
 - [x] parse_summary_bytes 분리 + OLE2 단위 테스트 ✅
 
 ### HWP 파서 — 남은 항목
-- [ ] EQEDIT 스크립트 → LaTeX 변환 고도화
+- [x] EQEDIT 스크립트 → LaTeX 변환 고도화 ✅ (da92270)
 - [ ] 샘플 HWP/HWPX 파일 기반 통합 테스트
 - [ ] 커버리지 80%+ 측정 (tarpaulin)
 
 ### 배포 (Phase 6)
-- [ ] GitHub Actions CI (build + test + clippy)
+- [x] GitHub Actions CI (build + test + clippy) ✅ (37d2645)
 - [ ] crates.io 배포 준비
 - [ ] 배치 변환 CLI 옵션
 
 ## 변경 이력
+
+### 2026-04-22 — Phase 2c: EQEDIT→LaTeX + GitHub Actions CI (37d2645 + da92270)
+
+**EQEDIT→LaTeX 변환기**:
+- eqedit.rs 모듈: 토크나이저 + 6단계 멀티패스 변환 파이프라인
+- 지원: 분수(over), 그리스 문자(60+), 연산자, 루트(sqrt/root), 매트릭스, 파일, 구분자(left/right)
+- MAX_RECURSION_DEPTH=32로 악의적 입력 스택 오버플로우 방지
+- convert.rs: Equation control → eqedit_to_latex → IR Math 블록 (단일 변환 지점)
+- 42 단위 테스트
+
+**GitHub Actions CI**:
+- Rust 1.75.0 MSRV, dtolnay/rust-toolchain, Swatinem/rust-cache
+- cargo check + clippy (-D warnings) + fmt check + test
+
+**리뷰 수정**:
+- C1: 무한 재귀 방지 (depth counter)
+- H1: 이중 변환 제거 (control.rs→convert.rs 단일 지점)
+- H2: 토크나이저 right-delimiter 오탐 제거
+
+**검증**: cargo check 0 에러, clippy 0 경고, 187 테스트 (173 unit + 14 integration)
 
 ### 2026-04-22 — Phase 2b: 서브모듈 분할 + 하이퍼링크 + DRM (71e54ea)
 
