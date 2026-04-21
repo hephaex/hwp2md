@@ -1,0 +1,16 @@
+/target/
+Cargo.lock
+*.swp
+*.swo
+*~
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+# Test outputs
+output/
+*.hwp
+*.hwpx
+!samples/*.hwp
+!samples/*.hwpx
