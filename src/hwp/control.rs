@@ -254,11 +254,20 @@ pub(crate) fn find_gsotype_bin_id(records: &[Record], start: usize, end: usize) 
 
 /// Parse the `CTRL_HEADER` at `ctrl_idx` and return the corresponding
 /// `HwpControl` variant, or `None` if the control type is unknown/malformed.
+/// Parse the URL from a `hyln` (CTRL_HYPERLINK) CTRL_HEADER record.
+///
+/// Layout (observed): bytes 0-3 = ctrl_id (`hyln`), bytes 4-5 = UTF-16LE
+/// char count, followed by that many UTF-16LE code units.  The exact
+/// field layout may vary across HWP versions; we apply a plausibility
+/// check on the decoded URL and return empty on garbage.
 pub(crate) fn parse_hyperlink_url(rec: &Record) -> String {
     if rec.data.len() < 6 {
         return String::new();
     }
     let (url, _) = read_utf16le_str(&rec.data, 4);
+    if url.is_empty() || url.contains('\0') {
+        return String::new();
+    }
     url
 }
 

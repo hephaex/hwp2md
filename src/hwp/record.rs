@@ -136,5 +136,5 @@ pub fn read_utf16le_str(data: &[u8], offset: usize) -> (String, usize) {
     }
     let count = u16::from_le_bytes([data[offset], data[offset + 1]]) as usize;
     let s = read_utf16le(data, offset + 2, count);
-    (s, offset + 2 + count * 2)
+    (s, (offset + 2 + count * 2).min(data.len()))
 }

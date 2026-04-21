@@ -1,6 +1,13 @@
 use crate::hwp::model::*;
 use crate::ir;
 
+const SAFE_URL_SCHEMES: &[&str] = &["http://", "https://", "mailto:", "ftp://", "ftps://"];
+
+fn is_safe_url_scheme(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    SAFE_URL_SCHEMES.iter().any(|s| lower.starts_with(s))
+}
+
 /// HWP font height is in 1/100 point units (HWP internal unit).
 /// e.g. 1600 = 16pt, 1400 = 14pt, 1200 = 12pt.
 const HEADING1_MIN_HEIGHT: u32 = 1600; // 16pt
@@ -157,7 +164,7 @@ pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<
             Some(ir::Block::Footnote { id, content })
         }
         HwpControl::Hyperlink { ref url } => {
-            if url.is_empty() {
+            if url.is_empty() || !is_safe_url_scheme(url) {
                 None
             } else {
                 Some(ir::Block::Paragraph {
@@ -430,5 +437,28 @@ mod tests {
         };
         let doc_info = DocInfo::default();
         assert!(control_to_block(&ctrl, &doc_info).is_none());
+    }
+
+    #[test]
+    fn control_to_block_hyperlink_javascript_url_rejected() {
+        let ctrl = HwpControl::Hyperlink {
+            url: "javascript:alert(1)".into(),
+        };
+        let doc_info = DocInfo::default();
+        assert!(control_to_block(&ctrl, &doc_info).is_none());
+    }
+
+    #[test]
+    fn is_safe_url_scheme_accepts_https() {
+        assert!(is_safe_url_scheme("https://example.com"));
+        assert!(is_safe_url_scheme("HTTP://EXAMPLE.COM"));
+        assert!(is_safe_url_scheme("mailto:user@example.com"));
+    }
+
+    #[test]
+    fn is_safe_url_scheme_rejects_dangerous() {
+        assert!(!is_safe_url_scheme("javascript:alert(1)"));
+        assert!(!is_safe_url_scheme("data:text/html,<h1>hi</h1>"));
+        assert!(!is_safe_url_scheme("vbscript:msgbox"));
     }
 }
