@@ -920,7 +920,10 @@ fn read_summary_info(
     // Property directory starts at sec_offset + 8.
     // Each entry is 8 bytes: property_id (u32) + offset_from_sec_start (u32).
     let dir_start = sec_offset + 8;
-    if dir_start + prop_count * 8 > raw.len() {
+    let dir_end = prop_count
+        .checked_mul(8)
+        .and_then(|n| dir_start.checked_add(n));
+    if dir_end.map_or(true, |e| e > raw.len()) {
         tracing::debug!("SummaryInformation: property directory truncated");
         return empty();
     }
@@ -1079,8 +1082,7 @@ fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<ir::Block> 
                 let row_idx = cell.row as usize;
                 if row_idx < rows.len() {
                     rows[row_idx].push(cell);
-                } else {
-                    // Gracefully extend for malformed row indices.
+                } else if row_idx < 10_000 {
                     rows.resize(row_idx + 1, Vec::new());
                     rows[row_idx].push(cell);
                 }
@@ -1956,6 +1958,98 @@ mod tests {
             // First row is marked as header.
             assert!(rows[0].is_header);
             assert!(!rows[1].is_header);
+        } else {
+            panic!("Expected Table block");
+        }
+    }
+
+    // --- find_gsotype_bin_id / parse_gshape_ctrl tests ---
+
+    #[test]
+    fn find_gsotype_bin_id_returns_id_from_picture_record() {
+        let mut data = vec![0u8; 6];
+        data[0..4].copy_from_slice(&0u32.to_le_bytes()); // kind = 0 (picture)
+        data[4..6].copy_from_slice(&42u16.to_le_bytes()); // bin_data_id = 42
+        let records = vec![Record {
+            tag_id: HWPTAG_GSOTYPE,
+            level: 1,
+            data,
+        }];
+        assert_eq!(find_gsotype_bin_id(&records, 0, 1), 42);
+    }
+
+    #[test]
+    fn find_gsotype_bin_id_returns_zero_when_no_gsotype() {
+        let records = vec![Record {
+            tag_id: HWPTAG_PARA_HEADER,
+            level: 0,
+            data: vec![0u8; 8],
+        }];
+        assert_eq!(find_gsotype_bin_id(&records, 0, 1), 0);
+    }
+
+    #[test]
+    fn find_gsotype_bin_id_skips_non_picture_kind() {
+        let mut data = vec![0u8; 6];
+        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // kind = 1 (OLE, not picture)
+        data[4..6].copy_from_slice(&10u16.to_le_bytes());
+        let records = vec![Record {
+            tag_id: HWPTAG_GSOTYPE,
+            level: 1,
+            data,
+        }];
+        assert_eq!(find_gsotype_bin_id(&records, 0, 1), 0);
+    }
+
+    #[test]
+    fn parse_gshape_ctrl_extracts_dimensions_and_bin_id() {
+        let mut ctrl_data = vec![0u8; 24];
+        ctrl_data[0..4].copy_from_slice(&CTRL_GSHAPE.to_le_bytes());
+        ctrl_data[16..20].copy_from_slice(&800u32.to_le_bytes()); // width
+        ctrl_data[20..24].copy_from_slice(&600u32.to_le_bytes()); // height
+
+        let mut gsotype_data = vec![0u8; 6];
+        gsotype_data[0..4].copy_from_slice(&0u32.to_le_bytes()); // picture
+        gsotype_data[4..6].copy_from_slice(&7u16.to_le_bytes()); // bin_data_id
+
+        let records = vec![
+            Record {
+                tag_id: HWPTAG_CTRL_HEADER,
+                level: 0,
+                data: ctrl_data,
+            },
+            Record {
+                tag_id: HWPTAG_GSOTYPE,
+                level: 1,
+                data: gsotype_data,
+            },
+        ];
+        let (bin_id, w, h) = parse_gshape_ctrl(&records, 0);
+        assert_eq!(bin_id, 7);
+        assert_eq!(w, 800);
+        assert_eq!(h, 600);
+    }
+
+    // --- control_to_block: row index cap test ---
+
+    #[test]
+    fn control_to_block_caps_malformed_row_index() {
+        let ctrl = HwpControl::Table {
+            row_count: 1,
+            col_count: 1,
+            cells: vec![HwpTableCell {
+                row: 50_000, // absurdly large
+                col: 0,
+                row_span: 1,
+                col_span: 1,
+                paragraphs: vec![],
+            }],
+        };
+        let doc_info = DocInfo::default();
+        let block = control_to_block(&ctrl, &doc_info).expect("Some");
+        if let ir::Block::Table { rows, .. } = block {
+            // Row with index 50_000 should be silently dropped (cap is 10_000)
+            assert!(rows.len() <= 10_000);
         } else {
             panic!("Expected Table block");
         }
