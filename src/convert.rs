@@ -132,7 +132,7 @@ fn print_info(doc: &ir::Document, path: &Path) {
 fn count_chars(block: &ir::Block) -> usize {
     match block {
         ir::Block::Heading { inlines, .. } | ir::Block::Paragraph { inlines } => {
-            inlines.iter().map(|i| i.text.len()).sum()
+            inlines.iter().map(|i| i.text.chars().count()).sum()
         }
         ir::Block::CodeBlock { code, .. } => code.len(),
         ir::Block::BlockQuote { blocks } => blocks.iter().map(count_chars).sum(),
@@ -160,7 +160,10 @@ fn write_assets(doc: &ir::Document, dir: &Path) -> Result<()> {
     fs::create_dir_all(dir)?;
 
     for asset in &doc.assets {
-        let path = dir.join(&asset.name);
+        let safe_name = std::path::Path::new(&asset.name)
+            .file_name()
+            .unwrap_or(std::ffi::OsStr::new("asset"));
+        let path = dir.join(safe_name);
         fs::write(&path, &asset.data)?;
         tracing::info!("Extracted: {:?}", path);
     }

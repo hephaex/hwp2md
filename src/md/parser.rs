@@ -146,10 +146,13 @@ fn node_to_block<'a>(node: &'a AstNode<'a>) -> Option<ir::Block> {
             Some(ir::Block::Table { rows, col_count })
         }
         NodeValue::ThematicBreak => Some(ir::Block::HorizontalRule),
-        NodeValue::Image(link) => Some(ir::Block::Image {
-            src: link.url.clone(),
-            alt: link.title.clone(),
-        }),
+        NodeValue::Image(link) => {
+            let alt = collect_alt_text(node);
+            Some(ir::Block::Image {
+                src: link.url.clone(),
+                alt,
+            })
+        }
         NodeValue::FootnoteDefinition(def) => {
             let blocks: Vec<_> = node.children().filter_map(|c| node_to_block(c)).collect();
             Some(ir::Block::Footnote {
@@ -163,6 +166,17 @@ fn node_to_block<'a>(node: &'a AstNode<'a>) -> Option<ir::Block> {
         }),
         _ => None,
     }
+}
+
+fn collect_alt_text<'a>(node: &'a AstNode<'a>) -> String {
+    let mut text = String::new();
+    for child in node.children() {
+        let data = child.data.borrow();
+        if let NodeValue::Text(t) = &data.value {
+            text.push_str(t);
+        }
+    }
+    text
 }
 
 fn collect_inlines<'a>(node: &'a AstNode<'a>) -> Vec<ir::Inline> {
@@ -237,8 +251,9 @@ fn collect_inlines_recursive<'a>(
                 collect_inlines_recursive(child, inlines, s);
             }
             NodeValue::Image(link) => {
+                let alt = collect_alt_text(child);
                 inlines.push(ir::Inline {
-                    text: format!("![{}]({})", link.title, link.url),
+                    text: format!("![{}]({})", alt, link.url),
                     ..ir::Inline::default()
                 });
             }

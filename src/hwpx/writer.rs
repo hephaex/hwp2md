@@ -39,8 +39,12 @@ pub fn write_hwpx(doc: &ir::Document, output: &Path, _style: Option<&Path>) -> R
         zip.write_all(generate_section_xml(&empty_section, 0).as_bytes())?;
     }
 
-    for asset in &doc.assets {
-        let path = format!("BinData/{}", asset.name);
+    for (i, asset) in doc.assets.iter().enumerate() {
+        let safe_name = std::path::Path::new(&asset.name)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| format!("asset_{}", i));
+        let path = format!("BinData/{}", safe_name);
         zip.start_file(&path, options)?;
         zip.write_all(&asset.data)?;
     }

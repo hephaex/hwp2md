@@ -101,17 +101,22 @@ fn read_file_header(cfb: &mut cfb::CompoundFile<std::fs::File>) -> Result<FileHe
     })
 }
 
+/// Maximum decompressed size to prevent decompression bombs (256 MB).
+const MAX_DECOMPRESSED: u64 = 256 * 1024 * 1024;
+
 fn decompress_stream(data: &[u8]) -> Result<Vec<u8>, Hwp2MdError> {
     let mut out = Vec::new();
-    let mut decoder = DeflateDecoder::new(data);
-    match decoder.read_to_end(&mut out) {
-        Ok(_) => return Ok(out),
-        Err(_) => {}
+    let decoder = DeflateDecoder::new(data);
+    if let Err(e) = decoder.take(MAX_DECOMPRESSED).read_to_end(&mut out) {
+        tracing::debug!("Deflate failed, trying zlib: {e}");
+    } else {
+        return Ok(out);
     }
 
     out.clear();
-    let mut decoder = flate2::read::ZlibDecoder::new(data);
+    let decoder = flate2::read::ZlibDecoder::new(data);
     decoder
+        .take(MAX_DECOMPRESSED)
         .read_to_end(&mut out)
         .map_err(|e| Hwp2MdError::Decompress(format!("zlib fallback: {e}")))?;
     Ok(out)
@@ -389,9 +394,15 @@ fn extract_paragraph_text(data: &[u8]) -> String {
         match ch {
             0x0000 => {}
             0x0001..=0x0002 => {
+                if i + 14 > len {
+                    break;
+                }
                 i += 14;
             }
             0x0003..=0x0008 => {
+                if i + 14 > len {
+                    break;
+                }
                 i += 14;
             }
             0x0009 => {
@@ -401,6 +412,9 @@ fn extract_paragraph_text(data: &[u8]) -> String {
                 result.push('\n');
             }
             0x000B..=0x000C => {
+                if i + 14 > len {
+                    break;
+                }
                 i += 14;
             }
             0x000D => {
@@ -410,10 +424,10 @@ fn extract_paragraph_text(data: &[u8]) -> String {
             _ => {
                 if let Some(c) = char::from_u32(ch as u32) {
                     result.push(c);
-                } else if (0xD800..=0xDBFF).contains(&ch) {
-                    if i + 1 < len {
-                        let low = u16::from_le_bytes([data[i], data[i + 1]]);
-                        i += 2;
+                } else if (0xD800..=0xDBFF).contains(&ch) && i + 1 < len {
+                    let low = u16::from_le_bytes([data[i], data[i + 1]]);
+                    i += 2;
+                    if (0xDC00..=0xDFFF).contains(&low) {
                         let codepoint =
                             0x10000 + ((ch as u32 - 0xD800) << 10) + (low as u32 - 0xDC00);
                         if let Some(c) = char::from_u32(codepoint) {

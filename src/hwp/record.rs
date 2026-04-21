@@ -62,6 +62,9 @@ impl Record {
     }
 }
 
+/// Maximum record data size to prevent unbounded allocation (64 MB).
+const MAX_RECORD_SIZE: usize = 64 * 1024 * 1024;
+
 pub fn parse_records<R: Read>(reader: &mut R) -> Result<Vec<Record>, Hwp2MdError> {
     let mut records = Vec::new();
     loop {
@@ -83,6 +86,13 @@ pub fn parse_records<R: Read>(reader: &mut R) -> Result<Vec<Record>, Hwp2MdError
         } else {
             size_field as usize
         };
+
+        if size > MAX_RECORD_SIZE {
+            return Err(Hwp2MdError::InvalidRecord(format!(
+                "record size {} exceeds maximum allowed {} (tag={})",
+                size, MAX_RECORD_SIZE, tag_id
+            )));
+        }
 
         let mut data = vec![0u8; size];
         reader.read_exact(&mut data).map_err(|e| {

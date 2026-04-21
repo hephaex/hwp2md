@@ -517,7 +517,7 @@ fn parse_heading_style(style_ref: &str) -> Option<u8> {
     if lower.contains("heading") || lower.contains("제목") || lower.contains("개요") {
         for ch in style_ref.chars() {
             if let Some(digit) = ch.to_digit(10) {
-                if digit >= 1 && digit <= 6 {
+                if (1..=6).contains(&digit) {
                     return Some(digit as u8);
                 }
             }

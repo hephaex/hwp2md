@@ -79,7 +79,7 @@ pub enum Block {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Inline {
     pub text: String,
     pub bold: bool,
@@ -110,22 +110,6 @@ impl Inline {
     }
 }
 
-impl Default for Inline {
-    fn default() -> Self {
-        Self {
-            text: String::new(),
-            bold: false,
-            italic: false,
-            underline: false,
-            strikethrough: false,
-            code: false,
-            superscript: false,
-            subscript: false,
-            link: None,
-            footnote_ref: None,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableRow {
