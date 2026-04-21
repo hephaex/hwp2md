@@ -33,6 +33,7 @@ pub const CTRL_FOOTNOTE: u32 = ctrl_id(b"fn  ");
 pub const CTRL_ENDNOTE: u32 = ctrl_id(b"en  ");
 pub const CTRL_PAGE_BREAK: u32 = ctrl_id(b"pgbk");
 pub const CTRL_COL_BREAK: u32 = ctrl_id(b"clbk");
+pub const CTRL_HYPERLINK: u32 = ctrl_id(b"hyln");
 
 const fn ctrl_id(b: &[u8; 4]) -> u32 {
     (b[0] as u32) | ((b[1] as u32) << 8) | ((b[2] as u32) << 16) | ((b[3] as u32) << 24)

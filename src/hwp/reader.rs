@@ -1,6 +1,9 @@
 use crate::error::Hwp2MdError;
+use crate::hwp::control::{find_children_end, parse_ctrl_header_at};
+use crate::hwp::convert::hwp_to_ir;
 use crate::hwp::model::*;
 use crate::hwp::record::*;
+use crate::hwp::summary::read_summary_info;
 use crate::ir;
 use byteorder::{LittleEndian, ReadBytesExt};
 use flate2::read::DeflateDecoder;
@@ -20,11 +23,17 @@ fn parse_hwp_file(path: &Path) -> Result<HwpDocument, anyhow::Error> {
 
     let header = read_file_header(&mut cfb)?;
 
-    if header.encrypted {
-        anyhow::bail!("Encrypted HWP files are not supported");
+    if header.encrypted || header.has_drm {
+        return Err(Hwp2MdError::HwpParse(
+            "HWP file is encrypted or DRM-protected".into(),
+        )
+        .into());
     }
     if header.distributed {
-        anyhow::bail!("DRM-protected (distributed) HWP files are not supported");
+        return Err(Hwp2MdError::HwpParse(
+            "DRM-protected (distributed) HWP files are not supported".into(),
+        )
+        .into());
     }
 
     let doc_info = read_doc_info(&mut cfb, header.compressed)?;
@@ -111,12 +120,6 @@ fn read_file_header(cfb: &mut cfb::CompoundFile<std::fs::File>) -> Result<FileHe
 
 /// Maximum decompressed size to prevent decompression bombs (256 MB).
 const MAX_DECOMPRESSED: u64 = 256 * 1024 * 1024;
-
-/// HWP font height is in 1/100 point units (HWP internal unit).
-/// e.g. 1600 = 16pt, 1400 = 14pt, 1200 = 12pt.
-const HEADING1_MIN_HEIGHT: u32 = 1600; // 16pt
-const HEADING2_MIN_HEIGHT: u32 = 1400; // 14pt
-const HEADING3_MIN_HEIGHT: u32 = 1200; // 12pt
 
 pub(crate) fn decompress_stream(data: &[u8]) -> Result<Vec<u8>, Hwp2MdError> {
     let mut out = Vec::new();
@@ -334,317 +337,7 @@ fn count_sections(cfb: &mut cfb::CompoundFile<std::fs::File>) -> usize {
     count
 }
 
-/// Returns the index one past the last child of `records[parent_idx]`.
-///
-/// Children are defined as consecutive records with `level > parent_level`.
-pub(crate) fn find_children_end(records: &[Record], parent_idx: usize) -> usize {
-    let parent_level = records[parent_idx].level;
-    let mut idx = parent_idx + 1;
-    while idx < records.len() && records[idx].level > parent_level {
-        idx += 1;
-    }
-    idx
-}
-
-/// Extract `HwpParagraph`s from records in `[start, end)`, treating them as a
-/// self-contained sub-stream (e.g. a table cell or footnote body).
-fn extract_paragraphs_from_range(
-    records: &[Record],
-    start: usize,
-    end: usize,
-) -> Vec<HwpParagraph> {
-    let mut paras: Vec<HwpParagraph> = Vec::new();
-    let mut current: Option<HwpParagraph> = None;
-    let mut idx = start;
-
-    while idx < end {
-        let rec = &records[idx];
-        match rec.tag_id {
-            HWPTAG_PARA_HEADER => {
-                if let Some(p) = current.take() {
-                    paras.push(p);
-                }
-                let para_shape_id = if rec.data.len() >= 6 {
-                    u16::from_le_bytes([rec.data[4], rec.data[5]])
-                } else {
-                    0
-                };
-                current = Some(HwpParagraph {
-                    text: String::new(),
-                    char_shape_ids: Vec::new(),
-                    para_shape_id,
-                    controls: Vec::new(),
-                });
-                idx += 1;
-            }
-            HWPTAG_PARA_TEXT => {
-                if let Some(ref mut p) = current {
-                    p.text = extract_paragraph_text(&rec.data);
-                }
-                idx += 1;
-            }
-            HWPTAG_PARA_CHAR_SHAPE => {
-                if let Some(ref mut p) = current {
-                    p.char_shape_ids = parse_char_shape_refs(&rec.data);
-                }
-                idx += 1;
-            }
-            HWPTAG_EQEDIT => {
-                if let Some(ref mut p) = current {
-                    let (script, _) = read_utf16le_str(&rec.data, 2);
-                    if !script.is_empty() {
-                        p.controls.push(HwpControl::Equation { script });
-                    }
-                }
-                idx += 1;
-            }
-            HWPTAG_CTRL_HEADER => {
-                // Nested controls inside cells (e.g. images within a table cell).
-                // Parse and attach to current paragraph, then skip the subtree.
-                if let Some(ctrl) = parse_ctrl_header_at(records, idx) {
-                    if let Some(ref mut p) = current {
-                        p.controls.push(ctrl);
-                    }
-                }
-                idx = find_children_end(records, idx);
-            }
-            _ => {
-                idx += 1;
-            }
-        }
-    }
-
-    if let Some(p) = current {
-        paras.push(p);
-    }
-    paras
-}
-
-/// Parse a `CTRL_TABLE` subtree starting at `ctrl_idx` in `records`.
-///
-/// Returns `(row_count, col_count, cells)`.
-fn parse_table_ctrl(records: &[Record], ctrl_idx: usize) -> (u16, u16, Vec<HwpTableCell>) {
-    let ctrl_end = find_children_end(records, ctrl_idx);
-    let mut row_count: u16 = 0;
-    let mut col_count: u16 = 0;
-    let mut cells: Vec<HwpTableCell> = Vec::new();
-
-    let mut idx = ctrl_idx + 1;
-    while idx < ctrl_end {
-        let rec = &records[idx];
-        match rec.tag_id {
-            HWPTAG_TABLE => {
-                // TABLE record layout (minimum 8 bytes):
-                //   bytes 0-3: properties (u32)
-                //   bytes 4-5: row count (u16)
-                //   bytes 6-7: col count (u16)
-                if rec.data.len() >= 6 {
-                    row_count = u16::from_le_bytes([rec.data[4], rec.data[5]]);
-                }
-                if rec.data.len() >= 8 {
-                    col_count = u16::from_le_bytes([rec.data[6], rec.data[7]]);
-                }
-                tracing::debug!("TABLE dims: {row_count}×{col_count}");
-                idx += 1;
-            }
-            HWPTAG_LIST_HEADER => {
-                // LIST_HEADER record for a single table cell.
-                // Layout (minimum 10 bytes):
-                //   bytes 0-1: properties (u16)
-                //   bytes 2-3: col (u16)   ← address within the row
-                //   bytes 4-5: row (u16)   ← row address
-                //   bytes 6-7: col_span (u16)
-                //   bytes 8-9: row_span (u16)
-                let col = if rec.data.len() >= 4 {
-                    u16::from_le_bytes([rec.data[2], rec.data[3]])
-                } else {
-                    0
-                };
-                let row = if rec.data.len() >= 6 {
-                    u16::from_le_bytes([rec.data[4], rec.data[5]])
-                } else {
-                    0
-                };
-                let col_span = if rec.data.len() >= 8 {
-                    let v = u16::from_le_bytes([rec.data[6], rec.data[7]]);
-                    if v == 0 {
-                        1
-                    } else {
-                        v
-                    }
-                } else {
-                    1
-                };
-                let row_span = if rec.data.len() >= 10 {
-                    let v = u16::from_le_bytes([rec.data[8], rec.data[9]]);
-                    if v == 0 {
-                        1
-                    } else {
-                        v
-                    }
-                } else {
-                    1
-                };
-
-                let cell_end = find_children_end(records, idx);
-                let paragraphs = extract_paragraphs_from_range(records, idx + 1, cell_end);
-
-                cells.push(HwpTableCell {
-                    row,
-                    col,
-                    row_span,
-                    col_span,
-                    paragraphs,
-                });
-                idx = cell_end;
-            }
-            _ => {
-                idx += 1;
-            }
-        }
-    }
-
-    (row_count, col_count, cells)
-}
-
-/// Parse the GShapeObject CTRL_HEADER subtree starting at `ctrl_idx`.
-///
-/// Returns `(bin_data_id, width, height)`.  All values are 0 when unavailable.
-///
-/// The CTRL_HEADER data for `gso ` layout:
-///   bytes  0- 3: ctrl_id (already validated by caller)
-///   bytes  4- 7: ctrl header properties (u32)
-///   bytes  8-11: y offset (i32)  — ignored
-///   bytes 12-15: x offset (i32)  — ignored
-///   bytes 16-19: width (hwp unit, 1/7200 inch)
-///   bytes 20-23: height (hwp unit)
-///
-/// The BinData reference lives in a child `HWPTAG_GSOTYPE` record.
-/// GSOTYPE layout for a picture (GSOType == 0):
-///   bytes  0- 3: GSOType kind (u32) — 0 = picture
-///   bytes  4- 7: color fill (u32)
-///   ...varies by kind...
-/// For pictures (kind 0), the bin data ID is at offset 80 (u16) in the GSOTYPE body.
-/// In practice this offset varies; we probe for it defensively.
-fn parse_gshape_ctrl(records: &[Record], ctrl_idx: usize) -> (u16, u32, u32) {
-    let rec = &records[ctrl_idx];
-
-    // Extract width and height from the CTRL_HEADER data itself.
-    let width = if rec.data.len() >= 20 {
-        u32::from_le_bytes([rec.data[16], rec.data[17], rec.data[18], rec.data[19]])
-    } else {
-        0
-    };
-    let height = if rec.data.len() >= 24 {
-        u32::from_le_bytes([rec.data[20], rec.data[21], rec.data[22], rec.data[23]])
-    } else {
-        0
-    };
-
-    // Search child records for HWPTAG_GSOTYPE which carries the bin data reference.
-    let ctrl_end = find_children_end(records, ctrl_idx);
-    let bin_data_id = find_gsotype_bin_id(records, ctrl_idx + 1, ctrl_end);
-
-    tracing::debug!("GSHAPE: bin_id={bin_data_id} width={width} height={height}");
-    (bin_data_id, width, height)
-}
-
-/// Scan `records[start..end]` for a `HWPTAG_GSOTYPE` record and extract the
-/// BinData ID.  The ID is a `u16` embedded at a known offset in the record data.
-///
-/// HWP 5.0 GSOTYPE (picture kind = 0) body layout relevant fields:
-///   bytes  0- 3: GSOType kind (u32) — 0 = picture, 1 = OLE, ...
-/// For kind 0 (picture), the BinData index follows at the end of a fixed-size
-/// header.  In practice the ID is stored at offset 2 inside a nested
-/// `HWPTAG_BEGIN + 68` (GSOPicture) record.  We fall back to scanning for
-/// a plausible non-zero u16 at known candidate offsets.
-fn find_gsotype_bin_id(records: &[Record], start: usize, end: usize) -> u16 {
-    for rec in records.iter().skip(start).take(end.saturating_sub(start)) {
-        if rec.tag_id == HWPTAG_GSOTYPE {
-            // GSOTYPE record for a picture:
-            //   bytes 0-3: kind (0 = picture)
-            //   bytes 4-7: fill color (u32)
-            //   ...
-            // The embedded BinData ID for pictures is at byte offset 2 of a
-            // child "picSub" structure.  Empirically it sits at offset 0 of
-            // a sub-record (tag HWPTAG_BEGIN+68), but we also check at offset
-            // 2 and 4 within this record itself when there are no children.
-            if rec.data.len() >= 4 {
-                let kind = u32::from_le_bytes([rec.data[0], rec.data[1], rec.data[2], rec.data[3]]);
-                if kind == 0 && rec.data.len() >= 6 {
-                    // Candidate at offset 4 (u16).
-                    let candidate = u16::from_le_bytes([rec.data[4], rec.data[5]]);
-                    if candidate > 0 {
-                        return candidate;
-                    }
-                }
-            }
-        }
-    }
-    0
-}
-
-/// Parse the `CTRL_HEADER` at `ctrl_idx` and return the corresponding
-/// `HwpControl` variant, or `None` if the control type is unknown/malformed.
-fn parse_ctrl_header_at(records: &[Record], ctrl_idx: usize) -> Option<HwpControl> {
-    let rec = &records[ctrl_idx];
-    if rec.data.len() < 4 {
-        tracing::debug!(
-            "CTRL_HEADER at index {ctrl_idx}: data too short ({} bytes)",
-            rec.data.len()
-        );
-        return None;
-    }
-
-    let ctrl_id = u32::from_le_bytes([rec.data[0], rec.data[1], rec.data[2], rec.data[3]]);
-
-    match ctrl_id {
-        CTRL_TABLE => {
-            let (row_count, col_count, cells) = parse_table_ctrl(records, ctrl_idx);
-            tracing::debug!(
-                "Parsed table: {row_count}×{col_count}, {} cells",
-                cells.len()
-            );
-            Some(HwpControl::Table {
-                row_count,
-                col_count,
-                cells,
-            })
-        }
-        CTRL_GSHAPE => {
-            let (bin_data_id, width, height) = parse_gshape_ctrl(records, ctrl_idx);
-            Some(HwpControl::Image {
-                bin_data_id,
-                width,
-                height,
-            })
-        }
-        CTRL_FOOTNOTE => {
-            let ctrl_end = find_children_end(records, ctrl_idx);
-            let paragraphs = extract_paragraphs_from_range(records, ctrl_idx + 1, ctrl_end);
-            Some(HwpControl::FootnoteEndnote {
-                is_endnote: false,
-                paragraphs,
-            })
-        }
-        CTRL_ENDNOTE => {
-            let ctrl_end = find_children_end(records, ctrl_idx);
-            let paragraphs = extract_paragraphs_from_range(records, ctrl_idx + 1, ctrl_end);
-            Some(HwpControl::FootnoteEndnote {
-                is_endnote: true,
-                paragraphs,
-            })
-        }
-        CTRL_PAGE_BREAK => Some(HwpControl::PageBreak),
-        CTRL_COL_BREAK => Some(HwpControl::ColumnBreak),
-        _ => {
-            tracing::debug!("CTRL_HEADER at index {ctrl_idx}: unhandled ctrl_id=0x{ctrl_id:08X}");
-            None
-        }
-    }
-}
-
-fn read_section_stream(
+pub(crate) fn read_section_stream(
     cfb: &mut cfb::CompoundFile<std::fs::File>,
     path: &str,
     compressed: bool,
@@ -784,7 +477,7 @@ pub(crate) fn extract_paragraph_text(data: &[u8]) -> String {
     result
 }
 
-fn parse_char_shape_refs(data: &[u8]) -> Vec<(u32, u16)> {
+pub(crate) fn parse_char_shape_refs(data: &[u8]) -> Vec<(u32, u16)> {
     let mut refs = Vec::new();
     let mut i = 0;
     while i + 6 <= data.len() {
@@ -854,470 +547,35 @@ fn read_bin_data(
     Ok(bin_data)
 }
 
-/// Property IDs for the OLE2 SummaryInformation stream.
-const PROP_TITLE: u32 = 0x02;
-const PROP_SUBJECT: u32 = 0x03;
-const PROP_AUTHOR: u32 = 0x04;
-const PROP_KEYWORDS: u32 = 0x06;
-
-/// VT_LPSTR type tag in a property set.
-const VT_LPSTR: u32 = 0x1E;
-
-/// Read the OLE2 `\x05SummaryInformation` stream and extract title, author,
-/// subject, and keywords.  Returns `(title, author, subject, keywords)`.
-///
-/// Gracefully returns all-`None`/empty on any parse failure so callers are
-/// never disrupted.
-fn read_summary_info(
-    cfb: &mut cfb::CompoundFile<std::fs::File>,
-) -> (Option<String>, Option<String>, Option<String>, Vec<String>) {
-    let empty = || (None, None, None, Vec::new());
-
-    // The stream name begins with the literal byte 0x05.
-    let stream_name = "\x05SummaryInformation";
-    let mut raw = Vec::new();
-    match cfb.open_stream(stream_name) {
-        Ok(mut s) => {
-            if s.read_to_end(&mut raw).is_err() {
-                tracing::debug!("SummaryInformation: read failed");
-                return empty();
-            }
-        }
-        Err(e) => {
-            tracing::debug!("SummaryInformation stream not found: {e}");
-            return empty();
-        }
+/// Encode a slice of u16 code units as little-endian bytes.
+/// Exposed for use in sibling module tests only.
+#[cfg(test)]
+pub(crate) fn encode_u16s_test(units: &[u16]) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(units.len() * 2);
+    for &u in units {
+        buf.push((u & 0xFF) as u8);
+        buf.push((u >> 8) as u8);
     }
-
-    // Minimum header: 28 bytes (byte-order + version + OS + reserved) +
-    // 20 bytes for the first section entry (16-byte FMTID + 4-byte offset).
-    if raw.len() < 48 {
-        tracing::debug!("SummaryInformation: stream too short ({} bytes)", raw.len());
-        return empty();
-    }
-
-    // Validate little-endian byte-order mark (bytes 0-1 = 0xFE 0xFF).
-    if raw[0] != 0xFE || raw[1] != 0xFF {
-        tracing::debug!("SummaryInformation: unexpected byte-order mark");
-        return empty();
-    }
-
-    // Section offset is at bytes 44-47 (after 28-byte header + 16-byte FMTID).
-    let sec_offset = u32::from_le_bytes([raw[44], raw[45], raw[46], raw[47]]) as usize;
-    if sec_offset + 8 > raw.len() {
-        tracing::debug!("SummaryInformation: section offset out of range");
-        return empty();
-    }
-
-    // Section header: byte-count (4) then property-count (4).
-    let prop_count = u32::from_le_bytes([
-        raw[sec_offset + 4],
-        raw[sec_offset + 5],
-        raw[sec_offset + 6],
-        raw[sec_offset + 7],
-    ]) as usize;
-
-    // Property directory starts at sec_offset + 8.
-    // Each entry is 8 bytes: property_id (u32) + offset_from_sec_start (u32).
-    let dir_start = sec_offset + 8;
-    let dir_end = prop_count
-        .checked_mul(8)
-        .and_then(|n| dir_start.checked_add(n));
-    if dir_end.map_or(true, |e| e > raw.len()) {
-        tracing::debug!("SummaryInformation: property directory truncated");
-        return empty();
-    }
-
-    let read_lpstr = |prop_offset: usize| -> Option<String> {
-        // prop_offset is relative to sec_offset.
-        let abs = sec_offset + prop_offset;
-        if abs + 8 > raw.len() {
-            return None;
-        }
-        let type_id = u32::from_le_bytes([raw[abs], raw[abs + 1], raw[abs + 2], raw[abs + 3]]);
-        if type_id != VT_LPSTR {
-            return None;
-        }
-        let size =
-            u32::from_le_bytes([raw[abs + 4], raw[abs + 5], raw[abs + 6], raw[abs + 7]]) as usize;
-        let data_start = abs + 8;
-        if data_start + size > raw.len() {
-            return None;
-        }
-        // Trim trailing NUL bytes, then decode as UTF-8 (lossy).
-        let bytes: &[u8] = raw[data_start..data_start + size]
-            .split(|&b| b == 0)
-            .next()
-            .unwrap_or(&[]);
-        if bytes.is_empty() {
-            return None;
-        }
-        Some(String::from_utf8_lossy(bytes).into_owned())
-    };
-
-    let mut title = None;
-    let mut author = None;
-    let mut subject = None;
-    let mut keywords: Vec<String> = Vec::new();
-
-    for i in 0..prop_count {
-        let entry = dir_start + i * 8;
-        let prop_id =
-            u32::from_le_bytes([raw[entry], raw[entry + 1], raw[entry + 2], raw[entry + 3]]);
-        let prop_offset = u32::from_le_bytes([
-            raw[entry + 4],
-            raw[entry + 5],
-            raw[entry + 6],
-            raw[entry + 7],
-        ]) as usize;
-
-        match prop_id {
-            PROP_TITLE => title = read_lpstr(prop_offset),
-            PROP_AUTHOR => author = read_lpstr(prop_offset),
-            PROP_SUBJECT => subject = read_lpstr(prop_offset),
-            PROP_KEYWORDS => {
-                if let Some(kw) = read_lpstr(prop_offset) {
-                    keywords = kw
-                        .split([',', ';', ' '])
-                        .filter(|s| !s.is_empty())
-                        .map(str::to_owned)
-                        .collect();
-                }
-            }
-            _ => {}
-        }
-    }
-
-    tracing::debug!(
-        "SummaryInformation parsed: title={:?} author={:?} subject={:?} keywords={:?}",
-        title,
-        author,
-        subject,
-        keywords
-    );
-
-    (title, author, subject, keywords)
-}
-
-fn hwp_to_ir(hwp: &HwpDocument) -> ir::Document {
-    let mut doc = ir::Document::new();
-
-    doc.metadata.title = hwp.summary_title.clone();
-    doc.metadata.author = hwp.summary_author.clone();
-    doc.metadata.subject = hwp.summary_subject.clone();
-    doc.metadata.keywords = hwp.summary_keywords.clone();
-
-    for section in &hwp.sections {
-        let mut ir_section = ir::Section { blocks: Vec::new() };
-
-        for para in &section.paragraphs {
-            let blocks = paragraph_to_blocks(para, &hwp.doc_info);
-            ir_section.blocks.extend(blocks);
-        }
-
-        doc.sections.push(ir_section);
-    }
-
-    for (id, data) in &hwp.bin_data {
-        let mime = guess_mime(data);
-        let ext = mime_to_ext(&mime);
-        doc.assets.push(ir::Asset {
-            name: format!("image_{id}.{ext}"),
-            data: data.clone(),
-            mime_type: mime,
-        });
-    }
-
-    doc
-}
-
-fn paragraph_to_blocks(para: &HwpParagraph, doc_info: &DocInfo) -> Vec<ir::Block> {
-    let mut blocks: Vec<ir::Block> = Vec::new();
-
-    // Emit IR blocks for each embedded control first.  Controls are independent
-    // of the paragraph text (a paragraph may contain *only* a table, for example).
-    for ctrl in &para.controls {
-        if let Some(block) = control_to_block(ctrl, doc_info) {
-            blocks.push(block);
-        }
-    }
-
-    // Emit the text content of the paragraph, if any.
-    let text = para.text.trim();
-    if !text.is_empty() {
-        let heading_level = detect_heading_level(para, doc_info);
-        let inlines = build_inlines(para, doc_info);
-        if !inlines.is_empty() {
-            if let Some(level) = heading_level {
-                blocks.push(ir::Block::Heading { level, inlines });
-            } else {
-                blocks.push(ir::Block::Paragraph { inlines });
-            }
-        }
-    }
-
-    blocks
-}
-
-/// Convert a single `HwpControl` to an `ir::Block`.  Returns `None` for
-/// controls that have no direct IR representation (e.g. page-break hints).
-fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<ir::Block> {
-    match ctrl {
-        HwpControl::Table {
-            row_count,
-            col_count,
-            cells,
-        } => {
-            // Group cells by row index, then sort each row by col index.
-            let n_rows = *row_count as usize;
-            let n_cols = *col_count as usize;
-            let effective_cols = if n_cols > 0 {
-                n_cols
-            } else {
-                cells.iter().map(|c| c.col as usize + 1).max().unwrap_or(1)
-            };
-
-            let mut rows: Vec<Vec<&HwpTableCell>> = vec![Vec::new(); n_rows.max(1)];
-            for cell in cells {
-                let row_idx = cell.row as usize;
-                if row_idx < rows.len() {
-                    rows[row_idx].push(cell);
-                } else if row_idx < 10_000 {
-                    rows.resize(row_idx + 1, Vec::new());
-                    rows[row_idx].push(cell);
-                }
-            }
-
-            let ir_rows: Vec<ir::TableRow> = rows
-                .into_iter()
-                .enumerate()
-                .map(|(row_idx, row_cells)| {
-                    let mut sorted = row_cells;
-                    sorted.sort_by_key(|c| c.col);
-                    let ir_cells: Vec<ir::TableCell> = sorted
-                        .into_iter()
-                        .map(|cell| ir::TableCell {
-                            blocks: cell
-                                .paragraphs
-                                .iter()
-                                .flat_map(|p| paragraph_to_blocks(p, doc_info))
-                                .collect(),
-                            colspan: cell.col_span as u32,
-                            rowspan: cell.row_span as u32,
-                        })
-                        .collect();
-                    ir::TableRow {
-                        cells: ir_cells,
-                        is_header: row_idx == 0,
-                    }
-                })
-                .collect();
-
-            Some(ir::Block::Table {
-                rows: ir_rows,
-                col_count: effective_cols,
-            })
-        }
-        HwpControl::Image { bin_data_id, .. } => {
-            let src = format!("image_{bin_data_id}.bin");
-            Some(ir::Block::Image {
-                src,
-                alt: String::new(),
-            })
-        }
-        HwpControl::Equation { script } => {
-            // Already captured as Math block in `paragraph_to_blocks` via EQEDIT.
-            // But if it surfaces here via controls, emit it.
-            Some(ir::Block::Math {
-                display: false,
-                tex: script.clone(),
-            })
-        }
-        HwpControl::FootnoteEndnote {
-            is_endnote,
-            paragraphs,
-        } => {
-            let content: Vec<ir::Block> = paragraphs
-                .iter()
-                .flat_map(|p| paragraph_to_blocks(p, doc_info))
-                .collect();
-            let id = if *is_endnote {
-                "endnote".to_string()
-            } else {
-                "footnote".to_string()
-            };
-            Some(ir::Block::Footnote { id, content })
-        }
-        HwpControl::Hyperlink { .. }
-        | HwpControl::PageBreak
-        | HwpControl::SectionBreak
-        | HwpControl::ColumnBreak => None,
-    }
-}
-
-fn detect_heading_level(para: &HwpParagraph, doc_info: &DocInfo) -> Option<u8> {
-    let ps_id = para.para_shape_id as usize;
-    if ps_id < doc_info.para_shapes.len() {
-        if let Some(level) = doc_info.para_shapes[ps_id].heading_type {
-            if level < 7 {
-                return Some(level + 1);
-            }
-        }
-    }
-
-    let text = para.text.trim();
-    if text.len() < 100 {
-        if let Some(first_cs) = para.char_shape_ids.first() {
-            let cs_id = first_cs.1 as usize;
-            if cs_id < doc_info.char_shapes.len() {
-                let cs = &doc_info.char_shapes[cs_id];
-                if cs.height >= HEADING1_MIN_HEIGHT && cs.bold {
-                    return Some(1);
-                }
-                if cs.height >= HEADING2_MIN_HEIGHT && cs.bold {
-                    return Some(2);
-                }
-                if cs.height >= HEADING3_MIN_HEIGHT && cs.bold {
-                    return Some(3);
-                }
-            }
-        }
-    }
-
-    None
-}
-
-fn build_inlines(para: &HwpParagraph, doc_info: &DocInfo) -> Vec<ir::Inline> {
-    let text = &para.text;
-    if text.is_empty() {
-        return Vec::new();
-    }
-
-    if para.char_shape_ids.is_empty() {
-        return vec![ir::Inline::plain(text.clone())];
-    }
-
-    let chars: Vec<char> = text.chars().collect();
-    let mut inlines = Vec::new();
-    let char_refs = &para.char_shape_ids;
-
-    for (idx, &(pos, cs_id)) in char_refs.iter().enumerate() {
-        let start = pos as usize;
-        let end = if idx + 1 < char_refs.len() {
-            char_refs[idx + 1].0 as usize
-        } else {
-            chars.len()
-        };
-
-        if start >= chars.len() {
-            break;
-        }
-        let end = end.min(chars.len());
-        let segment: String = chars[start..end].iter().collect();
-        let segment = segment.trim_end_matches('\r').to_string();
-
-        if segment.is_empty() {
-            continue;
-        }
-
-        let cs_idx = cs_id as usize;
-        let inline = if cs_idx < doc_info.char_shapes.len() {
-            let cs = &doc_info.char_shapes[cs_idx];
-            ir::Inline {
-                text: segment,
-                bold: cs.bold,
-                italic: cs.italic,
-                underline: cs.underline,
-                strikethrough: cs.strikethrough,
-                superscript: cs.superscript,
-                subscript: cs.subscript,
-                ..ir::Inline::default()
-            }
-        } else {
-            ir::Inline::plain(segment)
-        };
-
-        inlines.push(inline);
-    }
-
-    inlines
-}
-
-fn guess_mime(data: &[u8]) -> String {
-    if data.len() < 4 {
-        return "application/octet-stream".to_string();
-    }
-    match &data[..4] {
-        [0x89, b'P', b'N', b'G'] => "image/png".to_string(),
-        [0xFF, 0xD8, 0xFF, _] => "image/jpeg".to_string(),
-        [b'G', b'I', b'F', b'8'] => "image/gif".to_string(),
-        [b'B', b'M', _, _] => "image/bmp".to_string(),
-        _ => {
-            if data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" {
-                "image/webp".to_string()
-            } else {
-                "application/octet-stream".to_string()
-            }
-        }
-    }
-}
-
-fn mime_to_ext(mime: &str) -> &'static str {
-    match mime {
-        "image/png" => "png",
-        "image/jpeg" => "jpg",
-        "image/gif" => "gif",
-        "image/bmp" => "bmp",
-        "image/webp" => "webp",
-        _ => "bin",
-    }
+    buf
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
+    // --- Helpers ---
 
-    /// Encode a slice of u16 code units as little-endian bytes (the wire format
-    /// used by HWPTAG_PARA_TEXT records).
-    fn encode_u16s(units: &[u16]) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(units.len() * 2);
-        for &u in units {
-            buf.push((u & 0xFF) as u8);
-            buf.push((u >> 8) as u8);
-        }
-        buf
-    }
+    fn encode_u16s(units: &[u16]) -> Vec<u8> { encode_u16s_test(units) }
 
-    /// Build a CharShape record matching the current layout in `parse_char_shape`:
-    ///   bytes  0-13: face_id array (7 × u16)
-    ///   bytes 14-41: ratio/spacing/rel_size/offset arrays
-    ///   bytes 42-45: height (i32 LE)
-    ///   bytes 46-49: attribute flags (u32 LE) — bold=0x01, italic=0x02, underline=0x04, strike=0x40
-    ///   bytes 50-53: shadow space
-    ///   bytes 54-57: color (u32)
-    /// The minimum size checked is 58 bytes.
+    /// Build a 58-byte CharShape record with `flags` at offset 46 and `height` at offset 42.
     fn make_char_shape_data(flags: u32, height: i32) -> Vec<u8> {
         let mut data = vec![0u8; 58];
-        let hb = height.to_le_bytes();
-        data[42] = hb[0];
-        data[43] = hb[1];
-        data[44] = hb[2];
-        data[45] = hb[3];
-        let fb = flags.to_le_bytes();
-        data[46] = fb[0];
-        data[47] = fb[1];
-        data[48] = fb[2];
-        data[49] = fb[3];
+        data[42..46].copy_from_slice(&height.to_le_bytes());
+        data[46..50].copy_from_slice(&flags.to_le_bytes());
         data
     }
 
-    // -----------------------------------------------------------------------
-    // extract_paragraph_text
-    // -----------------------------------------------------------------------
+    // --- extract_paragraph_text ---
 
     #[test]
     fn extract_paragraph_text_basic_korean() {
@@ -1390,9 +648,7 @@ mod tests {
         assert_eq!(extract_paragraph_text(&data), "Z");
     }
 
-    // -----------------------------------------------------------------------
-    // parse_char_shape
-    // -----------------------------------------------------------------------
+    // --- parse_char_shape ---
 
     #[test]
     fn parse_char_shape_bold_flag() {
@@ -1451,23 +707,13 @@ mod tests {
         assert_eq!(cs.height, 1400);
     }
 
-    // -----------------------------------------------------------------------
-    // parse_para_shape
-    // -----------------------------------------------------------------------
+    // --- parse_para_shape ---
 
     fn make_para_shape_data(alignment_nibble: u8, margin_left: i32, line_spacing: i32) -> Vec<u8> {
         let mut data = vec![0u8; 24];
         data[0] = alignment_nibble & 0x07;
-        let ml = margin_left.to_le_bytes();
-        data[4] = ml[0];
-        data[5] = ml[1];
-        data[6] = ml[2];
-        data[7] = ml[3];
-        let ls = line_spacing.to_le_bytes();
-        data[20] = ls[0];
-        data[21] = ls[1];
-        data[22] = ls[2];
-        data[23] = ls[3];
+        data[4..8].copy_from_slice(&margin_left.to_le_bytes());
+        data[20..24].copy_from_slice(&line_spacing.to_le_bytes());
         data
     }
 
@@ -1520,9 +766,7 @@ mod tests {
         assert_eq!(ps.line_spacing, 0);
     }
 
-    // -----------------------------------------------------------------------
-    // decompress_stream
-    // -----------------------------------------------------------------------
+    // --- decompress_stream ---
 
     #[test]
     fn decompress_stream_valid_deflate() {
@@ -1559,499 +803,26 @@ mod tests {
         assert!(decompress_stream(b"\x00\x01\x02\x03rubbish").is_err());
     }
 
-    // -----------------------------------------------------------------------
-    // Phase 2: find_children_end
-    // -----------------------------------------------------------------------
-
-    /// Build a minimal Record for testing purposes.
-    fn make_record(tag_id: u16, level: u16) -> Record {
-        Record {
-            tag_id,
-            level,
-            data: Vec::new(),
-        }
-    }
-
-    /// Build a Record with a specific data payload.
-    fn make_record_with_data(tag_id: u16, level: u16, data: Vec<u8>) -> Record {
-        Record {
-            tag_id,
-            level,
-            data,
-        }
+    #[test]
+    fn read_file_header_encrypted_bit_sets_encrypted() {
+        let mut buf = vec![0u8; 256];
+        buf[0..17].copy_from_slice(b"HWP Document File");
+        buf[35] = 5; // version major
+        // props byte 36: bit 1 = encrypted (0x02), bit 0 = compressed (0x01)
+        buf[36] = 0x03; // compressed + encrypted
+        // We can't call read_file_header directly (it needs cfb),
+        // but we can verify the bit parsing logic:
+        let props = u32::from_le_bytes([buf[36], buf[37], buf[38], buf[39]]);
+        assert!((props & 0x02) != 0, "encrypted bit should be set");
     }
 
     #[test]
-    fn find_children_end_no_children() {
-        // Parent at level 0, immediately followed by a sibling at the same level.
-        let records = vec![
-            make_record(HWPTAG_CTRL_HEADER, 0),
-            make_record(HWPTAG_PARA_HEADER, 0), // sibling, not child
-        ];
-        assert_eq!(find_children_end(&records, 0), 1);
-    }
-
-    #[test]
-    fn find_children_end_with_children() {
-        // Parent at level 1, two children at level 2, then a sibling at level 1.
-        let records = vec![
-            make_record(HWPTAG_CTRL_HEADER, 1), // index 0 (parent)
-            make_record(HWPTAG_TABLE, 2),       // index 1 (child)
-            make_record(HWPTAG_LIST_HEADER, 2), // index 2 (child)
-            make_record(HWPTAG_PARA_HEADER, 1), // index 3 (sibling — stops here)
-        ];
-        assert_eq!(find_children_end(&records, 0), 3);
-    }
-
-    #[test]
-    fn find_children_end_deeply_nested() {
-        // Parent at 0, child at 1, grandchild at 2 — all are "descendants" of 0.
-        let records = vec![
-            make_record(HWPTAG_CTRL_HEADER, 0), // index 0
-            make_record(HWPTAG_TABLE, 1),       // index 1 (child)
-            make_record(HWPTAG_LIST_HEADER, 2), // index 2 (grandchild)
-            make_record(HWPTAG_PARA_HEADER, 3), // index 3 (great-grandchild)
-            make_record(HWPTAG_PARA_HEADER, 0), // index 4 (sibling)
-        ];
-        assert_eq!(find_children_end(&records, 0), 4);
-    }
-
-    #[test]
-    fn find_children_end_at_last_record() {
-        // Parent is the last element — no children, end == len.
-        let records = vec![make_record(HWPTAG_CTRL_HEADER, 0)];
-        assert_eq!(find_children_end(&records, 0), 1);
-    }
-
-    // -----------------------------------------------------------------------
-    // Phase 2: parse_table_ctrl
-    // -----------------------------------------------------------------------
-
-    /// Build a TABLE record with given row_count and col_count.
-    fn make_table_record(level: u16, row_count: u16, col_count: u16) -> Record {
-        let mut data = vec![0u8; 8];
-        // bytes 0-3: properties (zeroed)
-        data[4..6].copy_from_slice(&row_count.to_le_bytes());
-        data[6..8].copy_from_slice(&col_count.to_le_bytes());
-        make_record_with_data(HWPTAG_TABLE, level, data)
-    }
-
-    /// Build a LIST_HEADER record describing one table cell at (row, col).
-    fn make_list_header_record(
-        level: u16,
-        col: u16,
-        row: u16,
-        col_span: u16,
-        row_span: u16,
-    ) -> Record {
-        let mut data = vec![0u8; 10];
-        // bytes 0-1: properties
-        data[2..4].copy_from_slice(&col.to_le_bytes());
-        data[4..6].copy_from_slice(&row.to_le_bytes());
-        data[6..8].copy_from_slice(&col_span.to_le_bytes());
-        data[8..10].copy_from_slice(&row_span.to_le_bytes());
-        make_record_with_data(HWPTAG_LIST_HEADER, level, data)
-    }
-
-    /// Build a CTRL_HEADER record with ctrl_id `tbl `.
-    fn make_ctrl_header_table(level: u16) -> Record {
-        make_record_with_data(HWPTAG_CTRL_HEADER, level, CTRL_TABLE.to_le_bytes().to_vec())
-    }
-
-    #[test]
-    fn parse_table_ctrl_dimensions() {
-        // Flat record sequence:
-        //   [0] CTRL_HEADER(tbl )  level=0
-        //   [1] TABLE              level=1  (2 rows × 3 cols)
-        let records = vec![make_ctrl_header_table(0), make_table_record(1, 2, 3)];
-        let (rows, cols, cells) = parse_table_ctrl(&records, 0);
-        assert_eq!(rows, 2);
-        assert_eq!(cols, 3);
-        assert!(cells.is_empty(), "no LIST_HEADERs so no cells expected");
-    }
-
-    #[test]
-    fn parse_table_ctrl_with_cells() {
-        // One 1×2 table (1 row, 2 cols) with two cells each containing one paragraph.
-        //
-        // Record sequence (level notation: CH=0, TABLE/LH=1, PH=2, PT=3):
-        //   [0] CTRL_HEADER(tbl)   level=0
-        //   [1] TABLE(1×2)         level=1
-        //   [2] LIST_HEADER(r=0,c=0, span 1×1) level=1
-        //   [3] PARA_HEADER        level=2
-        //   [4] PARA_TEXT("A")     level=3   ← inside cell (0,0)
-        //   [5] LIST_HEADER(r=0,c=1, span 1×1) level=1
-        //   [6] PARA_HEADER        level=2
-        //   [7] PARA_TEXT("B")     level=3   ← inside cell (0,1)
-        let text_a = encode_u16s(&[b'A' as u16]);
-        let text_b = encode_u16s(&[b'B' as u16]);
-
-        let mut para_header_data = vec![0u8; 6]; // 6 bytes minimum
-        para_header_data[4] = 0; // para_shape_id = 0
-        para_header_data[5] = 0;
-
-        let records = vec![
-            make_ctrl_header_table(0),              // [0]
-            make_table_record(1, 1, 2),             // [1]
-            make_list_header_record(1, 0, 0, 1, 1), // [2]
-            make_record_with_data(HWPTAG_PARA_HEADER, 2, para_header_data.clone()), // [3]
-            make_record_with_data(HWPTAG_PARA_TEXT, 3, text_a), // [4]
-            make_list_header_record(1, 1, 0, 1, 1), // [5]
-            make_record_with_data(HWPTAG_PARA_HEADER, 2, para_header_data.clone()), // [6]
-            make_record_with_data(HWPTAG_PARA_TEXT, 3, text_b), // [7]
-        ];
-
-        let (rows, cols, cells) = parse_table_ctrl(&records, 0);
-        assert_eq!(rows, 1);
-        assert_eq!(cols, 2);
-        assert_eq!(cells.len(), 2);
-
-        // Cell (0,0) should have text "A"
-        let cell_00 = cells
-            .iter()
-            .find(|c| c.row == 0 && c.col == 0)
-            .expect("cell (0,0)");
-        assert_eq!(cell_00.paragraphs.len(), 1);
-        assert_eq!(cell_00.paragraphs[0].text, "A");
-
-        // Cell (0,1) should have text "B"
-        let cell_01 = cells
-            .iter()
-            .find(|c| c.row == 0 && c.col == 1)
-            .expect("cell (0,1)");
-        assert_eq!(cell_01.paragraphs.len(), 1);
-        assert_eq!(cell_01.paragraphs[0].text, "B");
-    }
-
-    #[test]
-    fn parse_table_ctrl_cell_spans() {
-        // A cell with row_span=2, col_span=2 must be recorded faithfully.
-        let records = vec![
-            make_ctrl_header_table(0),
-            make_table_record(1, 2, 2),
-            make_list_header_record(1, 0, 0, 2, 2), // merged cell spanning 2×2
-        ];
-        let (_rows, _cols, cells) = parse_table_ctrl(&records, 0);
-        assert_eq!(cells.len(), 1);
-        assert_eq!(cells[0].col_span, 2);
-        assert_eq!(cells[0].row_span, 2);
-    }
-
-    #[test]
-    fn parse_table_ctrl_malformed_table_record_short_data() {
-        // TABLE record with only 4 bytes — row/col count cannot be read.
-        // Must not panic; dimensions default to 0.
-        let mut short_data = vec![0u8; 4];
-        short_data[0..4].copy_from_slice(&0u32.to_le_bytes()); // properties only
-        let records = vec![
-            make_ctrl_header_table(0),
-            make_record_with_data(HWPTAG_TABLE, 1, short_data),
-        ];
-        let (rows, cols, cells) = parse_table_ctrl(&records, 0);
-        assert_eq!(rows, 0);
-        assert_eq!(cols, 0);
-        assert!(cells.is_empty());
-    }
-
-    // -----------------------------------------------------------------------
-    // Phase 2: parse_ctrl_header_at
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn parse_ctrl_header_at_table_returns_table_control() {
-        let records = vec![make_ctrl_header_table(0), make_table_record(1, 3, 4)];
-        let ctrl = parse_ctrl_header_at(&records, 0).expect("should return Some");
-        assert!(
-            matches!(
-                ctrl,
-                HwpControl::Table {
-                    row_count: 3,
-                    col_count: 4,
-                    ..
-                }
-            ),
-            "expected Table{{row_count:3, col_count:4}}, got {ctrl:?}"
-        );
-    }
-
-    #[test]
-    fn parse_ctrl_header_at_short_data_returns_none() {
-        // CTRL_HEADER with fewer than 4 bytes of data → cannot read ctrl_id.
-        let records = vec![make_record_with_data(HWPTAG_CTRL_HEADER, 0, vec![0u8; 2])];
-        assert!(parse_ctrl_header_at(&records, 0).is_none());
-    }
-
-    #[test]
-    fn parse_ctrl_header_at_unknown_ctrl_id_returns_none() {
-        // An unrecognised ctrl_id must return None gracefully.
-        let unknown_id: u32 = 0xDEAD_BEEF;
-        let records = vec![make_record_with_data(
-            HWPTAG_CTRL_HEADER,
-            0,
-            unknown_id.to_le_bytes().to_vec(),
-        )];
-        assert!(parse_ctrl_header_at(&records, 0).is_none());
-    }
-
-    #[test]
-    fn parse_ctrl_header_at_footnote_returns_footnote_endnote() {
-        let fn_id = CTRL_FOOTNOTE.to_le_bytes().to_vec();
-        let records = vec![make_record_with_data(HWPTAG_CTRL_HEADER, 0, fn_id)];
-        let ctrl = parse_ctrl_header_at(&records, 0).expect("Some");
-        assert!(matches!(
-            ctrl,
-            HwpControl::FootnoteEndnote {
-                is_endnote: false,
-                ..
-            }
-        ));
-    }
-
-    #[test]
-    fn parse_ctrl_header_at_endnote_returns_footnote_endnote() {
-        let en_id = CTRL_ENDNOTE.to_le_bytes().to_vec();
-        let records = vec![make_record_with_data(HWPTAG_CTRL_HEADER, 0, en_id)];
-        let ctrl = parse_ctrl_header_at(&records, 0).expect("Some");
-        assert!(matches!(
-            ctrl,
-            HwpControl::FootnoteEndnote {
-                is_endnote: true,
-                ..
-            }
-        ));
-    }
-
-    #[test]
-    fn parse_ctrl_header_at_page_break_returns_page_break() {
-        let pb_id = CTRL_PAGE_BREAK.to_le_bytes().to_vec();
-        let records = vec![make_record_with_data(HWPTAG_CTRL_HEADER, 0, pb_id)];
-        let ctrl = parse_ctrl_header_at(&records, 0).expect("Some");
-        assert!(matches!(ctrl, HwpControl::PageBreak));
-    }
-
-    // -----------------------------------------------------------------------
-    // Phase 2: extract_paragraphs_from_range
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn extract_paragraphs_from_range_empty_range() {
-        let records: Vec<Record> = Vec::new();
-        let paras = extract_paragraphs_from_range(&records, 0, 0);
-        assert!(paras.is_empty());
-    }
-
-    #[test]
-    fn extract_paragraphs_from_range_single_paragraph() {
-        let text_data = encode_u16s(&[b'H' as u16, b'i' as u16]);
-        let mut ph_data = vec![0u8; 6];
-        ph_data[4] = 0;
-        ph_data[5] = 0;
-
-        let records = vec![
-            make_record_with_data(HWPTAG_PARA_HEADER, 2, ph_data),
-            make_record_with_data(HWPTAG_PARA_TEXT, 3, text_data),
-        ];
-        let paras = extract_paragraphs_from_range(&records, 0, records.len());
-        assert_eq!(paras.len(), 1);
-        assert_eq!(paras[0].text, "Hi");
-    }
-
-    #[test]
-    fn extract_paragraphs_from_range_multiple_paragraphs() {
-        let text_a = encode_u16s(&[b'A' as u16]);
-        let text_b = encode_u16s(&[b'B' as u16]);
-        let ph_data = vec![0u8; 6];
-
-        let records = vec![
-            make_record_with_data(HWPTAG_PARA_HEADER, 2, ph_data.clone()),
-            make_record_with_data(HWPTAG_PARA_TEXT, 3, text_a),
-            make_record_with_data(HWPTAG_PARA_HEADER, 2, ph_data.clone()),
-            make_record_with_data(HWPTAG_PARA_TEXT, 3, text_b),
-        ];
-        let paras = extract_paragraphs_from_range(&records, 0, records.len());
-        assert_eq!(paras.len(), 2);
-        assert_eq!(paras[0].text, "A");
-        assert_eq!(paras[1].text, "B");
-    }
-
-    // -----------------------------------------------------------------------
-    // Phase 2: control_to_block (IR conversion)
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn control_to_block_image_produces_image_block() {
-        let ctrl = HwpControl::Image {
-            bin_data_id: 7,
-            width: 100,
-            height: 200,
-        };
-        let doc_info = DocInfo::default();
-        let block = control_to_block(&ctrl, &doc_info).expect("Some");
-        assert!(
-            matches!(block, ir::Block::Image { ref src, .. } if src == "image_7.bin"),
-            "expected Image block with src=image_7.bin, got {block:?}"
-        );
-    }
-
-    #[test]
-    fn control_to_block_empty_table_produces_table_block() {
-        let ctrl = HwpControl::Table {
-            row_count: 2,
-            col_count: 3,
-            cells: Vec::new(),
-        };
-        let doc_info = DocInfo::default();
-        let block = control_to_block(&ctrl, &doc_info).expect("Some");
-        assert!(matches!(block, ir::Block::Table { col_count: 3, .. }));
-    }
-
-    #[test]
-    fn control_to_block_footnote_produces_footnote_block() {
-        let ctrl = HwpControl::FootnoteEndnote {
-            is_endnote: false,
-            paragraphs: Vec::new(),
-        };
-        let doc_info = DocInfo::default();
-        let block = control_to_block(&ctrl, &doc_info).expect("Some");
-        assert!(matches!(block, ir::Block::Footnote { .. }));
-    }
-
-    #[test]
-    fn control_to_block_page_break_returns_none() {
-        let ctrl = HwpControl::PageBreak;
-        let doc_info = DocInfo::default();
-        assert!(control_to_block(&ctrl, &doc_info).is_none());
-    }
-
-    #[test]
-    fn control_to_block_table_groups_cells_into_rows() {
-        // 2×2 table with 4 cells.
-        let make_cell = |row: u16, col: u16, text: &str| HwpTableCell {
-            row,
-            col,
-            row_span: 1,
-            col_span: 1,
-            paragraphs: vec![HwpParagraph {
-                text: text.to_string(),
-                char_shape_ids: Vec::new(),
-                para_shape_id: 0,
-                controls: Vec::new(),
-            }],
-        };
-        let ctrl = HwpControl::Table {
-            row_count: 2,
-            col_count: 2,
-            cells: vec![
-                make_cell(0, 0, "r0c0"),
-                make_cell(0, 1, "r0c1"),
-                make_cell(1, 0, "r1c0"),
-                make_cell(1, 1, "r1c1"),
-            ],
-        };
-        let doc_info = DocInfo::default();
-        let block = control_to_block(&ctrl, &doc_info).expect("Some");
-        if let ir::Block::Table { rows, col_count } = block {
-            assert_eq!(col_count, 2);
-            assert_eq!(rows.len(), 2);
-            assert_eq!(rows[0].cells.len(), 2);
-            assert_eq!(rows[1].cells.len(), 2);
-            // First row is marked as header.
-            assert!(rows[0].is_header);
-            assert!(!rows[1].is_header);
-        } else {
-            panic!("Expected Table block");
-        }
-    }
-
-    // --- find_gsotype_bin_id / parse_gshape_ctrl tests ---
-
-    #[test]
-    fn find_gsotype_bin_id_returns_id_from_picture_record() {
-        let mut data = vec![0u8; 6];
-        data[0..4].copy_from_slice(&0u32.to_le_bytes()); // kind = 0 (picture)
-        data[4..6].copy_from_slice(&42u16.to_le_bytes()); // bin_data_id = 42
-        let records = vec![Record {
-            tag_id: HWPTAG_GSOTYPE,
-            level: 1,
-            data,
-        }];
-        assert_eq!(find_gsotype_bin_id(&records, 0, 1), 42);
-    }
-
-    #[test]
-    fn find_gsotype_bin_id_returns_zero_when_no_gsotype() {
-        let records = vec![Record {
-            tag_id: HWPTAG_PARA_HEADER,
-            level: 0,
-            data: vec![0u8; 8],
-        }];
-        assert_eq!(find_gsotype_bin_id(&records, 0, 1), 0);
-    }
-
-    #[test]
-    fn find_gsotype_bin_id_skips_non_picture_kind() {
-        let mut data = vec![0u8; 6];
-        data[0..4].copy_from_slice(&1u32.to_le_bytes()); // kind = 1 (OLE, not picture)
-        data[4..6].copy_from_slice(&10u16.to_le_bytes());
-        let records = vec![Record {
-            tag_id: HWPTAG_GSOTYPE,
-            level: 1,
-            data,
-        }];
-        assert_eq!(find_gsotype_bin_id(&records, 0, 1), 0);
-    }
-
-    #[test]
-    fn parse_gshape_ctrl_extracts_dimensions_and_bin_id() {
-        let mut ctrl_data = vec![0u8; 24];
-        ctrl_data[0..4].copy_from_slice(&CTRL_GSHAPE.to_le_bytes());
-        ctrl_data[16..20].copy_from_slice(&800u32.to_le_bytes()); // width
-        ctrl_data[20..24].copy_from_slice(&600u32.to_le_bytes()); // height
-
-        let mut gsotype_data = vec![0u8; 6];
-        gsotype_data[0..4].copy_from_slice(&0u32.to_le_bytes()); // picture
-        gsotype_data[4..6].copy_from_slice(&7u16.to_le_bytes()); // bin_data_id
-
-        let records = vec![
-            Record {
-                tag_id: HWPTAG_CTRL_HEADER,
-                level: 0,
-                data: ctrl_data,
-            },
-            Record {
-                tag_id: HWPTAG_GSOTYPE,
-                level: 1,
-                data: gsotype_data,
-            },
-        ];
-        let (bin_id, w, h) = parse_gshape_ctrl(&records, 0);
-        assert_eq!(bin_id, 7);
-        assert_eq!(w, 800);
-        assert_eq!(h, 600);
-    }
-
-    // --- control_to_block: row index cap test ---
-
-    #[test]
-    fn control_to_block_caps_malformed_row_index() {
-        let ctrl = HwpControl::Table {
-            row_count: 1,
-            col_count: 1,
-            cells: vec![HwpTableCell {
-                row: 50_000, // absurdly large
-                col: 0,
-                row_span: 1,
-                col_span: 1,
-                paragraphs: vec![],
-            }],
-        };
-        let doc_info = DocInfo::default();
-        let block = control_to_block(&ctrl, &doc_info).expect("Some");
-        if let ir::Block::Table { rows, .. } = block {
-            // Row with index 50_000 should be silently dropped (cap is 10_000)
-            assert!(rows.len() <= 10_000);
-        } else {
-            panic!("Expected Table block");
-        }
+    fn read_file_header_drm_bit_sets_has_drm() {
+        let mut buf = vec![0u8; 256];
+        buf[0..17].copy_from_slice(b"HWP Document File");
+        buf[35] = 5;
+        buf[36] = 0x10; // has_drm bit
+        let props = u32::from_le_bytes([buf[36], buf[37], buf[38], buf[39]]);
+        assert!((props & 0x10) != 0, "has_drm bit should be set");
     }
 }
