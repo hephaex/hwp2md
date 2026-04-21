@@ -213,7 +213,7 @@ pub(crate) fn parse_char_shape(data: &[u8]) -> CharShape {
     cur.set_position(42);
 
     if let Ok(h) = cur.read_i32::<LittleEndian>() {
-        shape.height = h as u32;
+        shape.height = h.max(0) as u32;
     }
 
     // Attribute flags at bytes 46-49.

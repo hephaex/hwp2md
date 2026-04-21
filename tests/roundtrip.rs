@@ -320,3 +320,49 @@ fn roundtrip_mixed_content() {
     assert!(has_code, "CodeBlock missing; md: {md:?}");
     assert!(has_list, "List missing; md: {md:?}");
 }
+
+#[test]
+fn roundtrip_inline_formatting_bold_italic_strikethrough() {
+    let source = "This has **bold**, *italic*, and ~~strikethrough~~ text.\n";
+    let doc = parse_markdown(source);
+    let md = write_markdown(&doc, false);
+
+    assert!(md.contains("**bold**"), "bold missing; md: {md:?}");
+    assert!(md.contains("*italic*"), "italic missing; md: {md:?}");
+    assert!(
+        md.contains("~~strikethrough~~"),
+        "strikethrough missing; md: {md:?}"
+    );
+}
+
+#[test]
+fn roundtrip_ir_inline_flags_survive() {
+    let original = make_doc(vec![ir::Block::Paragraph {
+        inlines: vec![
+            plain("normal "),
+            ir::Inline {
+                text: "bold".into(),
+                bold: true,
+                ..Default::default()
+            },
+            plain(" "),
+            ir::Inline {
+                text: "italic".into(),
+                italic: true,
+                ..Default::default()
+            },
+        ],
+    }]);
+
+    let md = write_markdown(&original, false);
+    let parsed = parse_markdown(&md);
+
+    if let Some(ir::Block::Paragraph { inlines }) = first_blocks(&parsed).first() {
+        let has_bold = inlines.iter().any(|i| i.bold && i.text.contains("bold"));
+        let has_italic = inlines.iter().any(|i| i.italic && i.text.contains("italic"));
+        assert!(has_bold, "bold flag not preserved; inlines: {inlines:?}");
+        assert!(has_italic, "italic flag not preserved; inlines: {inlines:?}");
+    } else {
+        panic!("Expected Paragraph block");
+    }
+}

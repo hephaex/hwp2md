@@ -37,7 +37,8 @@ fn write_frontmatter(out: &mut String, meta: &ir::Metadata) {
         out.push_str(&format!("description: \"{}\"\n", escape_yaml(desc)));
     }
     if !meta.keywords.is_empty() {
-        out.push_str(&format!("keywords: [{}]\n", meta.keywords.join(", ")));
+        let escaped: Vec<String> = meta.keywords.iter().map(|k| escape_yaml(k)).collect();
+        out.push_str(&format!("keywords: [{}]\n", escaped.join(", ")));
     }
     out.push_str("---\n\n");
 }
@@ -313,6 +314,21 @@ mod tests {
     #[test]
     fn escape_yaml_no_special_chars() {
         assert_eq!(escape_yaml("hello world"), "hello world");
+    }
+
+    #[test]
+    fn escape_yaml_newline() {
+        assert_eq!(escape_yaml("line1\nline2"), "line1\\nline2");
+    }
+
+    #[test]
+    fn escape_yaml_carriage_return() {
+        assert_eq!(escape_yaml("a\rb"), "a\\rb");
+    }
+
+    #[test]
+    fn escape_yaml_tab() {
+        assert_eq!(escape_yaml("a\tb"), "a\\tb");
     }
 
     // -----------------------------------------------------------------------
