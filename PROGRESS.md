@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: Phase 1 완료 + 보안/정확도 수정 완료
+## 현재 상태: Phase 1.5 완료 (테스트 + HIGH/MEDIUM 수정)
 
 ### 완료
 
@@ -23,6 +23,17 @@
   - H6/H7: 이미지 alt text 수정
   - H9: 멀티바이트 글자수 계산 수정
   - clippy 경고 수정 (derive Default, range contains, collapsible if)
+- [x] Phase 1.5 (d877719 + f4d4564):
+  - 103 테스트 작성 (89 unit + 14 integration, 0 failures)
+  - H2: CharShape 속성 오프셋 46-49로 수정 (was 60-63)
+  - H3: 제목 감지 임계값 상수화 (16pt/14pt/12pt)
+  - H5: charPr OWPML 위치 확인 + 문서화
+  - H8: 프론트매터 keywords YAML 파싱
+  - M3: HWPX writer Result 전파 (`?` 사용)
+  - M6: YAML escape \n/\r/\t 추가
+  - M8: parse_heading_style 끝 숫자 추출
+  - M10: encoding_rs, serde_yaml 미사용 의존성 제거
+  - 리뷰 수정: keyword escape, height clamp, 인라인 서식 라운드트립 테스트
 
 ### 진행 중
 
@@ -30,7 +41,6 @@
 
 ### 미착수
 
-- [ ] Phase 1.5: 중기 개선 (테스트, 남은 HIGH/MEDIUM 버그)
 - [ ] Phase 2: HWP 파싱 고도화 (테이블, 이미지, 하이퍼링크, 각주, 수식)
 - [ ] Phase 3: HWPX 파싱 고도화 (스타일, colspan, BinData)
 - [ ] Phase 4: Markdown 렌더러 고도화 (GFM 검증, 이미지 옵션)
@@ -39,25 +49,26 @@
 
 ## 중기 개선 로드맵 (Phase 1.5)
 
-### 1순위: 테스트 기반 구축 (M1)
-- [ ] 단위 테스트: `extract_paragraph_text`, `parse_char_shape`, 서로게이트 페어 처리
-- [ ] 통합 테스트: 샘플 HWP/HWPX → IR → Markdown 라운드트립
-- [ ] IR 라운드트립: IR→MD→IR 동등성 검증
-- [ ] 커버리지 80%+ 목표
+### 1순위: 테스트 기반 구축 (M1) ✅ 완료
+- [x] 단위 테스트: `extract_paragraph_text`, `parse_char_shape`, 서로게이트 페어 처리
+- [x] 통합 테스트: IR→MD→IR, MD→IR→MD 라운드트립 (14건)
+- [x] 103 테스트 전체 통과
+- [ ] 커버리지 80%+ 측정 (tarpaulin)
+- [ ] 샘플 HWP/HWPX 파일 기반 통합 테스트
 
-### 2순위: 남은 HIGH 이슈
-- [ ] H2: CharShape 속성 오프셋 — HWP 스펙 대조하여 정확한 바이트 위치 검증
-- [ ] H3: 제목 감지 매직넘버 (1600/1400/1200) — HWP 단위(1/7200인치) 기반 문서화
-- [ ] H5: HWPX writer charPr → run 시작 직후에 배치 (OWPML 스키마 준수)
-- [ ] H8: frontmatter keywords YAML 파싱 → Vec 변환
+### 2순위: 남은 HIGH 이슈 ✅ 완료
+- [x] H2: CharShape 속성 오프셋 46-49 수정 (HWP 5.0 스펙 대조)
+- [x] H3: 제목 감지 임계값 상수화 + 단위 문서화
+- [x] H5: charPr 위치 확인 (이미 정확) + 문서화
+- [x] H8: frontmatter keywords YAML 파싱
 
 ### 3순위: MEDIUM 이슈
-- [ ] M3: HWPX writer 30+ `write_event` Result를 `?` 전파로 변경
-- [ ] M6: YAML escape에 줄바꿸/탭/특수문자 처리 추가
+- [x] M3: HWPX writer Result 전파 (`?` 사용)
+- [x] M6: YAML escape \n/\r/\t 추가
+- [x] M8: `parse_heading_style` 끝 숫자 추출
+- [x] M10: encoding_rs, serde_yaml 제거
 - [ ] M7: HWP OLE2 SummaryInformation 스트림에서 메타데이터(제목/저자) 추출
-- [ ] M8: `parse_heading_style` — 끝 숫자 추출로 수정
 - [ ] M9: BIN 스트림 탐색 — doc_info bin_data_entries 기반으로 최적화
-- [ ] M10: 미사용 의존성 제거 (serde_yaml → 실제 사용 시 유지)
 - [ ] H4: `--style` 파라미터 구현 또는 CLI에서 제거
 
 ## 장기 개선 로드맵 (Phase 2~6)
