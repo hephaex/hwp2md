@@ -432,9 +432,7 @@ mod tests {
 
     #[test]
     fn control_to_block_hyperlink_empty_url_returns_none() {
-        let ctrl = HwpControl::Hyperlink {
-            url: String::new(),
-        };
+        let ctrl = HwpControl::Hyperlink { url: String::new() };
         let doc_info = DocInfo::default();
         assert!(control_to_block(&ctrl, &doc_info).is_none());
     }

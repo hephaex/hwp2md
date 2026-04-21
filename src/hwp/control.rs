@@ -1,4 +1,3 @@
-use crate::hwp::eqedit::eqedit_to_latex;
 use crate::hwp::model::*;
 use crate::hwp::reader::{extract_paragraph_text, parse_char_shape_refs};
 use crate::hwp::record::*;
@@ -62,8 +61,7 @@ pub(crate) fn extract_paragraphs_from_range(
                 if let Some(ref mut p) = current {
                     let (script, _) = read_utf16le_str(&rec.data, 2);
                     if !script.is_empty() {
-                        let tex = eqedit_to_latex(&script);
-                        p.controls.push(HwpControl::Equation { script: tex });
+                        p.controls.push(HwpControl::Equation { script });
                     }
                 }
                 idx += 1;
@@ -140,13 +138,21 @@ pub(crate) fn parse_table_ctrl(
                 };
                 let col_span = if rec.data.len() >= 8 {
                     let v = u16::from_le_bytes([rec.data[6], rec.data[7]]);
-                    if v == 0 { 1 } else { v }
+                    if v == 0 {
+                        1
+                    } else {
+                        v
+                    }
                 } else {
                     1
                 };
                 let row_span = if rec.data.len() >= 10 {
                     let v = u16::from_le_bytes([rec.data[8], rec.data[9]]);
-                    if v == 0 { 1 } else { v }
+                    if v == 0 {
+                        1
+                    } else {
+                        v
+                    }
                 } else {
                     1
                 };
@@ -235,12 +241,7 @@ pub(crate) fn find_gsotype_bin_id(records: &[Record], start: usize, end: usize) 
             // a sub-record (tag HWPTAG_BEGIN+68), but we also check at offset
             // 2 and 4 within this record itself when there are no children.
             if rec.data.len() >= 4 {
-                let kind = u32::from_le_bytes([
-                    rec.data[0],
-                    rec.data[1],
-                    rec.data[2],
-                    rec.data[3],
-                ]);
+                let kind = u32::from_le_bytes([rec.data[0], rec.data[1], rec.data[2], rec.data[3]]);
                 if kind == 0 && rec.data.len() >= 6 {
                     // Candidate at offset 4 (u16).
                     let candidate = u16::from_le_bytes([rec.data[4], rec.data[5]]);
@@ -333,9 +334,7 @@ pub(crate) fn parse_ctrl_header_at(records: &[Record], ctrl_idx: usize) -> Optio
         CTRL_PAGE_BREAK => Some(HwpControl::PageBreak),
         CTRL_COL_BREAK => Some(HwpControl::ColumnBreak),
         _ => {
-            tracing::debug!(
-                "CTRL_HEADER at index {ctrl_idx}: unhandled ctrl_id=0x{ctrl_id:08X}"
-            );
+            tracing::debug!("CTRL_HEADER at index {ctrl_idx}: unhandled ctrl_id=0x{ctrl_id:08X}");
             None
         }
     }
@@ -418,9 +417,9 @@ mod tests {
         // Parent at level 1, two children at level 2, then a sibling at level 1.
         let records = vec![
             make_record(HWPTAG_CTRL_HEADER, 1), // index 0 (parent)
-            make_record(HWPTAG_TABLE, 2),        // index 1 (child)
-            make_record(HWPTAG_LIST_HEADER, 2),  // index 2 (child)
-            make_record(HWPTAG_PARA_HEADER, 1),  // index 3 (sibling — stops here)
+            make_record(HWPTAG_TABLE, 2),       // index 1 (child)
+            make_record(HWPTAG_LIST_HEADER, 2), // index 2 (child)
+            make_record(HWPTAG_PARA_HEADER, 1), // index 3 (sibling — stops here)
         ];
         assert_eq!(find_children_end(&records, 0), 3);
     }
@@ -429,11 +428,11 @@ mod tests {
     fn find_children_end_deeply_nested() {
         // Parent at 0, child at 1, grandchild at 2 — all are "descendants" of 0.
         let records = vec![
-            make_record(HWPTAG_CTRL_HEADER, 0),  // index 0
-            make_record(HWPTAG_TABLE, 1),         // index 1 (child)
-            make_record(HWPTAG_LIST_HEADER, 2),   // index 2 (grandchild)
-            make_record(HWPTAG_PARA_HEADER, 3),   // index 3 (great-grandchild)
-            make_record(HWPTAG_PARA_HEADER, 0),   // index 4 (sibling)
+            make_record(HWPTAG_CTRL_HEADER, 0), // index 0
+            make_record(HWPTAG_TABLE, 1),       // index 1 (child)
+            make_record(HWPTAG_LIST_HEADER, 2), // index 2 (grandchild)
+            make_record(HWPTAG_PARA_HEADER, 3), // index 3 (great-grandchild)
+            make_record(HWPTAG_PARA_HEADER, 0), // index 4 (sibling)
         ];
         assert_eq!(find_children_end(&records, 0), 4);
     }
@@ -482,12 +481,12 @@ mod tests {
         para_header_data[5] = 0;
 
         let records = vec![
-            make_ctrl_header_table(0),               // [0]
-            make_table_record(1, 1, 2),              // [1]
-            make_list_header_record(1, 0, 0, 1, 1),  // [2]
+            make_ctrl_header_table(0),              // [0]
+            make_table_record(1, 1, 2),             // [1]
+            make_list_header_record(1, 0, 0, 1, 1), // [2]
             make_record_with_data(HWPTAG_PARA_HEADER, 2, para_header_data.clone()), // [3]
             make_record_with_data(HWPTAG_PARA_TEXT, 3, text_a), // [4]
-            make_list_header_record(1, 1, 0, 1, 1),  // [5]
+            make_list_header_record(1, 1, 0, 1, 1), // [5]
             make_record_with_data(HWPTAG_PARA_HEADER, 2, para_header_data.clone()), // [6]
             make_record_with_data(HWPTAG_PARA_TEXT, 3, text_b), // [7]
         ];

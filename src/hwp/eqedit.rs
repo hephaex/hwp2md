@@ -1,15 +1,15 @@
 /// EQEDIT-to-LaTeX converter for HWP 5.0 equation scripts.
 ///
-/// HWP stores equations in a proprietary keyword-based scripting language called
-/// EQEDIT.  This module converts the most common EQEDIT patterns to valid LaTeX
-/// so that downstream renderers (MathJax, KaTeX, pandoc) can display them
-/// correctly.
+/// HWP stores equations in a proprietary keyword-based scripting language
+/// called EQEDIT.  This module converts the most common EQEDIT patterns to
+/// valid LaTeX so that downstream renderers (MathJax, KaTeX, pandoc) can
+/// display them correctly.
 ///
 /// # Supported Patterns
 ///
 /// - `{A} over {B}` → `\frac{A}{B}`
 /// - `sqrt{X}` → `\sqrt{X}`
-/// - `root{N}{X}` → `\sqrt[N]{X}`
+/// - `root {N} {X}` → `\sqrt[N]{X}`
 /// - Greek letters (`alpha`, `beta`, …) → `\alpha`, `\beta`, …
 /// - Operators (`times`, `div`, `pm`, `le`, `ge`, `ne`, `approx`, `cdot`,
 ///   `inf`, `sum`, `int`, `prod`, `lim`) → prefixed with `\`
@@ -18,18 +18,27 @@
 ///   `\begin{matrix}…\end{matrix}`
 /// - `pile{…}` → `\begin{matrix}…\end{matrix}` (single-column aligned)
 /// - Already-valid LaTeX constructs are passed through unchanged
+const MAX_RECURSION_DEPTH: usize = 32;
+
 pub(crate) fn eqedit_to_latex(script: &str) -> String {
+    convert_with_depth(script, 0)
+}
+
+fn convert_with_depth(script: &str, depth: usize) -> String {
     let script = script.trim();
     if script.is_empty() {
         return String::new();
     }
+    if depth >= MAX_RECURSION_DEPTH {
+        return script.to_string();
+    }
 
-    // Tokenise, transform, then reassemble.
     let tokens = tokenise(script);
-    let tokens = transform_over(tokens);
-    let tokens = transform_root(tokens);
-    let tokens = transform_matrix(tokens);
-    let tokens = expand_keywords(tokens);
+    let tokens = transform_over(tokens, depth);
+    let tokens = transform_root(tokens, depth);
+    let tokens = transform_matrix(tokens, depth);
+    let tokens = expand_keywords(tokens, depth);
+    let tokens = expand_left_right(tokens, depth);
     reassemble(&tokens)
 }
 
@@ -37,12 +46,11 @@ pub(crate) fn eqedit_to_latex(script: &str) -> String {
 // Token type
 // ---------------------------------------------------------------------------
 
-/// A coarse-grained token used during transformation.
 #[derive(Debug, Clone, PartialEq)]
 enum Token {
-    /// A `{…}` group (the braces are included in `text`).
+    /// A `{…}` group (braces included).
     Group(String),
-    /// Any other text fragment (keyword, operator, whitespace, …).
+    /// Any other text fragment.
     Word(String),
 }
 
@@ -58,50 +66,38 @@ impl Token {
 // Step 1 – Tokenise
 // ---------------------------------------------------------------------------
 
-/// Split `script` into a flat list of `Token`s.
+/// Split `script` into flat `Token`s.
 ///
-/// Tokens are either `{…}` groups (with balanced braces) or whitespace-delimited
-/// words.  Whitespace between tokens is preserved as `Word` tokens so that
-/// reassembly does not merge adjacent identifiers.
+/// `{…}` groups are consumed with balanced-brace tracking.  Single-character
+/// operator characters (`_`, `^`, `(`, `)`, …) are emitted as individual
+/// `Word` tokens so that `sum_{i=1}^{n}` splits at `_` and `^`, allowing the
+/// keyword `sum` to be matched.
 fn tokenise(script: &str) -> Vec<Token> {
     let chars: Vec<char> = script.chars().collect();
     let mut tokens: Vec<Token> = Vec::new();
     let mut i = 0;
 
     while i < chars.len() {
-        if chars[i] == '{' {
-            // Check if this brace is preceded by `left` or `right` — if so,
-            // emit the brace as a literal word, not a group start.
-            let preceded_by_delim = matches!(
-                tokens.last(),
-                Some(Token::Word(w)) if w == "left" || w == "right"
-            );
-            if preceded_by_delim {
-                tokens.push(Token::Word("{".to_string()));
-                i += 1;
-            } else {
-                let (group, end) = consume_brace_group(&chars, i);
-                tokens.push(Token::Group(group));
-                i = end;
-            }
-        } else if chars[i] == '}' && matches!(tokens.last(), Some(Token::Word(w)) if w == "right" || w.ends_with("right")) {
-            tokens.push(Token::Word("}".to_string()));
-            i += 1;
-        } else if chars[i].is_whitespace() {
-            // Collapse consecutive whitespace into a single space word.
+        let c = chars[i];
+        if c == '{' {
+            let (group, end) = consume_brace_group(&chars, i);
+            tokens.push(Token::Group(group));
+            i = end;
+        } else if c.is_whitespace() {
             while i < chars.len() && chars[i].is_whitespace() {
                 i += 1;
             }
             tokens.push(Token::Word(" ".to_string()));
-        } else if chars[i] == '_' || chars[i] == '^' {
-            tokens.push(Token::Word(chars[i].to_string()));
+        } else if is_operator_char(c) {
+            tokens.push(Token::Word(c.to_string()));
             i += 1;
         } else {
             let start = i;
-            while i < chars.len()
-                && !chars[i].is_whitespace()
-                && !matches!(chars[i], '{' | '}' | '_' | '^')
-            {
+            while i < chars.len() {
+                let ch = chars[i];
+                if ch.is_whitespace() || ch == '{' || ch == '}' || is_operator_char(ch) {
+                    break;
+                }
                 i += 1;
             }
             let word: String = chars[start..i].iter().collect();
@@ -114,11 +110,27 @@ fn tokenise(script: &str) -> Vec<Token> {
     tokens
 }
 
-/// Consume a balanced `{…}` group starting at `chars[start]`.
-///
-/// Returns `(group_string, one_past_closing_brace_index)`.
-/// The returned string includes the outer braces.  Unbalanced input is handled
-/// gracefully by consuming to end-of-string.
+fn is_operator_char(c: char) -> bool {
+    matches!(
+        c,
+        '_' | '^'
+            | '('
+            | ')'
+            | '['
+            | ']'
+            | '+'
+            | '-'
+            | '='
+            | '/'
+            | '|'
+            | '&'
+            | '#'
+            | '!'
+            | ','
+            | '.'
+    )
+}
+
 fn consume_brace_group(chars: &[char], start: usize) -> (String, usize) {
     debug_assert_eq!(chars[start], '{');
     let mut depth = 0usize;
@@ -139,8 +151,6 @@ fn consume_brace_group(chars: &[char], start: usize) -> (String, usize) {
         }
         i += 1;
     }
-
-    // Unbalanced — return what we have.
     (s, i)
 }
 
@@ -148,27 +158,18 @@ fn consume_brace_group(chars: &[char], start: usize) -> (String, usize) {
 // Step 2 – Transform `over`
 // ---------------------------------------------------------------------------
 
-/// Rewrite `{A} over {B}` sequences into `\frac{A}{B}`.
-///
-/// The `over` keyword must appear as a standalone `Word` token between two
-/// `Group` tokens.  Whitespace tokens between the group and the keyword are
-/// consumed as part of the match.
-fn transform_over(tokens: Vec<Token>) -> Vec<Token> {
+fn transform_over(tokens: Vec<Token>, depth: usize) -> Vec<Token> {
     let mut out: Vec<Token> = Vec::with_capacity(tokens.len());
     let mut i = 0;
-
     while i < tokens.len() {
-        // Look ahead for the pattern:
-        //   [Group] [optional whitespace] Word("over") [optional whitespace] [Group]
-        if let Some(frac) = try_match_over(&tokens, i) {
-            out.push(Token::Word(frac.latex));
-            i = frac.next_idx;
+        if let Some(m) = try_match_over(&tokens, i, depth) {
+            out.push(Token::Word(m.latex));
+            i = m.next_idx;
         } else {
             out.push(tokens[i].clone());
             i += 1;
         }
     }
-
     out
 }
 
@@ -177,41 +178,32 @@ struct OverMatch {
     next_idx: usize,
 }
 
-fn try_match_over(tokens: &[Token], i: usize) -> Option<OverMatch> {
-    // tokens[i] must be a Group (the numerator).
-    if !matches!(tokens.get(i), Some(Token::Group(_))) {
-        return None;
-    }
-    let num_raw = tokens[i].as_str();
+fn try_match_over(tokens: &[Token], i: usize, depth: usize) -> Option<OverMatch> {
+    let num_group = match tokens.get(i) {
+        Some(Token::Group(g)) => g.clone(),
+        _ => return None,
+    };
 
-    // Skip optional whitespace.
     let mut j = i + 1;
     while matches!(tokens.get(j), Some(Token::Word(w)) if w.trim().is_empty()) {
         j += 1;
     }
-
-    // tokens[j] must be the bare keyword "over".
     if !matches!(tokens.get(j), Some(Token::Word(w)) if w == "over") {
         return None;
     }
     j += 1;
-
-    // Skip optional whitespace.
     while matches!(tokens.get(j), Some(Token::Word(w)) if w.trim().is_empty()) {
         j += 1;
     }
 
-    // tokens[j] must be a Group (the denominator).
-    if !matches!(tokens.get(j), Some(Token::Group(_))) {
-        return None;
-    }
-    let den_raw = tokens[j].as_str();
+    let den_group = match tokens.get(j) {
+        Some(Token::Group(g)) => g.clone(),
+        _ => return None,
+    };
     j += 1;
 
-    let num_inner = num_raw.strip_prefix('{').and_then(|s| s.strip_suffix('}')).unwrap_or(num_raw);
-    let den_inner = den_raw.strip_prefix('{').and_then(|s| s.strip_suffix('}')).unwrap_or(den_raw);
-    let num_latex = eqedit_to_latex(num_inner);
-    let den_latex = eqedit_to_latex(den_inner);
+    let num_latex = convert_with_depth(strip_braces(&num_group), depth + 1);
+    let den_latex = convert_with_depth(strip_braces(&den_group), depth + 1);
     let latex = format!("\\frac{{{num_latex}}}{{{den_latex}}}");
     Some(OverMatch { latex, next_idx: j })
 }
@@ -220,25 +212,18 @@ fn try_match_over(tokens: &[Token], i: usize) -> Option<OverMatch> {
 // Step 2b – Transform `root`
 // ---------------------------------------------------------------------------
 
-/// Rewrite `root {N} {X}` sequences (bare-word form) into `\sqrt[N]{X}`.
-///
-/// The tokeniser produces `Word("root")`, `Group("{N}")`, `Group("{X}")`.
-/// We consume those three consecutive tokens and emit a single `Word` containing
-/// the converted LaTeX.
-fn transform_root(tokens: Vec<Token>) -> Vec<Token> {
+fn transform_root(tokens: Vec<Token>, depth: usize) -> Vec<Token> {
     let mut out: Vec<Token> = Vec::with_capacity(tokens.len());
     let mut i = 0;
-
     while i < tokens.len() {
-        if let Some(result) = try_match_root(&tokens, i) {
-            out.push(Token::Word(result.latex));
-            i = result.next_idx;
+        if let Some(m) = try_match_root(&tokens, i, depth) {
+            out.push(Token::Word(m.latex));
+            i = m.next_idx;
         } else {
             out.push(tokens[i].clone());
             i += 1;
         }
     }
-
     out
 }
 
@@ -247,71 +232,50 @@ struct RootMatch {
     next_idx: usize,
 }
 
-fn try_match_root(tokens: &[Token], i: usize) -> Option<RootMatch> {
-    // tokens[i] must be Word("root").
+fn try_match_root(tokens: &[Token], i: usize, depth: usize) -> Option<RootMatch> {
     if !matches!(tokens.get(i), Some(Token::Word(w)) if w == "root") {
         return None;
     }
-
-    // Skip optional whitespace.
     let mut j = i + 1;
     while matches!(tokens.get(j), Some(Token::Word(w)) if w.trim().is_empty()) {
         j += 1;
     }
-
-    // First Group: the index N.
-    if !matches!(tokens.get(j), Some(Token::Group(_))) {
-        return None;
-    }
-    let n_group = tokens[j].as_str();
-    let n_inner = n_group
-        .strip_prefix('{')
-        .and_then(|s| s.strip_suffix('}'))
-        .unwrap_or(n_group);
-    let n_latex = eqedit_to_latex(n_inner);
+    let n_group = match tokens.get(j) {
+        Some(Token::Group(g)) => g.clone(),
+        _ => return None,
+    };
     j += 1;
-
-    // Skip optional whitespace.
     while matches!(tokens.get(j), Some(Token::Word(w)) if w.trim().is_empty()) {
         j += 1;
     }
-
-    // Second Group: the radicand X.
-    if !matches!(tokens.get(j), Some(Token::Group(_))) {
-        return None;
-    }
-    let x_group = tokens[j].as_str();
-    let x_inner = x_group
-        .strip_prefix('{')
-        .and_then(|s| s.strip_suffix('}'))
-        .unwrap_or(x_group);
-    let x_latex = eqedit_to_latex(x_inner);
+    let x_group = match tokens.get(j) {
+        Some(Token::Group(g)) => g.clone(),
+        _ => return None,
+    };
     j += 1;
 
+    let n_latex = convert_with_depth(strip_braces(&n_group), depth + 1);
+    let x_latex = convert_with_depth(strip_braces(&x_group), depth + 1);
     let latex = format!("\\sqrt[{n_latex}]{{{x_latex}}}");
     Some(RootMatch { latex, next_idx: j })
 }
 
 // ---------------------------------------------------------------------------
-// Step 2c – Transform `matrix` and `pile`
+// Step 2c – Transform `matrix` / `pile`
 // ---------------------------------------------------------------------------
 
-/// Rewrite `matrix {…}` and `pile {…}` (bare-word forms) into their LaTeX
-/// `matrix` environment equivalents.
-fn transform_matrix(tokens: Vec<Token>) -> Vec<Token> {
+fn transform_matrix(tokens: Vec<Token>, depth: usize) -> Vec<Token> {
     let mut out: Vec<Token> = Vec::with_capacity(tokens.len());
     let mut i = 0;
-
     while i < tokens.len() {
-        if let Some(result) = try_match_matrix(&tokens, i) {
-            out.push(Token::Word(result.latex));
-            i = result.next_idx;
+        if let Some(m) = try_match_matrix(&tokens, i, depth) {
+            out.push(Token::Word(m.latex));
+            i = m.next_idx;
         } else {
             out.push(tokens[i].clone());
             i += 1;
         }
     }
-
     out
 }
 
@@ -320,41 +284,28 @@ struct MatrixMatch {
     next_idx: usize,
 }
 
-fn try_match_matrix(tokens: &[Token], i: usize) -> Option<MatrixMatch> {
-    // tokens[i] must be Word("matrix") or Word("pile").
-    let is_pile = match tokens.get(i) {
-        Some(Token::Word(w)) if w == "matrix" => false,
-        Some(Token::Word(w)) if w == "pile" => true,
+fn try_match_matrix(tokens: &[Token], i: usize, depth: usize) -> Option<MatrixMatch> {
+    match tokens.get(i) {
+        Some(Token::Word(w)) if w == "matrix" || w == "pile" => {}
         _ => return None,
-    };
-
-    // Skip optional whitespace.
+    }
     let mut j = i + 1;
     while matches!(tokens.get(j), Some(Token::Word(w)) if w.trim().is_empty()) {
         j += 1;
     }
-
-    // Next token must be a Group.
     let group = match tokens.get(j) {
         Some(Token::Group(g)) => g.clone(),
         _ => return None,
     };
     j += 1;
 
-    let body = group
-        .strip_prefix('{')
-        .and_then(|s| s.strip_suffix('}'))
-        .unwrap_or(&group);
-
+    let body = strip_braces(&group);
     let rows: Vec<String> = body
         .split('#')
-        .map(|row| eqedit_to_latex(row.trim()))
+        .map(|row| convert_with_depth(row.trim(), depth + 1))
         .collect();
-
     let env_body = rows.join(" \\\\ ");
-    let _ = is_pile; // both forms use the same environment
     let latex = format!("\\begin{{matrix}}{env_body}\\end{{matrix}}");
-
     Some(MatrixMatch { latex, next_idx: j })
 }
 
@@ -362,60 +313,25 @@ fn try_match_matrix(tokens: &[Token], i: usize) -> Option<MatrixMatch> {
 // Step 3 – Expand keywords
 // ---------------------------------------------------------------------------
 
-/// Map each `Word` token that matches an EQEDIT keyword to its LaTeX equivalent.
-///
-/// `Group` tokens are recursively converted so that keywords inside braces (e.g.
-/// `sqrt{alpha}`) are handled correctly.
-fn expand_keywords(tokens: Vec<Token>) -> Vec<Token> {
+fn expand_keywords(tokens: Vec<Token>, depth: usize) -> Vec<Token> {
     tokens
         .into_iter()
         .map(|tok| match tok {
             Token::Word(w) => Token::Word(map_keyword(&w)),
-            Token::Group(g) => Token::Group(expand_group(&g)),
+            Token::Group(g) => Token::Group(expand_group(&g, depth)),
         })
         .collect()
 }
 
-/// Recursively convert the *interior* of a `{…}` group.
-fn expand_group(group: &str) -> String {
-    // Strip outer braces, convert interior, re-wrap.
-    let inner = group
-        .strip_prefix('{')
-        .and_then(|s| s.strip_suffix('}'))
-        .unwrap_or(group);
-
-    // Check whether the group begins with a structural keyword.  These need
-    // special handling at this level rather than generic keyword expansion.
-    let trimmed = inner.trim_start();
-    if trimmed.starts_with("matrix") && matches_keyword_start(trimmed, "matrix") {
-        return convert_matrix(trimmed, "matrix", false);
-    }
-    if trimmed.starts_with("pile") && matches_keyword_start(trimmed, "pile") {
-        return convert_matrix(trimmed, "pile", true);
-    }
-    if trimmed.starts_with("root") && matches_keyword_start(trimmed, "root") {
-        return convert_root(trimmed);
-    }
-
-    // General case: recursively tokenise → transform_over → expand → reassemble.
-    let converted = eqedit_to_latex(inner);
+fn expand_group(group: &str, depth: usize) -> String {
+    let inner = strip_braces(group);
+    let converted = convert_with_depth(inner, depth + 1);
     format!("{{{converted}}}")
 }
 
-/// Check that `s` starts with `keyword` followed by whitespace or `{` (i.e.
-/// it is the keyword as a whole word, not a prefix of a longer identifier).
-fn matches_keyword_start(s: &str, keyword: &str) -> bool {
-    let rest = &s[keyword.len()..];
-    rest.is_empty() || rest.starts_with('{') || rest.starts_with(' ') || rest.starts_with('\t')
-}
-
-/// Look up a bare EQEDIT keyword and return its LaTeX replacement.
-///
-/// If the word is not a recognised keyword it is returned unchanged.
 fn map_keyword(word: &str) -> String {
-    // Handle structural keywords that appear as bare words (not inside braces).
     match word {
-        // --- Greek letters (lowercase) ---
+        // Greek (lowercase)
         "alpha" => "\\alpha".into(),
         "beta" => "\\beta".into(),
         "gamma" => "\\gamma".into(),
@@ -445,8 +361,7 @@ fn map_keyword(word: &str) -> String {
         "chi" => "\\chi".into(),
         "psi" => "\\psi".into(),
         "omega" => "\\omega".into(),
-
-        // --- Greek letters (uppercase) ---
+        // Greek (uppercase)
         "Alpha" => "\\Alpha".into(),
         "Beta" => "\\Beta".into(),
         "Gamma" => "\\Gamma".into(),
@@ -470,8 +385,7 @@ fn map_keyword(word: &str) -> String {
         "Chi" => "\\Chi".into(),
         "Psi" => "\\Psi".into(),
         "Omega" => "\\Omega".into(),
-
-        // --- Arithmetic / relational operators ---
+        // Arithmetic / relational
         "times" => "\\times".into(),
         "div" => "\\div".into(),
         "pm" => "\\pm".into(),
@@ -487,8 +401,7 @@ fn map_keyword(word: &str) -> String {
         "cdots" => "\\cdots".into(),
         "vdots" => "\\vdots".into(),
         "ddots" => "\\ddots".into(),
-
-        // --- Set / logic operators ---
+        // Set / logic
         "in" => "\\in".into(),
         "notin" => "\\notin".into(),
         "subset" => "\\subset".into(),
@@ -499,8 +412,7 @@ fn map_keyword(word: &str) -> String {
         "cap" => "\\cap".into(),
         "forall" => "\\forall".into(),
         "exists" => "\\exists".into(),
-
-        // --- Calculus / large operators ---
+        // Calculus / large operators
         "sum" => "\\sum".into(),
         "prod" => "\\prod".into(),
         "int" => "\\int".into(),
@@ -510,8 +422,7 @@ fn map_keyword(word: &str) -> String {
         "infty" => "\\infty".into(),
         "partial" => "\\partial".into(),
         "nabla" => "\\nabla".into(),
-
-        // --- Arrows ---
+        // Arrows
         "to" => "\\to".into(),
         "leftarrow" => "\\leftarrow".into(),
         "rightarrow" => "\\rightarrow".into(),
@@ -519,8 +430,7 @@ fn map_keyword(word: &str) -> String {
         "Rightarrow" => "\\Rightarrow".into(),
         "leftrightarrow" => "\\leftrightarrow".into(),
         "Leftrightarrow" => "\\Leftrightarrow".into(),
-
-        // --- Miscellaneous ---
+        // Miscellaneous
         "sqrt" => "\\sqrt".into(),
         "vec" => "\\vec".into(),
         "hat" => "\\hat".into(),
@@ -528,140 +438,131 @@ fn map_keyword(word: &str) -> String {
         "tilde" => "\\tilde".into(),
         "dot" => "\\dot".into(),
         "ddot" => "\\ddot".into(),
-
-        // --- Delimiter keywords ---
-        "left(" => "\\left(".into(),
-        "right)" => "\\right)".into(),
-        "left[" => "\\left[".into(),
-        "right]" => "\\right]".into(),
-        "left|" => "\\left|".into(),
-        "right|" => "\\right|".into(),
-        "left" => "\\left".into(),
-        "right" => "\\right".into(),
-        "{" => "\\{".into(),
-        "}" => "\\}".into(),
-
-        // `root` as a standalone word means nothing; handled in expand_group.
-        // `matrix` / `pile` similarly.
-        // Pass everything else through as-is.
         other => other.into(),
     }
 }
 
 // ---------------------------------------------------------------------------
-// Step 4 – Handle structural forms: `root`, `matrix`, `pile`
+// Step 4 – Expand `left` / `right` delimiter sequences
 // ---------------------------------------------------------------------------
 
-/// Convert `matrix{…}` or `pile{…}` to a LaTeX `matrix` environment.
+/// Collapse `Word("left")` + delimiter and `Word("right")` + delimiter pairs
+/// into `\left…` / `\right…` LaTeX forms.
 ///
-/// EQEDIT separates rows with `#` and (for matrix) columns with `&`.
-/// For `pile` (single-column), rows are also `#`-separated; we treat each row
-/// as a single cell.
-///
-/// The function receives the *interior* of the outer group (i.e. `matrix{…}` or
-/// `pile{…}` without any surrounding braces), and returns the full LaTeX string
-/// including the outer `{…}` wrapper expected by `expand_group`.
-fn convert_matrix(inner: &str, keyword: &str, _is_pile: bool) -> String {
-    // Strip leading keyword name.
-    let rest = inner[keyword.len()..].trim_start();
+/// After tokenisation:
+/// - `left(` → `Word("left")` + `Word("(")`  → `\left(`
+/// - `left[` → `Word("left")` + `Word("[")`  → `\left[`
+/// - `left{ … }` → `Word("left")` + `Group("{…}")` → `\left\{…\right\}`
+fn expand_left_right(tokens: Vec<Token>, depth: usize) -> Vec<Token> {
+    let mut out: Vec<Token> = Vec::with_capacity(tokens.len());
+    let mut i = 0;
 
-    // The rest must begin with `{` — grab the balanced group.
-    let chars: Vec<char> = rest.chars().collect();
-    if chars.first() != Some(&'{') {
-        // Malformed — return the raw interior wrapped.
-        return format!("{{{inner}}}");
+    while i < tokens.len() {
+        match &tokens[i] {
+            Token::Word(w) if w == "left" => {
+                let mut j = i + 1;
+                while matches!(tokens.get(j), Some(Token::Word(ww)) if ww == " ") {
+                    j += 1;
+                }
+                match tokens.get(j) {
+                    Some(Token::Word(d)) if d == "(" => {
+                        out.push(Token::Word("\\left(".into()));
+                        i = j + 1;
+                    }
+                    Some(Token::Word(d)) if d == "[" => {
+                        out.push(Token::Word("\\left[".into()));
+                        i = j + 1;
+                    }
+                    Some(Token::Word(d)) if d == "|" => {
+                        out.push(Token::Word("\\left|".into()));
+                        i = j + 1;
+                    }
+                    Some(Token::Group(g)) => {
+                        // In EQEDIT, `left{ content right}` forms a braced-delimiter
+                        // pair.  The tokeniser consumed `{ content right}` as a group.
+                        // Strip any trailing `right` keyword from the interior.
+                        let interior = strip_braces(g);
+                        let (content, _had_right) = strip_trailing_right(interior);
+                        let converted = convert_with_depth(content.trim(), depth + 1);
+                        out.push(Token::Word(format!("\\left\\{{ {converted} \\right\\}}")));
+                        i = j + 1;
+                    }
+                    _ => {
+                        out.push(tokens[i].clone());
+                        i += 1;
+                    }
+                }
+            }
+            Token::Word(w) if w == "right" => {
+                let mut j = i + 1;
+                while matches!(tokens.get(j), Some(Token::Word(ww)) if ww == " ") {
+                    j += 1;
+                }
+                match tokens.get(j) {
+                    Some(Token::Word(d)) if d == ")" => {
+                        out.push(Token::Word("\\right)".into()));
+                        i = j + 1;
+                    }
+                    Some(Token::Word(d)) if d == "]" => {
+                        out.push(Token::Word("\\right]".into()));
+                        i = j + 1;
+                    }
+                    Some(Token::Word(d)) if d == "|" => {
+                        out.push(Token::Word("\\right|".into()));
+                        i = j + 1;
+                    }
+                    _ => {
+                        out.push(tokens[i].clone());
+                        i += 1;
+                    }
+                }
+            }
+            _ => {
+                out.push(tokens[i].clone());
+                i += 1;
+            }
+        }
     }
-    let (group, _) = consume_brace_group(&chars, 0);
-    let body = group
-        .strip_prefix('{')
-        .and_then(|s| s.strip_suffix('}'))
-        .unwrap_or(&group);
 
-    // Split on `#` (row separator).  Within each row, convert EQEDIT to LaTeX.
-    let rows: Vec<String> = body
-        .split('#')
-        .map(|row| eqedit_to_latex(row.trim()))
-        .collect();
-
-    // Join rows with `\\` (LaTeX newline) and wrap in the matrix environment.
-    let env_body = rows.join(" \\\\ ");
-    format!("{{\\begin{{matrix}}{env_body}\\end{{matrix}}}}")
+    out
 }
 
-/// Convert a `root{N}{X}` form to `\sqrt[N]{X}`.
-///
-/// This is called from `expand_group` when the content of a group starts with
-/// `root`.  It expects the *interior* of the outer group (everything between the
-/// outer `{…}`), and returns the full LaTeX string including the outer `{…}`
-/// wrapper.
-fn convert_root(inner: &str) -> String {
-    // Strip leading "root" and whitespace.
-    let rest = inner["root".len()..].trim_start();
-    let chars: Vec<char> = rest.chars().collect();
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
 
-    if chars.first() != Some(&'{') {
-        return format!("{{{inner}}}");
-    }
-
-    // First group: the index N.
-    let (n_group, after_n) = consume_brace_group(&chars, 0);
-    let n_inner = n_group
-        .strip_prefix('{')
+fn strip_braces(s: &str) -> &str {
+    s.strip_prefix('{')
         .and_then(|s| s.strip_suffix('}'))
-        .unwrap_or(&n_group);
-    let n_latex = eqedit_to_latex(n_inner);
-
-    // Skip whitespace after first group.
-    let remaining: String = chars[after_n..].iter().collect();
-    let remaining = remaining.trim_start();
-    let rem_chars: Vec<char> = remaining.chars().collect();
-
-    if rem_chars.first() != Some(&'{') {
-        return format!("{{{inner}}}");
-    }
-
-    // Second group: the radicand X.
-    let (x_group, _) = consume_brace_group(&rem_chars, 0);
-    let x_inner = x_group
-        .strip_prefix('{')
-        .and_then(|s| s.strip_suffix('}'))
-        .unwrap_or(&x_group);
-    let x_latex = eqedit_to_latex(x_inner);
-
-    format!("{{\\sqrt[{n_latex}]{{{x_latex}}}}}")
+        .unwrap_or(s)
 }
 
-// Override `expand_group` for the `root` keyword.
-// The function is called from `expand_group`; update that function to dispatch
-// to `convert_root` when appropriate.
-// (This is handled inline in `expand_group` above via `trimmed.starts_with`.)
+/// Strip a trailing ` right` keyword (with optional leading whitespace) from
+/// `s`, returning `(content, true)` if found, or `(s, false)` if not.
+///
+/// Used when processing the interior of a `left{…}` EQEDIT group where the
+/// tokeniser consumed `right}` as part of the balanced brace group.
+fn strip_trailing_right(s: &str) -> (&str, bool) {
+    let trimmed = s.trim_end();
+    if let Some(without) = trimmed.strip_suffix("right") {
+        (without.trim_end(), true)
+    } else {
+        (s, false)
+    }
+}
 
-// ---------------------------------------------------------------------------
-// Step 5 – Reassemble
-// ---------------------------------------------------------------------------
-
-/// Concatenate all tokens back into a string, stripping leading/trailing spaces.
 fn reassemble(tokens: &[Token]) -> String {
     tokens.iter().map(|t| t.as_str()).collect::<String>()
 }
 
 // ---------------------------------------------------------------------------
-// Patch: update expand_group to handle `root`
-// ---------------------------------------------------------------------------
-// (Already integrated above — `expand_group` checks for "root" before the
-// general recursive path.)
-
-// ---------------------------------------------------------------------------
-// Public entry point (re-export for clarity)
+// Tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // --- helper -----------------------------------------------------------
-
-    /// Assert that `eqedit_to_latex(input)` equals `expected`, trimming both.
     fn check(input: &str, expected: &str) {
         let got = eqedit_to_latex(input);
         assert_eq!(
@@ -690,8 +591,6 @@ mod tests {
 
     #[test]
     fn already_valid_latex_passthrough() {
-        // A script that is already valid LaTeX (no EQEDIT keywords) must
-        // survive unchanged.
         check("\\frac{1}{2}", "\\frac{1}{2}");
     }
 
@@ -719,7 +618,6 @@ mod tests {
 
     #[test]
     fn fraction_with_extra_whitespace() {
-        // Multiple spaces between components should still match.
         check("{p}  over  {q}", "\\frac{p}{q}");
     }
 
@@ -859,8 +757,6 @@ mod tests {
 
     #[test]
     fn nested_fractions() {
-        // {{{a} over {b}} over {c}} is unusual but should not panic.
-        // We only check that it contains two \frac occurrences.
         let result = eqedit_to_latex("{{a} over {b}} over {c}");
         assert!(
             result.contains("\\frac"),
@@ -880,18 +776,12 @@ mod tests {
 
     #[test]
     fn matrix_single_row() {
-        check(
-            "matrix{1 & 2 & 3}",
-            "\\begin{matrix}1 & 2 & 3\\end{matrix}",
-        );
+        check("matrix{1 & 2 & 3}", "\\begin{matrix}1 & 2 & 3\\end{matrix}");
     }
 
     #[test]
     fn pile_two_rows() {
-        check(
-            "pile{a # b}",
-            "\\begin{matrix}a \\\\ b\\end{matrix}",
-        );
+        check("pile{a # b}", "\\begin{matrix}a \\\\ b\\end{matrix}");
     }
 
     // --- delimiter forms --------------------------------------------------
@@ -910,8 +800,6 @@ mod tests {
 
     #[test]
     fn over_without_groups_is_passed_through() {
-        // If `over` appears without surrounding groups it is not a fraction.
-        // It may not produce valid LaTeX, but must not panic.
         let result = eqedit_to_latex("a over b");
         assert!(!result.is_empty());
     }
