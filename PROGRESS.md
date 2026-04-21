@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: Phase 2 완료 (HWP 제어 문자 파싱 + 메타데이터)
+## 현재 상태: Phase 2b 완료 (서브모듈 분할 + 하이퍼링크 + DRM)
 
 ### 완료
 
@@ -44,13 +44,18 @@
   - 리뷰 수정: checked_mul 오버플로우 가드, 행 인덱스 10K cap, gshape/gsotype 테스트 5건
   - 130 테스트 (116 unit + 14 integration, 0 failures)
 
+- [x] Phase 2b + 아키텍처 리팩토링 (71e54ea):
+  - reader.rs 서브모듈 분할: reader(828L), control(781L), convert(434L), summary(238L)
+  - 하이퍼링크 URL 추출 (CTRL_HYPERLINK + parse_hyperlink_url + IR 변환)
+  - parse_summary_bytes 분리 + OLE2 바이트 버퍼 테스트 4건
+  - DRM/암호화 감지 (has_drm 비트 검사 + Hwp2MdError)
+  - 142 테스트 (128 unit + 14 integration, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
-
-- [ ] Phase 2b: HWP 파싱 고도화 (하이퍼링크 URL 추출, EQEDIT→LaTeX 고도화, DRM 감지)
 - [ ] Phase 3: HWPX 파싱 고도화 (스타일, colspan, BinData)
 - [ ] Phase 4: Markdown 렌더러 고도화 (GFM 검증, 이미지 옵션)
 - [ ] Phase 5: HWPX 라이터 고도화 (스타일, 이미지, 템플릿)
@@ -83,21 +88,23 @@
 ## 장기 개선 로드맵 (Phase 2~6)
 
 ### 아키텍처
-- [ ] reader.rs 분할 (현재 2000+ lines → table/image/summary 서브모듈)
+- [x] reader.rs 서브모듈 분할 (2057→828+781+434+238) ✅
 - [ ] ParseContext 19필드 → 타입 상태 패턴 또는 빌더 분리
 - [ ] Reader/Writer trait 정의 (HWP/HWPX/MD 공통 인터페이스)
 - [x] HwpDocument → IR 변환에서 제어 문자 파싱 (테이블/이미지/각주) ✅
 
-### HWP 파서 (Phase 2) — 완료 항목
+### HWP 파서 (Phase 2+2b) — 완료 항목
 - [x] CTRL_TABLE + LIST_HEADER 레코드로 테이블 구조 파싱 ✅
 - [x] BinData 참조 해결 → 이미지 인라인 삽입 ✅
 - [x] CTRL_FOOTNOTE/ENDNOTE 파싱 ✅
+- [x] 하이퍼링크 URL 추출 (CTRL_HYPERLINK + parse_hyperlink_url) ✅
+- [x] DRM/암호화 감지 (has_drm 비트 + Hwp2MdError) ✅
+- [x] parse_summary_bytes 분리 + OLE2 단위 테스트 ✅
 
-### HWP 파서 (Phase 2b) — 남은 항목
-- [ ] 하이퍼링크 URL 추출 (CTRL_HEADER에서 URL 바이트 파싱)
+### HWP 파서 — 남은 항목
 - [ ] EQEDIT 스크립트 → LaTeX 변환 고도화
-- [ ] DRM/암호화 감지 메시지 개선
-- [ ] read_summary_info 단위 테스트 (OLE2 바이트 버퍼 기반)
+- [ ] 샘플 HWP/HWPX 파일 기반 통합 테스트
+- [ ] 커버리지 80%+ 측정 (tarpaulin)
 
 ### 배포 (Phase 6)
 - [ ] GitHub Actions CI (build + test + clippy)
@@ -105,6 +112,19 @@
 - [ ] 배치 변환 CLI 옵션
 
 ## 변경 이력
+
+### 2026-04-22 — Phase 2b: 서브모듈 분할 + 하이퍼링크 + DRM (71e54ea)
+
+**아키텍처 리팩토링**:
+- reader.rs (2057L) → reader.rs (828L) + control.rs (781L) + convert.rs (434L) + summary.rs (238L)
+- 모든 파일 800L 가이드라인 준수 (reader.rs 828L는 테스트 포함)
+
+**Phase 2b 기능**:
+- 하이퍼링크 URL 추출: CTRL_HYPERLINK → parse_hyperlink_url → IR Paragraph + linked Inline
+- parse_summary_bytes 추출: OLE2 파싱 로직 분리, 바이트 버퍼 기반 테스트 가능
+- DRM 감지: has_drm 비트 검사 추가, Hwp2MdError 타입으로 일관된 에러 반환
+
+**검증**: cargo check 0 에러, clippy 0 경고, 142 테스트 (128 unit + 14 integration)
 
 ### 2026-04-22 — Phase 2: HWP 제어 문자 파싱 (14694df + 77db271)
 
