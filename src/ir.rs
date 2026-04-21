@@ -146,3 +146,54 @@ pub struct Asset {
     pub data: Vec<u8>,
     pub mime_type: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inline_plain_sets_text_and_all_bools_false() {
+        let i = Inline::plain("hello");
+        assert_eq!(i.text, "hello");
+        assert!(!i.bold);
+        assert!(!i.italic);
+        assert!(!i.underline);
+        assert!(!i.strikethrough);
+        assert!(!i.code);
+        assert!(!i.superscript);
+        assert!(!i.subscript);
+        assert!(i.link.is_none());
+        assert!(i.footnote_ref.is_none());
+    }
+
+    #[test]
+    fn inline_bold_sets_text_and_bold_true_rest_false() {
+        let i = Inline::bold("strong");
+        assert_eq!(i.text, "strong");
+        assert!(i.bold);
+        assert!(!i.italic);
+        assert!(!i.underline);
+        assert!(!i.strikethrough);
+        assert!(!i.code);
+        assert!(!i.superscript);
+        assert!(!i.subscript);
+        assert!(i.link.is_none());
+        assert!(i.footnote_ref.is_none());
+    }
+
+    #[test]
+    fn document_new_has_empty_sections_and_assets() {
+        let doc = Document::new();
+        assert!(doc.sections.is_empty());
+        assert!(doc.assets.is_empty());
+    }
+
+    #[test]
+    fn document_default_equals_new() {
+        let a = Document::new();
+        let b = Document::default();
+        // Both must be empty — compare structurally via their serialized form.
+        assert_eq!(a.sections.len(), b.sections.len());
+        assert_eq!(a.assets.len(), b.assets.len());
+    }
+}

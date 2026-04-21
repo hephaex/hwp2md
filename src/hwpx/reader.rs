@@ -512,14 +512,21 @@ fn flush_cell_paragraph(ctx: &mut ParseContext) {
     }
 }
 
-fn parse_heading_style(style_ref: &str) -> Option<u8> {
+pub(crate) fn parse_heading_style(style_ref: &str) -> Option<u8> {
     let lower = style_ref.to_lowercase();
     if lower.contains("heading") || lower.contains("제목") || lower.contains("개요") {
-        for ch in style_ref.chars() {
-            if let Some(digit) = ch.to_digit(10) {
-                if (1..=6).contains(&digit) {
-                    return Some(digit as u8);
-                }
+        // Extract the trailing number so "Heading12" → 12, "제목 10" → 10
+        let num_str: String = style_ref
+            .chars()
+            .rev()
+            .take_while(|c| c.is_ascii_digit())
+            .collect::<String>()
+            .chars()
+            .rev()
+            .collect();
+        if let Ok(n) = num_str.parse::<u8>() {
+            if (1..=6).contains(&n) {
+                return Some(n);
             }
         }
         return Some(1);
@@ -577,5 +584,53 @@ fn guess_mime_from_name(name: &str) -> String {
         "image/x-emf".to_string()
     } else {
         "application/octet-stream".to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_heading_style_heading1() {
+        assert_eq!(parse_heading_style("Heading1"), Some(1));
+    }
+
+    #[test]
+    fn parse_heading_style_heading6() {
+        assert_eq!(parse_heading_style("Heading6"), Some(6));
+    }
+
+    #[test]
+    fn parse_heading_style_korean_title() {
+        // "제목1" → 1
+        assert_eq!(parse_heading_style("제목1"), Some(1));
+    }
+
+    #[test]
+    fn parse_heading_style_korean_outline_3() {
+        // "개요3" → 3
+        assert_eq!(parse_heading_style("개요3"), Some(3));
+    }
+
+    #[test]
+    fn parse_heading_style_normal_is_none() {
+        assert_eq!(parse_heading_style("Normal"), None);
+    }
+
+    #[test]
+    fn parse_heading_style_body_text_is_none() {
+        assert_eq!(parse_heading_style("BodyText"), None);
+    }
+
+    #[test]
+    fn parse_heading_style_heading_no_digit_defaults_to_1() {
+        // "Heading" without a trailing digit → defaults to level 1.
+        assert_eq!(parse_heading_style("Heading"), Some(1));
+    }
+
+    #[test]
+    fn parse_heading_style_case_insensitive() {
+        assert_eq!(parse_heading_style("HEADING2"), Some(2));
     }
 }

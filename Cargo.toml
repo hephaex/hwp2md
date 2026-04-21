@@ -31,8 +31,6 @@ zip = { version = "2.0", default-features = false, features = ["deflate"] }
 # XML parsing (HWPX)
 quick-xml = { version = "0.37", features = ["serialize"] }
 
-# Text encoding
-encoding_rs = "0.8"
 byteorder = "1.5"
 
 # Markdown
@@ -43,7 +41,6 @@ clap = { version = "4", features = ["derive"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
-serde_yaml = "0.9"
 
 # Error handling
 thiserror = "2"

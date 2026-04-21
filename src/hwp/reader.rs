@@ -104,7 +104,13 @@ fn read_file_header(cfb: &mut cfb::CompoundFile<std::fs::File>) -> Result<FileHe
 /// Maximum decompressed size to prevent decompression bombs (256 MB).
 const MAX_DECOMPRESSED: u64 = 256 * 1024 * 1024;
 
-fn decompress_stream(data: &[u8]) -> Result<Vec<u8>, Hwp2MdError> {
+/// HWP font height is in 1/100 point units (HWP internal unit).
+/// e.g. 1600 = 16pt, 1400 = 14pt, 1200 = 12pt.
+const HEADING1_MIN_HEIGHT: u32 = 1600; // 16pt
+const HEADING2_MIN_HEIGHT: u32 = 1400; // 14pt
+const HEADING3_MIN_HEIGHT: u32 = 1200; // 12pt
+
+pub(crate) fn decompress_stream(data: &[u8]) -> Result<Vec<u8>, Hwp2MdError> {
     let mut out = Vec::new();
     let decoder = DeflateDecoder::new(data);
     if let Err(e) = decoder.take(MAX_DECOMPRESSED).read_to_end(&mut out) {
@@ -181,54 +187,53 @@ fn read_doc_info(
     Ok(doc_info)
 }
 
-fn parse_char_shape(data: &[u8]) -> CharShape {
+pub(crate) fn parse_char_shape(data: &[u8]) -> CharShape {
+    // HWP 5.0 CharShape record layout:
+    //   bytes  0-13: face_id array (7 × u16 = 14 bytes)
+    //   bytes 14-20: ratio array   (7 × u8)
+    //   bytes 21-27: spacing array (7 × i8)
+    //   bytes 28-34: rel_size array(7 × u8)
+    //   bytes 35-41: offset array  (7 × i8)
+    //   bytes 42-45: height        (i32)
+    //   bytes 46-49: attribute flags (u32) ← bold/italic/underline/strikethrough
+    //   bytes 50-53: shadow space  (i16 × 2)
+    //   bytes 54-57: color         (u32)
     let mut shape = CharShape::default();
-    if data.len() < 72 {
+    if data.len() < 58 {
         return shape;
     }
 
     let mut cur = Cursor::new(data);
+    // Read first face_id; the remaining 6 face_ids are skipped via set_position.
     if let Ok(face_id) = cur.read_u16::<LittleEndian>() {
         shape.face_id = face_id;
     }
 
-    let _ = cur.read_u16::<LittleEndian>();
-    let _ = cur.read_u16::<LittleEndian>();
-    let _ = cur.read_u16::<LittleEndian>();
-    let _ = cur.read_u16::<LittleEndian>();
-    let _ = cur.read_u16::<LittleEndian>();
-    let _ = cur.read_u16::<LittleEndian>();
-
-    for _ in 0..7 {
-        let _ = cur.read_u8();
-    }
-    for _ in 0..7 {
-        let _ = cur.read_u8();
-    }
-    for _ in 0..7 {
-        let _ = cur.read_u8();
-    }
+    // Jump directly to height at byte 42 instead of manually skipping each field.
+    cur.set_position(42);
 
     if let Ok(h) = cur.read_i32::<LittleEndian>() {
         shape.height = h as u32;
     }
 
-    if data.len() >= 64 {
-        let attr = u32::from_le_bytes([data[60], data[61], data[62], data[63]]);
+    // Attribute flags at bytes 46-49.
+    if data.len() >= 50 {
+        let attr = u32::from_le_bytes([data[46], data[47], data[48], data[49]]);
         shape.bold = (attr & 0x01) != 0;
         shape.italic = (attr & 0x02) != 0;
         shape.underline = (attr & 0x04) != 0;
         shape.strikethrough = (attr & 0x40) != 0;
     }
 
-    if data.len() >= 68 {
-        shape.color = u32::from_le_bytes([data[64], data[65], data[66], data[67]]);
+    // Color at bytes 54-57.
+    if data.len() >= 58 {
+        shape.color = u32::from_le_bytes([data[54], data[55], data[56], data[57]]);
     }
 
     shape
 }
 
-fn parse_para_shape(data: &[u8]) -> ParaShape {
+pub(crate) fn parse_para_shape(data: &[u8]) -> ParaShape {
     let mut shape = ParaShape::default();
     if data.len() < 8 {
         return shape;
@@ -382,7 +387,7 @@ fn read_section_stream(
     Ok(section)
 }
 
-fn extract_paragraph_text(data: &[u8]) -> String {
+pub(crate) fn extract_paragraph_text(data: &[u8]) -> String {
     let mut result = String::new();
     let mut i = 0;
     let len = data.len();
@@ -560,13 +565,13 @@ fn detect_heading_level(para: &HwpParagraph, doc_info: &DocInfo) -> Option<u8> {
             let cs_id = first_cs.1 as usize;
             if cs_id < doc_info.char_shapes.len() {
                 let cs = &doc_info.char_shapes[cs_id];
-                if cs.height >= 1600 && cs.bold {
+                if cs.height >= HEADING1_MIN_HEIGHT && cs.bold {
                     return Some(1);
                 }
-                if cs.height >= 1400 && cs.bold {
+                if cs.height >= HEADING2_MIN_HEIGHT && cs.bold {
                     return Some(2);
                 }
-                if cs.height >= 1200 && cs.bold {
+                if cs.height >= HEADING3_MIN_HEIGHT && cs.bold {
                     return Some(3);
                 }
             }
@@ -659,5 +664,292 @@ fn mime_to_ext(mime: &str) -> &'static str {
         "image/bmp" => "bmp",
         "image/webp" => "webp",
         _ => "bin",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    /// Encode a slice of u16 code units as little-endian bytes (the wire format
+    /// used by HWPTAG_PARA_TEXT records).
+    fn encode_u16s(units: &[u16]) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(units.len() * 2);
+        for &u in units {
+            buf.push((u & 0xFF) as u8);
+            buf.push((u >> 8) as u8);
+        }
+        buf
+    }
+
+    /// Build a CharShape record matching the current layout in `parse_char_shape`:
+    ///   bytes  0-13: face_id array (7 × u16)
+    ///   bytes 14-41: ratio/spacing/rel_size/offset arrays
+    ///   bytes 42-45: height (i32 LE)
+    ///   bytes 46-49: attribute flags (u32 LE) — bold=0x01, italic=0x02, underline=0x04, strike=0x40
+    ///   bytes 50-53: shadow space
+    ///   bytes 54-57: color (u32)
+    /// The minimum size checked is 58 bytes.
+    fn make_char_shape_data(flags: u32, height: i32) -> Vec<u8> {
+        let mut data = vec![0u8; 58];
+        let hb = height.to_le_bytes();
+        data[42] = hb[0];
+        data[43] = hb[1];
+        data[44] = hb[2];
+        data[45] = hb[3];
+        let fb = flags.to_le_bytes();
+        data[46] = fb[0];
+        data[47] = fb[1];
+        data[48] = fb[2];
+        data[49] = fb[3];
+        data
+    }
+
+    // -----------------------------------------------------------------------
+    // extract_paragraph_text
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn extract_paragraph_text_basic_korean() {
+        // "한글" — U+D55C U+AE00
+        let data = encode_u16s(&[0xD55C, 0xAE00]);
+        assert_eq!(extract_paragraph_text(&data), "한글");
+    }
+
+    #[test]
+    fn extract_paragraph_text_ascii() {
+        let data = encode_u16s(&[b'H' as u16, b'i' as u16]);
+        assert_eq!(extract_paragraph_text(&data), "Hi");
+    }
+
+    #[test]
+    fn extract_paragraph_text_tab() {
+        let data = encode_u16s(&[0x0009]);
+        assert_eq!(extract_paragraph_text(&data), "\t");
+    }
+
+    #[test]
+    fn extract_paragraph_text_newline() {
+        let data = encode_u16s(&[0x000A]);
+        assert_eq!(extract_paragraph_text(&data), "\n");
+    }
+
+    #[test]
+    fn extract_paragraph_text_paragraph_break_skipped() {
+        // 0x000D is a paragraph-break marker; it must not appear in output.
+        let data = encode_u16s(&[b'A' as u16, 0x000D, b'B' as u16]);
+        assert_eq!(extract_paragraph_text(&data), "AB");
+    }
+
+    #[test]
+    fn extract_paragraph_text_control_chars_skip_14_bytes() {
+        // Control codes 0x0003–0x0008 are followed by 14 skip-bytes.
+        // After the control code (2 bytes) we place 7 u16 zero-words (= 14 bytes),
+        // then the letter 'X'.
+        let mut units: Vec<u16> = vec![0x0003];
+        units.extend_from_slice(&[0u16; 7]); // 7 × 2 = 14 bytes
+        units.push(b'X' as u16);
+        let data = encode_u16s(&units);
+        assert_eq!(extract_paragraph_text(&data), "X");
+    }
+
+    #[test]
+    fn extract_paragraph_text_truncated_control_stops_gracefully() {
+        // Control code 0x0001 but only 2 more bytes remain (< 14) → must not panic.
+        let data = encode_u16s(&[0x0001, 0x0000]);
+        let result = extract_paragraph_text(&data);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn extract_paragraph_text_surrogate_pair() {
+        // U+1F600 GRINNING FACE → surrogate pair 0xD83D 0xDE00
+        let data = encode_u16s(&[0xD83D, 0xDE00]);
+        assert_eq!(extract_paragraph_text(&data), "\u{1F600}");
+    }
+
+    #[test]
+    fn extract_paragraph_text_empty_input() {
+        assert_eq!(extract_paragraph_text(&[]), "");
+    }
+
+    #[test]
+    fn extract_paragraph_text_null_code_unit_skipped() {
+        // 0x0000 must be silently ignored.
+        let data = encode_u16s(&[0x0000, b'Z' as u16]);
+        assert_eq!(extract_paragraph_text(&data), "Z");
+    }
+
+    // -----------------------------------------------------------------------
+    // parse_char_shape
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_char_shape_bold_flag() {
+        let cs = parse_char_shape(&make_char_shape_data(0x01, 0));
+        assert!(cs.bold);
+        assert!(!cs.italic);
+        assert!(!cs.underline);
+        assert!(!cs.strikethrough);
+    }
+
+    #[test]
+    fn parse_char_shape_italic_flag() {
+        let cs = parse_char_shape(&make_char_shape_data(0x02, 0));
+        assert!(!cs.bold);
+        assert!(cs.italic);
+    }
+
+    #[test]
+    fn parse_char_shape_underline_flag() {
+        let cs = parse_char_shape(&make_char_shape_data(0x04, 0));
+        assert!(cs.underline);
+    }
+
+    #[test]
+    fn parse_char_shape_strikethrough_flag() {
+        // strikethrough = bit 6 = 0x40
+        let cs = parse_char_shape(&make_char_shape_data(0x40, 0));
+        assert!(cs.strikethrough);
+        assert!(!cs.bold);
+    }
+
+    #[test]
+    fn parse_char_shape_all_style_flags() {
+        // bold | italic | underline | strikethrough = 0x01 | 0x02 | 0x04 | 0x40 = 0x47
+        let cs = parse_char_shape(&make_char_shape_data(0x47, 0));
+        assert!(cs.bold);
+        assert!(cs.italic);
+        assert!(cs.underline);
+        assert!(cs.strikethrough);
+    }
+
+    #[test]
+    fn parse_char_shape_short_data_returns_default() {
+        // The guard is data.len() < 58; use 20 bytes to trigger the early return.
+        let cs = parse_char_shape(&[0u8; 20]);
+        assert!(!cs.bold);
+        assert!(!cs.italic);
+        assert!(!cs.underline);
+        assert!(!cs.strikethrough);
+        assert_eq!(cs.height, 0);
+    }
+
+    #[test]
+    fn parse_char_shape_height_parsed() {
+        let cs = parse_char_shape(&make_char_shape_data(0, 1400));
+        assert_eq!(cs.height, 1400);
+    }
+
+    // -----------------------------------------------------------------------
+    // parse_para_shape
+    // -----------------------------------------------------------------------
+
+    fn make_para_shape_data(alignment_nibble: u8, margin_left: i32, line_spacing: i32) -> Vec<u8> {
+        let mut data = vec![0u8; 24];
+        data[0] = alignment_nibble & 0x07;
+        let ml = margin_left.to_le_bytes();
+        data[4] = ml[0];
+        data[5] = ml[1];
+        data[6] = ml[2];
+        data[7] = ml[3];
+        let ls = line_spacing.to_le_bytes();
+        data[20] = ls[0];
+        data[21] = ls[1];
+        data[22] = ls[2];
+        data[23] = ls[3];
+        data
+    }
+
+    #[test]
+    fn parse_para_shape_alignment_justify() {
+        let ps = parse_para_shape(&make_para_shape_data(0, 0, 0));
+        assert_eq!(ps.alignment, crate::hwp::model::Alignment::Justify);
+    }
+
+    #[test]
+    fn parse_para_shape_alignment_left() {
+        let ps = parse_para_shape(&make_para_shape_data(1, 0, 0));
+        assert_eq!(ps.alignment, crate::hwp::model::Alignment::Left);
+    }
+
+    #[test]
+    fn parse_para_shape_alignment_right() {
+        let ps = parse_para_shape(&make_para_shape_data(2, 0, 0));
+        assert_eq!(ps.alignment, crate::hwp::model::Alignment::Right);
+    }
+
+    #[test]
+    fn parse_para_shape_alignment_center() {
+        let ps = parse_para_shape(&make_para_shape_data(3, 0, 0));
+        assert_eq!(ps.alignment, crate::hwp::model::Alignment::Center);
+    }
+
+    #[test]
+    fn parse_para_shape_alignment_unknown_defaults_to_left() {
+        let ps = parse_para_shape(&make_para_shape_data(7, 0, 0));
+        assert_eq!(ps.alignment, crate::hwp::model::Alignment::Left);
+    }
+
+    #[test]
+    fn parse_para_shape_margin_left() {
+        let ps = parse_para_shape(&make_para_shape_data(1, 500, 0));
+        assert_eq!(ps.margin_left, 500);
+    }
+
+    #[test]
+    fn parse_para_shape_line_spacing() {
+        let ps = parse_para_shape(&make_para_shape_data(1, 0, 160));
+        assert_eq!(ps.line_spacing, 160);
+    }
+
+    #[test]
+    fn parse_para_shape_short_data_returns_default() {
+        let ps = parse_para_shape(&[0u8; 4]);
+        assert_eq!(ps.margin_left, 0);
+        assert_eq!(ps.line_spacing, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // decompress_stream
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn decompress_stream_valid_deflate() {
+        use flate2::{write::DeflateEncoder, Compression};
+        use std::io::Write;
+
+        let original = b"Hello, HWP world!";
+        let mut enc = DeflateEncoder::new(Vec::new(), Compression::default());
+        enc.write_all(original).unwrap();
+        let compressed = enc.finish().unwrap();
+
+        let decompressed = decompress_stream(&compressed).unwrap();
+        assert_eq!(decompressed, original);
+    }
+
+    #[test]
+    fn decompress_stream_valid_zlib_fallback() {
+        use flate2::{write::ZlibEncoder, Compression};
+        use std::io::Write;
+
+        let original = b"zlib fallback test data";
+        let mut enc = ZlibEncoder::new(Vec::new(), Compression::default());
+        enc.write_all(original).unwrap();
+        let compressed = enc.finish().unwrap();
+
+        // zlib bytes are not valid raw deflate, so the first pass must fail and
+        // the zlib decoder must succeed.
+        let decompressed = decompress_stream(&compressed).unwrap();
+        assert_eq!(decompressed, original);
+    }
+
+    #[test]
+    fn decompress_stream_invalid_data_returns_error() {
+        assert!(decompress_stream(b"\x00\x01\x02\x03rubbish").is_err());
     }
 }
