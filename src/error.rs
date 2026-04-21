@@ -17,6 +17,15 @@ pub enum Hwp2MdError {
     #[error("HWPX write error: {0}")]
     HwpxWrite(String),
 
+    #[error("decompression error: {0}")]
+    Decompress(String),
+
+    #[error("invalid record: {0}")]
+    InvalidRecord(String),
+
+    #[error("encoding error: {0}")]
+    Encoding(String),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }

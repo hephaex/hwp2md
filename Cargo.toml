@@ -1,6 +1,6 @@
 [package]
 name = "hwp2md"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Mario Cho <hephaex@gmail.com>"]
 description = "HWP/HWPX ↔ Markdown bidirectional converter"
@@ -19,40 +19,43 @@ name = "hwp2md"
 path = "src/lib.rs"
 
 [dependencies]
-# HWP parsing
-unhwp = "0.2"
-hwpforge = "0.5"
-hwpforge-smithy-md = "0.5"
-hwpforge-smithy-hwpx = "0.5"
-hwpforge-core = "0.5"
-hwpforge-foundation = "0.5"
-
-# Low-level format handling
+# CFB/OLE2 container (HWP 5.0)
 cfb = "0.14"
+
+# Compression
 flate2 = "1.0"
+
+# ZIP container (HWPX)
 zip = { version = "2.0", default-features = false, features = ["deflate"] }
-quick-xml = "0.37"
+
+# XML parsing (HWPX)
+quick-xml = { version = "0.37", features = ["serialize"] }
+
+# Text encoding
 encoding_rs = "0.8"
-codepage = "0.1"
 byteorder = "1.5"
 
 # Markdown
 comrak = "0.34"
-pulldown-cmark = "0.12"
 
-# CLI & utility
+# CLI
 clap = { version = "4", features = ["derive"] }
+
+# Serialization
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_yaml = "0.9"
+
+# Error handling
 thiserror = "2"
 anyhow = "1"
+
+# Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 tempfile = "3"
 pretty_assertions = "1"
-insta = "1"
 
 [profile.release]
 lto = true

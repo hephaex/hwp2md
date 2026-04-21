@@ -7,6 +7,22 @@ pub struct Document {
     pub assets: Vec<Asset>,
 }
 
+impl Document {
+    pub fn new() -> Self {
+        Self {
+            metadata: Metadata::default(),
+            sections: Vec::new(),
+            assets: Vec::new(),
+        }
+    }
+}
+
+impl Default for Document {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Metadata {
     pub title: Option<String>,
@@ -14,6 +30,8 @@ pub struct Metadata {
     pub created: Option<String>,
     pub modified: Option<String>,
     pub description: Option<String>,
+    pub subject: Option<String>,
+    pub keywords: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,15 +41,42 @@ pub struct Section {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Block {
-    Heading { level: u8, text: Vec<Inline> },
-    Paragraph { text: Vec<Inline> },
-    Table { rows: Vec<TableRow> },
-    CodeBlock { language: Option<String>, code: String },
-    BlockQuote { blocks: Vec<Block> },
-    List { ordered: bool, items: Vec<ListItem> },
-    Image { src: String, alt: String },
+    Heading {
+        level: u8,
+        inlines: Vec<Inline>,
+    },
+    Paragraph {
+        inlines: Vec<Inline>,
+    },
+    Table {
+        rows: Vec<TableRow>,
+        col_count: usize,
+    },
+    CodeBlock {
+        language: Option<String>,
+        code: String,
+    },
+    BlockQuote {
+        blocks: Vec<Block>,
+    },
+    List {
+        ordered: bool,
+        start: u32,
+        items: Vec<ListItem>,
+    },
+    Image {
+        src: String,
+        alt: String,
+    },
     HorizontalRule,
-    Footnote { id: String, content: Vec<Block> },
+    Footnote {
+        id: String,
+        content: Vec<Block>,
+    },
+    Math {
+        display: bool,
+        tex: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,11 +84,30 @@ pub struct Inline {
     pub text: String,
     pub bold: bool,
     pub italic: bool,
+    pub underline: bool,
     pub strikethrough: bool,
     pub code: bool,
-    pub link: Option<String>,
     pub superscript: bool,
     pub subscript: bool,
+    pub link: Option<String>,
+    pub footnote_ref: Option<String>,
+}
+
+impl Inline {
+    pub fn plain(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            ..Self::default()
+        }
+    }
+
+    pub fn bold(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            bold: true,
+            ..Self::default()
+        }
+    }
 }
 
 impl Default for Inline {
@@ -52,11 +116,13 @@ impl Default for Inline {
             text: String::new(),
             bold: false,
             italic: false,
+            underline: false,
             strikethrough: false,
             code: false,
-            link: None,
             superscript: false,
             subscript: false,
+            link: None,
+            footnote_ref: None,
         }
     }
 }
@@ -64,18 +130,29 @@ impl Default for Inline {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableRow {
     pub cells: Vec<TableCell>,
+    pub is_header: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableCell {
-    pub content: Vec<Inline>,
+    pub blocks: Vec<Block>,
     pub colspan: u32,
     pub rowspan: u32,
 }
 
+impl Default for TableCell {
+    fn default() -> Self {
+        Self {
+            blocks: Vec::new(),
+            colspan: 1,
+            rowspan: 1,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListItem {
-    pub content: Vec<Inline>,
+    pub blocks: Vec<Block>,
     pub children: Vec<ListItem>,
 }
 

@@ -1,8 +1,6 @@
 pub mod convert;
 pub mod error;
-pub mod hwp_reader;
-pub mod hwpx_reader;
-pub mod hwpx_writer;
+pub mod hwp;
+pub mod hwpx;
 pub mod ir;
-pub mod md_parser;
-pub mod md_writer;
+pub mod md;

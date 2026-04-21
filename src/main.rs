@@ -62,7 +62,6 @@ fn main() -> Result<()> {
             assets_dir,
             frontmatter,
         } => {
-            tracing::info!("Converting {:?} to Markdown", input);
             hwp2md::convert::to_markdown(
                 &input,
                 output.as_deref(),
@@ -75,7 +74,6 @@ fn main() -> Result<()> {
             output,
             style,
         } => {
-            tracing::info!("Converting {:?} to HWPX", input);
             hwp2md::convert::to_hwpx(&input, output.as_deref(), style.as_deref())?;
         }
         Commands::Info { input } => {
