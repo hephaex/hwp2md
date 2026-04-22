@@ -123,35 +123,62 @@ fn write_block(out: &mut String, block: &ir::Block, indent: usize) {
     }
 }
 
+/// Escape Markdown metacharacters in plain inline text so they are treated
+/// literally by GFM renderers.  Only characters that cause misinterpretation
+/// inside a formatted inline span are escaped: backslash, backtick, asterisk,
+/// underscore, tilde, and square brackets.  Parentheses are intentionally
+/// left unescaped because they only matter when preceded by `]`, which cannot
+/// occur in plain text after bracket-escaping.
+fn escape_inline(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            '\\' | '`' | '*' | '_' | '~' | '[' | ']' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
 fn render_inlines(inlines: &[ir::Inline]) -> String {
     let mut out = String::new();
     for inline in inlines {
-        let mut text = inline.text.clone();
-
+        // Code spans: wrap raw text in backticks; no other escaping needed.
         if inline.code {
-            out.push_str(&format!("`{text}`"));
+            out.push_str(&format!("`{}`", inline.text));
             continue;
         }
 
-        if inline.bold && inline.italic {
-            text = format!("***{text}***");
-        } else if inline.bold {
-            text = format!("**{text}**");
-        } else if inline.italic {
-            text = format!("*{text}*");
-        }
+        // Escape Markdown metacharacters in the visible text.
+        let mut text = escape_inline(&inline.text);
 
-        if inline.strikethrough {
-            text = format!("~~{text}~~");
-        }
-        if inline.underline {
-            text = format!("<u>{text}</u>");
-        }
-        if inline.superscript {
-            text = format!("<sup>{text}</sup>");
-        }
-        if inline.subscript {
-            text = format!("<sub>{text}</sub>");
+        // Apply bold/italic only when the text is non-empty; wrapping an empty
+        // string with `**` or `*` produces `****` / `**` which most GFM
+        // renderers emit as literal asterisks rather than an empty span.
+        if !text.is_empty() {
+            if inline.bold && inline.italic {
+                text = format!("***{text}***");
+            } else if inline.bold {
+                text = format!("**{text}**");
+            } else if inline.italic {
+                text = format!("*{text}*");
+            }
+
+            if inline.strikethrough {
+                text = format!("~~{text}~~");
+            }
+            if inline.underline {
+                text = format!("<u>{text}</u>");
+            }
+            if inline.superscript {
+                text = format!("<sup>{text}</sup>");
+            }
+            if inline.subscript {
+                text = format!("<sub>{text}</sub>");
+            }
         }
 
         if let Some(ref url) = inline.link {
@@ -233,7 +260,15 @@ fn cell_to_text(cell: &ir::TableCell) -> String {
             ir::Block::Paragraph { inlines } => {
                 texts.push(render_inlines(inlines));
             }
-            _ => {
+            ir::Block::Heading { .. }
+            | ir::Block::Table { .. }
+            | ir::Block::CodeBlock { .. }
+            | ir::Block::BlockQuote { .. }
+            | ir::Block::List { .. }
+            | ir::Block::Image { .. }
+            | ir::Block::HorizontalRule
+            | ir::Block::Footnote { .. }
+            | ir::Block::Math { .. } => {
                 let mut s = String::new();
                 write_block(&mut s, block, 0);
                 texts.push(s.trim().to_string());
@@ -271,413 +306,5 @@ fn write_list(out: &mut String, items: &[ir::ListItem], ordered: bool, start: u3
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ir;
-
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
-
-    fn plain(t: &str) -> ir::Inline {
-        ir::Inline::plain(t)
-    }
-
-    fn make_doc_with_blocks(blocks: Vec<ir::Block>) -> ir::Document {
-        let mut doc = ir::Document::new();
-        doc.sections.push(ir::Section { blocks });
-        doc
-    }
-
-    // -----------------------------------------------------------------------
-    // escape_yaml
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn escape_yaml_backslash() {
-        assert_eq!(escape_yaml("a\\b"), "a\\\\b");
-    }
-
-    #[test]
-    fn escape_yaml_double_quote() {
-        assert_eq!(escape_yaml("say \"hi\""), "say \\\"hi\\\"");
-    }
-
-    #[test]
-    fn escape_yaml_no_special_chars() {
-        assert_eq!(escape_yaml("hello world"), "hello world");
-    }
-
-    #[test]
-    fn escape_yaml_newline() {
-        assert_eq!(escape_yaml("line1\nline2"), "line1\\nline2");
-    }
-
-    #[test]
-    fn escape_yaml_carriage_return() {
-        assert_eq!(escape_yaml("a\rb"), "a\\rb");
-    }
-
-    #[test]
-    fn escape_yaml_tab() {
-        assert_eq!(escape_yaml("a\tb"), "a\\tb");
-    }
-
-    // -----------------------------------------------------------------------
-    // render_inlines
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn render_inlines_plain() {
-        assert_eq!(render_inlines(&[plain("hello")]), "hello");
-    }
-
-    #[test]
-    fn render_inlines_bold() {
-        let inlines = vec![ir::Inline {
-            text: "bold".into(),
-            bold: true,
-            ..Default::default()
-        }];
-        assert_eq!(render_inlines(&inlines), "**bold**");
-    }
-
-    #[test]
-    fn render_inlines_italic() {
-        let inlines = vec![ir::Inline {
-            text: "em".into(),
-            italic: true,
-            ..Default::default()
-        }];
-        assert_eq!(render_inlines(&inlines), "*em*");
-    }
-
-    #[test]
-    fn render_inlines_bold_italic() {
-        let inlines = vec![ir::Inline {
-            text: "bi".into(),
-            bold: true,
-            italic: true,
-            ..Default::default()
-        }];
-        assert_eq!(render_inlines(&inlines), "***bi***");
-    }
-
-    #[test]
-    fn render_inlines_strikethrough() {
-        let inlines = vec![ir::Inline {
-            text: "del".into(),
-            strikethrough: true,
-            ..Default::default()
-        }];
-        assert_eq!(render_inlines(&inlines), "~~del~~");
-    }
-
-    #[test]
-    fn render_inlines_underline() {
-        let inlines = vec![ir::Inline {
-            text: "ul".into(),
-            underline: true,
-            ..Default::default()
-        }];
-        assert_eq!(render_inlines(&inlines), "<u>ul</u>");
-    }
-
-    #[test]
-    fn render_inlines_superscript() {
-        let inlines = vec![ir::Inline {
-            text: "sup".into(),
-            superscript: true,
-            ..Default::default()
-        }];
-        assert_eq!(render_inlines(&inlines), "<sup>sup</sup>");
-    }
-
-    #[test]
-    fn render_inlines_subscript() {
-        let inlines = vec![ir::Inline {
-            text: "sub".into(),
-            subscript: true,
-            ..Default::default()
-        }];
-        assert_eq!(render_inlines(&inlines), "<sub>sub</sub>");
-    }
-
-    #[test]
-    fn render_inlines_code() {
-        let inlines = vec![ir::Inline {
-            text: "code()".into(),
-            code: true,
-            ..Default::default()
-        }];
-        assert_eq!(render_inlines(&inlines), "`code()`");
-    }
-
-    #[test]
-    fn render_inlines_link() {
-        let inlines = vec![ir::Inline {
-            text: "click".into(),
-            link: Some("https://example.com".into()),
-            ..Default::default()
-        }];
-        assert_eq!(render_inlines(&inlines), "[click](https://example.com)");
-    }
-
-    #[test]
-    fn render_inlines_footnote_ref() {
-        let inlines = vec![ir::Inline {
-            text: String::new(),
-            footnote_ref: Some("1".into()),
-            ..Default::default()
-        }];
-        assert_eq!(render_inlines(&inlines), "[^1]");
-    }
-
-    // -----------------------------------------------------------------------
-    // write_markdown — block types
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn write_markdown_heading_levels() {
-        for level in 1u8..=6 {
-            let doc = make_doc_with_blocks(vec![ir::Block::Heading {
-                level,
-                inlines: vec![plain("Title")],
-            }]);
-            let md = write_markdown(&doc, false);
-            let hashes = "#".repeat(level as usize);
-            assert!(
-                md.starts_with(&format!("{hashes} Title")),
-                "level {level}: got {md:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn write_markdown_paragraph() {
-        let doc = make_doc_with_blocks(vec![ir::Block::Paragraph {
-            inlines: vec![plain("Hello, world.")],
-        }]);
-        let md = write_markdown(&doc, false);
-        assert!(md.contains("Hello, world."));
-    }
-
-    #[test]
-    fn write_markdown_code_block() {
-        let doc = make_doc_with_blocks(vec![ir::Block::CodeBlock {
-            language: Some("rust".into()),
-            code: "fn main() {}".into(),
-        }]);
-        let md = write_markdown(&doc, false);
-        assert!(md.contains("```rust\n"), "got: {md}");
-        assert!(md.contains("fn main() {}"), "got: {md}");
-        assert!(md.contains("\n```"), "got: {md}");
-    }
-
-    #[test]
-    fn write_markdown_code_block_no_language() {
-        let doc = make_doc_with_blocks(vec![ir::Block::CodeBlock {
-            language: None,
-            code: "raw code".into(),
-        }]);
-        let md = write_markdown(&doc, false);
-        assert!(md.contains("```\n"), "got: {md}");
-        assert!(md.contains("raw code"), "got: {md}");
-    }
-
-    #[test]
-    fn write_markdown_simple_gfm_table() {
-        let rows = vec![
-            ir::TableRow {
-                cells: vec![
-                    ir::TableCell {
-                        blocks: vec![ir::Block::Paragraph {
-                            inlines: vec![plain("Name")],
-                        }],
-                        ..Default::default()
-                    },
-                    ir::TableCell {
-                        blocks: vec![ir::Block::Paragraph {
-                            inlines: vec![plain("Age")],
-                        }],
-                        ..Default::default()
-                    },
-                ],
-                is_header: true,
-            },
-            ir::TableRow {
-                cells: vec![
-                    ir::TableCell {
-                        blocks: vec![ir::Block::Paragraph {
-                            inlines: vec![plain("Alice")],
-                        }],
-                        ..Default::default()
-                    },
-                    ir::TableCell {
-                        blocks: vec![ir::Block::Paragraph {
-                            inlines: vec![plain("30")],
-                        }],
-                        ..Default::default()
-                    },
-                ],
-                is_header: false,
-            },
-        ];
-        let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2 }]);
-        let md = write_markdown(&doc, false);
-        assert!(md.contains("| Name | Age |"), "got: {md}");
-        assert!(md.contains("| --- |"), "got: {md}");
-        assert!(md.contains("| Alice | 30 |"), "got: {md}");
-    }
-
-    #[test]
-    fn write_markdown_complex_table_html_fallback() {
-        // A cell with colspan > 1 must trigger the HTML table fallback.
-        let rows = vec![ir::TableRow {
-            cells: vec![ir::TableCell {
-                blocks: vec![ir::Block::Paragraph {
-                    inlines: vec![plain("wide")],
-                }],
-                colspan: 2,
-                rowspan: 1,
-            }],
-            is_header: true,
-        }];
-        let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2 }]);
-        let md = write_markdown(&doc, false);
-        assert!(md.contains("<table>"), "got: {md}");
-        assert!(md.contains("colspan=\"2\""), "got: {md}");
-    }
-
-    #[test]
-    fn write_markdown_unordered_list() {
-        let doc = make_doc_with_blocks(vec![ir::Block::List {
-            ordered: false,
-            start: 1,
-            items: vec![
-                ir::ListItem {
-                    blocks: vec![ir::Block::Paragraph {
-                        inlines: vec![plain("alpha")],
-                    }],
-                    children: Vec::new(),
-                },
-                ir::ListItem {
-                    blocks: vec![ir::Block::Paragraph {
-                        inlines: vec![plain("beta")],
-                    }],
-                    children: Vec::new(),
-                },
-            ],
-        }]);
-        let md = write_markdown(&doc, false);
-        assert!(md.contains("- alpha"), "got: {md}");
-        assert!(md.contains("- beta"), "got: {md}");
-    }
-
-    #[test]
-    fn write_markdown_ordered_list() {
-        let doc = make_doc_with_blocks(vec![ir::Block::List {
-            ordered: true,
-            start: 1,
-            items: vec![
-                ir::ListItem {
-                    blocks: vec![ir::Block::Paragraph {
-                        inlines: vec![plain("first")],
-                    }],
-                    children: Vec::new(),
-                },
-                ir::ListItem {
-                    blocks: vec![ir::Block::Paragraph {
-                        inlines: vec![plain("second")],
-                    }],
-                    children: Vec::new(),
-                },
-            ],
-        }]);
-        let md = write_markdown(&doc, false);
-        assert!(md.contains("1. first"), "got: {md}");
-        assert!(md.contains("2. second"), "got: {md}");
-    }
-
-    #[test]
-    fn write_markdown_image() {
-        let doc = make_doc_with_blocks(vec![ir::Block::Image {
-            src: "img.png".into(),
-            alt: "a picture".into(),
-        }]);
-        let md = write_markdown(&doc, false);
-        assert!(md.contains("![a picture](img.png)"), "got: {md}");
-    }
-
-    #[test]
-    fn write_markdown_horizontal_rule() {
-        let doc = make_doc_with_blocks(vec![ir::Block::HorizontalRule]);
-        let md = write_markdown(&doc, false);
-        assert!(md.contains("---"), "got: {md}");
-    }
-
-    #[test]
-    fn write_markdown_math_display() {
-        let doc = make_doc_with_blocks(vec![ir::Block::Math {
-            display: true,
-            tex: "E=mc^2".into(),
-        }]);
-        let md = write_markdown(&doc, false);
-        assert!(md.contains("$$\n"), "got: {md}");
-        assert!(md.contains("E=mc^2"), "got: {md}");
-    }
-
-    #[test]
-    fn write_markdown_math_inline() {
-        let doc = make_doc_with_blocks(vec![ir::Block::Math {
-            display: false,
-            tex: "x+y".into(),
-        }]);
-        let md = write_markdown(&doc, false);
-        assert!(md.contains("$x+y$"), "got: {md}");
-    }
-
-    #[test]
-    fn write_markdown_footnote() {
-        let doc = make_doc_with_blocks(vec![ir::Block::Footnote {
-            id: "fn1".into(),
-            content: vec![ir::Block::Paragraph {
-                inlines: vec![plain("footnote text")],
-            }],
-        }]);
-        let md = write_markdown(&doc, false);
-        assert!(md.contains("[^fn1]:"), "got: {md}");
-        assert!(md.contains("footnote text"), "got: {md}");
-    }
-
-    #[test]
-    fn write_markdown_frontmatter() {
-        let mut doc = ir::Document::new();
-        doc.metadata.title = Some("My Title".into());
-        doc.metadata.author = Some("Author Name".into());
-        doc.sections.push(ir::Section { blocks: Vec::new() });
-        let md = write_markdown(&doc, true);
-        assert!(md.starts_with("---\n"), "got: {md}");
-        assert!(md.contains("title: \"My Title\""), "got: {md}");
-        assert!(md.contains("author: \"Author Name\""), "got: {md}");
-    }
-
-    #[test]
-    fn write_markdown_multi_section_separator() {
-        let mut doc = ir::Document::new();
-        doc.sections.push(ir::Section {
-            blocks: vec![ir::Block::Paragraph {
-                inlines: vec![plain("Section 1")],
-            }],
-        });
-        doc.sections.push(ir::Section {
-            blocks: vec![ir::Block::Paragraph {
-                inlines: vec![plain("Section 2")],
-            }],
-        });
-        let md = write_markdown(&doc, false);
-        assert!(md.contains("\n---\n"), "got: {md}");
-        assert!(md.contains("Section 1"), "got: {md}");
-        assert!(md.contains("Section 2"), "got: {md}");
-    }
-}
+#[path = "writer_tests.rs"]
+mod tests;
