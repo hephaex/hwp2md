@@ -6,6 +6,13 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
 
+#[path = "context.rs"]
+mod context;
+pub(crate) use context::{
+    apply_charpr_attrs, flush_cell_paragraph, flush_footnote_paragraph, flush_list_item_paragraph,
+    flush_paragraph, ParseContext,
+};
+
 pub fn read_hwpx(path: &Path) -> Result<ir::Document, anyhow::Error> {
     let file = std::fs::File::open(path)?;
     let mut archive =
@@ -254,7 +261,7 @@ fn read_section_xml(
     parse_section_xml(&xml)
 }
 
-fn parse_section_xml(xml: &str) -> Result<ir::Section, Hwp2MdError> {
+pub(crate) fn parse_section_xml(xml: &str) -> Result<ir::Section, Hwp2MdError> {
     let mut section = ir::Section { blocks: Vec::new() };
     let mut reader = Reader::from_str(xml);
     let mut buf = Vec::new();
@@ -295,164 +302,6 @@ fn parse_section_xml(xml: &str) -> Result<ir::Section, Hwp2MdError> {
     flush_paragraph(&mut context, &mut section);
 
     Ok(section)
-}
-
-struct ParseContext {
-    in_paragraph: bool,
-    in_run: bool,
-    in_table: bool,
-    in_cell: bool,
-    current_text: String,
-    current_inlines: Vec<ir::Inline>,
-    current_bold: bool,
-    current_italic: bool,
-    current_underline: bool,
-    current_strike: bool,
-    heading_level: Option<u8>,
-    table_rows: Vec<ir::TableRow>,
-    current_row_cells: Vec<ir::TableCell>,
-    cell_blocks: Vec<ir::Block>,
-    cell_inlines: Vec<ir::Inline>,
-    cell_text: String,
-    col_count: usize,
-    // colspan/rowspan for the cell currently being parsed
-    current_colspan: u32,
-    current_rowspan: u32,
-    list_ordered: bool,
-    in_list: bool,
-    list_items: Vec<ir::ListItem>,
-    in_list_item: bool,
-    list_item_blocks: Vec<ir::Block>,
-    list_item_inlines: Vec<ir::Inline>,
-    list_item_text: String,
-    equation_text: String,
-    in_equation: bool,
-    // footnote / endnote accumulation
-    in_footnote: bool,
-    footnote_id: String,
-    footnote_blocks: Vec<ir::Block>,
-    footnote_inlines: Vec<ir::Inline>,
-    footnote_text: String,
-}
-
-impl Default for ParseContext {
-    fn default() -> Self {
-        Self {
-            in_paragraph: false,
-            in_run: false,
-            in_table: false,
-            in_cell: false,
-            current_text: String::new(),
-            current_inlines: Vec::new(),
-            current_bold: false,
-            current_italic: false,
-            current_underline: false,
-            current_strike: false,
-            heading_level: None,
-            table_rows: Vec::new(),
-            current_row_cells: Vec::new(),
-            cell_blocks: Vec::new(),
-            cell_inlines: Vec::new(),
-            cell_text: String::new(),
-            col_count: 0,
-            // A cell with no span attributes spans exactly 1 column and 1 row.
-            current_colspan: 1,
-            current_rowspan: 1,
-            list_ordered: false,
-            in_list: false,
-            list_items: Vec::new(),
-            in_list_item: false,
-            list_item_blocks: Vec::new(),
-            list_item_inlines: Vec::new(),
-            list_item_text: String::new(),
-            equation_text: String::new(),
-            in_equation: false,
-            in_footnote: false,
-            footnote_id: String::new(),
-            footnote_blocks: Vec::new(),
-            footnote_inlines: Vec::new(),
-            footnote_text: String::new(),
-        }
-    }
-}
-
-impl ParseContext {
-    /// Returns a mutable reference to the active text buffer.
-    ///
-    /// Priority: footnote > list_item > cell > default paragraph buffer.
-    // Priority: footnote > list_item > cell > default (unified across all handlers)
-    fn active_text_buf(&mut self) -> &mut String {
-        if self.in_footnote {
-            &mut self.footnote_text
-        } else if self.in_list_item {
-            &mut self.list_item_text
-        } else if self.in_cell {
-            &mut self.cell_text
-        } else {
-            &mut self.current_text
-        }
-    }
-
-    /// Push an inline to the active inline buffer.
-    fn push_inline(&mut self, inline: ir::Inline) {
-        if self.in_footnote {
-            self.footnote_inlines.push(inline);
-        } else if self.in_list_item {
-            self.list_item_inlines.push(inline);
-        } else if self.in_cell {
-            self.cell_inlines.push(inline);
-        } else {
-            self.current_inlines.push(inline);
-        }
-    }
-
-    /// Push a block to the active block buffer.
-    ///
-    /// Note: the default (non-cell, non-list-item, non-footnote) target is the
-    /// section's block list, which is passed separately to keep the borrow
-    /// checker happy.  Call `section.blocks.push(block)` directly in that case.
-    fn push_block_scoped(&mut self, block: ir::Block) -> Option<ir::Block> {
-        if self.in_footnote {
-            self.footnote_blocks.push(block);
-            None
-        } else if self.in_list_item {
-            self.list_item_blocks.push(block);
-            None
-        } else if self.in_cell {
-            self.cell_blocks.push(block);
-            None
-        } else {
-            Some(block)
-        }
-    }
-}
-
-/// Parse `bold`, `italic`, `underline`, and `strikeout` attributes from a
-/// `<charPr>` or `<hp:charPr>` element and write them onto `ctx`.
-///
-/// Called from both `handle_start_element` (non-self-closing variant) and
-/// `handle_empty_element` (self-closing variant) so the two paths are
-/// guaranteed to behave identically.
-fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut ParseContext) {
-    for attr in e.attributes().flatten() {
-        let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-        let val = attr.unescape_value().unwrap_or_default();
-        match key {
-            "bold" | "hp:bold" => ctx.current_bold = val.as_ref() == "true" || val.as_ref() == "1",
-            "italic" | "hp:italic" => {
-                ctx.current_italic = val.as_ref() == "true" || val.as_ref() == "1"
-            }
-            "underline" | "hp:underline" => {
-                ctx.current_underline =
-                    !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0"
-            }
-            "strikeout" | "hp:strikeout" => {
-                ctx.current_strike =
-                    !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0"
-            }
-            _ => {}
-        }
-    }
 }
 
 fn handle_start_element(local: &str, e: &quick_xml::events::BytesStart, ctx: &mut ParseContext) {
@@ -764,91 +613,6 @@ fn handle_empty_element(
             }
         }
         _ => {}
-    }
-}
-
-fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section) {
-    if !ctx.current_text.is_empty() {
-        let text = std::mem::take(&mut ctx.current_text);
-        ctx.current_inlines.push(ir::Inline {
-            text,
-            bold: ctx.current_bold,
-            italic: ctx.current_italic,
-            underline: ctx.current_underline,
-            strikethrough: ctx.current_strike,
-            ..ir::Inline::default()
-        });
-    }
-
-    if ctx.current_inlines.is_empty() {
-        return;
-    }
-
-    let inlines = std::mem::take(&mut ctx.current_inlines);
-    let block = if let Some(level) = ctx.heading_level {
-        ir::Block::Heading { level, inlines }
-    } else {
-        ir::Block::Paragraph { inlines }
-    };
-    section.blocks.push(block);
-}
-
-fn flush_cell_paragraph(ctx: &mut ParseContext) {
-    if !ctx.cell_text.is_empty() {
-        let text = std::mem::take(&mut ctx.cell_text);
-        ctx.cell_inlines.push(ir::Inline {
-            text,
-            bold: ctx.current_bold,
-            italic: ctx.current_italic,
-            underline: ctx.current_underline,
-            strikethrough: ctx.current_strike,
-            ..ir::Inline::default()
-        });
-    }
-
-    if !ctx.cell_inlines.is_empty() {
-        let inlines = std::mem::take(&mut ctx.cell_inlines);
-        ctx.cell_blocks.push(ir::Block::Paragraph { inlines });
-    }
-}
-
-fn flush_list_item_paragraph(ctx: &mut ParseContext) {
-    if !ctx.list_item_text.is_empty() {
-        let text = std::mem::take(&mut ctx.list_item_text);
-        ctx.list_item_inlines.push(ir::Inline {
-            text,
-            bold: ctx.current_bold,
-            italic: ctx.current_italic,
-            underline: ctx.current_underline,
-            strikethrough: ctx.current_strike,
-            ..ir::Inline::default()
-        });
-    }
-
-    if !ctx.list_item_inlines.is_empty() {
-        let inlines = std::mem::take(&mut ctx.list_item_inlines);
-        ctx.list_item_blocks.push(ir::Block::Paragraph { inlines });
-    }
-}
-
-/// Flush any pending run text and inline list from within a footnote/endnote
-/// paragraph into `footnote_blocks`.  Mirrors the logic of `flush_cell_paragraph`.
-fn flush_footnote_paragraph(ctx: &mut ParseContext) {
-    if !ctx.footnote_text.is_empty() {
-        let text = std::mem::take(&mut ctx.footnote_text);
-        ctx.footnote_inlines.push(ir::Inline {
-            text,
-            bold: ctx.current_bold,
-            italic: ctx.current_italic,
-            underline: ctx.current_underline,
-            strikethrough: ctx.current_strike,
-            ..ir::Inline::default()
-        });
-    }
-
-    if !ctx.footnote_inlines.is_empty() {
-        let inlines = std::mem::take(&mut ctx.footnote_inlines);
-        ctx.footnote_blocks.push(ir::Block::Paragraph { inlines });
     }
 }
 

@@ -801,7 +801,14 @@ mod tests {
     #[test]
     fn over_without_groups_is_passed_through() {
         let result = eqedit_to_latex("a over b");
-        assert!(!result.is_empty());
+        assert!(
+            result.contains("over") || result.contains("a"),
+            "bare 'a over b' (no group braces) must pass through as-is; got: {result:?}"
+        );
+        assert!(
+            !result.contains("\\frac"),
+            "bare 'a over b' must NOT produce \\frac (no brace groups); got: {result:?}"
+        );
     }
 
     #[test]

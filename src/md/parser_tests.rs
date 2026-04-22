@@ -640,16 +640,27 @@ See[^note].
 
 #[test]
 fn collect_inlines_soft_break_emits_newline() {
-    // A soft break between two words in a paragraph becomes a "\n" inline.
     let doc = parse_markdown("first\nsecond\n");
     let blocks = first_section_blocks(&doc);
-    if let ir::Block::Paragraph { inlines } = &blocks[0] {
-        let has_newline = inlines.iter().any(|i| i.text == "\n");
-        // comrak may or may not emit a SoftBreak — either output is acceptable;
-        // the key test is that parsing does NOT panic.
-        let _ = has_newline;
+    assert_eq!(blocks.len(), 1, "expected exactly one paragraph block");
+    match &blocks[0] {
+        ir::Block::Paragraph { inlines } => {
+            let combined: String = inlines.iter().map(|i| i.text.as_str()).collect();
+            assert!(
+                combined.contains("first"),
+                "text 'first' missing; combined: {combined:?}"
+            );
+            assert!(
+                combined.contains("second"),
+                "text 'second' missing; combined: {combined:?}"
+            );
+            assert!(
+                inlines.iter().any(|i| i.text == "\n"),
+                "SoftBreak must produce a newline inline; inlines: {inlines:?}"
+            );
+        }
+        other => panic!("expected Paragraph, got {other:?}"),
     }
-    // Just ensure no panic — the specific output depends on comrak version.
 }
 
 #[test]
@@ -748,8 +759,18 @@ fn collect_inlines_sub_close_tag_restores_state() {
 fn parse_markdown_horizontal_rule() {
     let doc = parse_markdown("---\n\ntext\n");
     let blocks = first_section_blocks(&doc);
-    // The --- might be a thematic break; check it does not cause panic.
-    let _ = blocks;
+    assert!(
+        blocks
+            .iter()
+            .any(|b| matches!(b, ir::Block::HorizontalRule)),
+        "expected HorizontalRule block from '---'; blocks: {blocks:?}"
+    );
+    assert!(
+        blocks
+            .iter()
+            .any(|b| matches!(b, ir::Block::Paragraph { .. })),
+        "expected Paragraph block with 'text'; blocks: {blocks:?}"
+    );
 }
 
 // -----------------------------------------------------------------------

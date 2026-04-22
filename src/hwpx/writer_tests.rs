@@ -2,6 +2,8 @@ use super::*;
 use crate::ir::{Asset, Block, Document, Inline, ListItem, Metadata, Section, TableCell, TableRow};
 use std::io::Read as _;
 
+use crate::hwpx::read_hwpx;
+
 // ── helpers ──────────────────────────────────────────────────────────────
 
 fn inline(text: &str) -> Inline {
@@ -562,4 +564,127 @@ fn write_hwpx_content_hpf_references_sections() {
     let mut content = String::new();
     entry.read_to_string(&mut content).expect("read");
     assert!(content.contains("section0.xml"), "{content}");
+}
+
+#[test]
+fn write_hwpx_bindata_entry_has_correct_content() {
+    let png_bytes = vec![0x89u8, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = Document {
+        metadata: Metadata::default(),
+        sections: Vec::new(),
+        assets: vec![Asset {
+            name: "banner.png".into(),
+            data: png_bytes.clone(),
+            mime_type: "image/png".into(),
+        }],
+    };
+    write_hwpx(&doc, tmp.path(), None).expect("write");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive
+        .by_name("BinData/banner.png")
+        .expect("BinData/banner.png");
+    let mut actual = Vec::new();
+    entry.read_to_end(&mut actual).expect("read");
+    assert_eq!(
+        actual, png_bytes,
+        "BinData entry content must match asset data"
+    );
+}
+
+#[test]
+fn write_hwpx_image_block_xml_references_asset_name() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = Document {
+        metadata: Metadata::default(),
+        sections: vec![Section {
+            blocks: vec![Block::Image {
+                src: "diagram.png".into(),
+                alt: "a diagram".into(),
+            }],
+        }],
+        assets: vec![Asset {
+            name: "diagram.png".into(),
+            data: vec![0x89, 0x50, 0x4e, 0x47],
+            mime_type: "image/png".into(),
+        }],
+    };
+    write_hwpx(&doc, tmp.path(), None).expect("write");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive
+        .by_name("Contents/section0.xml")
+        .expect("section0.xml");
+    let mut content = String::new();
+    entry.read_to_string(&mut content).expect("read");
+
+    assert!(
+        content.contains("diagram.png"),
+        "section XML must reference image asset name; got: {content}"
+    );
+    assert!(
+        content.contains("<hp:img"),
+        "section XML must contain hp:img element; got: {content}"
+    );
+    assert!(
+        content.contains(r#"alt="a diagram""#),
+        "section XML must carry alt text; got: {content}"
+    );
+    let entries = zip_entry_names(tmp.path());
+    assert!(
+        entries.contains(&"BinData/diagram.png".to_owned()),
+        "BinData entry must exist: {entries:?}"
+    );
+}
+
+#[test]
+fn write_hwpx_image_roundtrip_preserves_asset() {
+    let png_bytes = vec![0x89u8, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+
+    let original = Document {
+        metadata: Metadata::default(),
+        sections: vec![Section {
+            blocks: vec![Block::Image {
+                src: "photo.png".into(),
+                alt: "a photo".into(),
+            }],
+        }],
+        assets: vec![Asset {
+            name: "photo.png".into(),
+            data: png_bytes.clone(),
+            mime_type: "image/png".into(),
+        }],
+    };
+    write_hwpx(&original, tmp.path(), None).expect("write");
+
+    let read_back = read_hwpx(tmp.path()).expect("read_hwpx");
+
+    let has_image = read_back
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(|b| matches!(b, Block::Image { src, .. } if src.contains("photo")));
+    assert!(
+        has_image,
+        "image block must survive HWPX roundtrip; sections: {:?}",
+        read_back.sections
+    );
+
+    assert_eq!(
+        read_back.assets.len(),
+        1,
+        "one asset expected after roundtrip"
+    );
+    assert_eq!(
+        read_back.assets[0].data, png_bytes,
+        "asset binary content must be preserved through roundtrip"
+    );
+    assert_eq!(
+        read_back.assets[0].mime_type, "image/png",
+        "asset MIME type must be preserved"
+    );
 }

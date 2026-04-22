@@ -12,6 +12,14 @@ readme = "README.md"
 keywords = ["hwp", "hwpx", "markdown", "converter", "hangul"]
 categories = ["command-line-utilities", "text-processing"]
 rust-version = "1.75"
+exclude = [
+    ".github/",
+    ".history/",
+    "PLAN.md",
+    "PROGRESS.md",
+    "tests/fixtures/",
+    "benches/",
+]
 
 [[bin]]
 name = "hwp2md"
