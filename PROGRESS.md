@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: Phase 5 완료 (Parser 고도화 + 테스트 커버리지)
+## 현재 상태: Phase 8 완료 (테스트 분리 + 통합 테스트 인프라 + 토크나이저 버그 수정)
 
 ### 완료
 
@@ -130,13 +130,21 @@
   - 모든 프로덕션 파일 800행 이하 달성
   - 478 테스트 (440 unit + 11 CLI + 27 roundtrip, 0 failures)
 
+- [x] Phase 8: 테스트 분리 + 통합 테스트 인프라 + 토크나이저 버그 수정 (ac63b6f):
+  - eqedit.rs 테스트 분리: 42 테스트 → eqedit_tests.rs (829→563행)
+  - HwpxFixture 빌더: 프로그래매틱 HWPX ZIP 생성 (tests/fixtures/mod.rs)
+  - 24 통합 테스트: 빈 문서, 메타데이터, 단락, 제목, 테이블, 서식, 혼합, API, ZIP 구조, 엣지케이스
+  - 토크나이저 무한 루프 수정: unmatched '}' 처리 누락 → tokenise()에 '}' 핸들러 추가
+  - 2 신규 에지케이스 테스트: deep_nesting_does_not_panic, unmatched_closing_brace_no_underflow
+  - cargo publish --dry-run 통과
+  - 504 테스트 (442 unit + 11 CLI + 24 integration + 27 roundtrip, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
-- [ ] Phase 8: HWPX 라이터 고도화 (스타일, 템플릿)
-- [ ] Phase 9: CLI 완성 + 배포 (cargo publish)
+- [ ] Phase 9: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성 + 배포 (cargo publish)
 
 ## 중기 개선 로드맵 (Phase 1.5)
 
@@ -205,6 +213,32 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-04-22 — Phase 8: 테스트 분리 + 통합 테스트 인프라 + 토크나이저 버그 수정 (ac63b6f)
+
+**eqedit.rs 테스트 분리**:
+- 42 단위 테스트 → src/hwp/eqedit_tests.rs (`#[cfg(test)] #[path]` 패턴)
+- eqedit.rs: 829→563행 (800행 가이드라인 준수)
+- 2 신규 에지케이스 테스트: deep_nesting (50중첩), unmatched_closing_brace
+
+**HwpxFixture 빌더 (tests/fixtures/mod.rs)**:
+- 프로그래매틱 HWPX ZIP 생성: mimetype, container.xml, content.hpf, section0.xml, header.xml
+- 헬퍼: para_xml(), heading_xml(), table_2x2_xml(), styled_run_xml()
+- write_to_tempfile(): tempfile 기반 임시 파일 생성
+
+**24 통합 테스트 (tests/integration.rs)**:
+- 빈 문서, 메타데이터(title/author), 단락, 복수 단락, 제목(1-6), 테이블(2×2)
+- 서식(bold+italic), 혼합 컨텐츠, 다수 단락(5개), 매우 긴 단락
+- API: hwpx_to_markdown/markdown_to_hwpx 직접 호출
+- ZIP 구조: mimetype 존재, section0.xml, content.hpf
+- 엣지: 빈 제목/셀, 특수문자(< > & ")
+
+**토크나이저 버그 수정**:
+- 무한 루프: tokenise()에서 bare '}' 문자를 처리하지 않아 i가 전진하지 않음
+- 수정: `} ` → `Token::Word("}"), i += 1` 핸들러 추가
+- 리뷰에서 제안된 `saturating_sub` 수정이 원인이 아님 — 토크나이저 자체 결함
+
+**검증**: cargo check 0 에러, clippy 0 경고, 504 테스트 (442 unit + 11 CLI + 24 integration + 27 roundtrip)
 
 ### 2026-04-22 — Phase 5: Parser 고도화 + 테스트 커버리지 (8360c8f)
 
