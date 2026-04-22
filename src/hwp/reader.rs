@@ -641,6 +641,59 @@ mod tests {
         assert_eq!(ps.line_spacing, 0);
     }
 
+    // --- parse_char_shape superscript/subscript ---
+
+    #[test]
+    fn parse_char_shape_superscript_flag() {
+        // superscript = bits 16-17 value 1 → 0x0001_0000
+        let cs = parse_char_shape(&make_char_shape_data(0x0001_0000, 0));
+        assert!(cs.superscript);
+        assert!(!cs.subscript);
+    }
+
+    #[test]
+    fn parse_char_shape_subscript_flag() {
+        // subscript = bits 16-17 value 2 → 0x0002_0000
+        let cs = parse_char_shape(&make_char_shape_data(0x0002_0000, 0));
+        assert!(!cs.superscript);
+        assert!(cs.subscript);
+    }
+
+    #[test]
+    fn parse_char_shape_bold_and_superscript() {
+        let cs = parse_char_shape(&make_char_shape_data(0x0001_0001, 0));
+        assert!(cs.bold);
+        assert!(cs.superscript);
+        assert!(!cs.subscript);
+    }
+
+    // --- parse_para_shape heading_type ---
+
+    fn make_para_shape_with_heading(head_type: u8, para_level: u8) -> Vec<u8> {
+        let mut data = vec![0u8; 24];
+        let attr1 = ((head_type as u32) << 24) | ((para_level as u32) << 26);
+        data[0..4].copy_from_slice(&attr1.to_le_bytes());
+        data
+    }
+
+    #[test]
+    fn parse_para_shape_heading_type_outline() {
+        let ps = parse_para_shape(&make_para_shape_with_heading(1, 0));
+        assert_eq!(ps.heading_type, Some(0));
+    }
+
+    #[test]
+    fn parse_para_shape_heading_type_level_3() {
+        let ps = parse_para_shape(&make_para_shape_with_heading(1, 3));
+        assert_eq!(ps.heading_type, Some(3));
+    }
+
+    #[test]
+    fn parse_para_shape_no_heading() {
+        let ps = parse_para_shape(&make_para_shape_with_heading(0, 0));
+        assert_eq!(ps.heading_type, None);
+    }
+
     // --- decompress_stream ---
 
     #[test]
