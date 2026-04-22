@@ -267,3 +267,548 @@ fn write_inlines<W: Write>(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ir::{
+        Asset, Block, Document, Inline, ListItem, Metadata, Section, TableCell, TableRow,
+    };
+    use std::io::Read as _;
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    fn inline(text: &str) -> Inline {
+        Inline::plain(text)
+    }
+
+    fn bold_inline(text: &str) -> Inline {
+        Inline {
+            text: text.into(),
+            bold: true,
+            ..Inline::default()
+        }
+    }
+
+    fn italic_inline(text: &str) -> Inline {
+        Inline {
+            text: text.into(),
+            italic: true,
+            ..Inline::default()
+        }
+    }
+
+    fn underline_inline(text: &str) -> Inline {
+        Inline {
+            text: text.into(),
+            underline: true,
+            ..Inline::default()
+        }
+    }
+
+    fn section_xml(blocks: Vec<Block>) -> String {
+        let sec = Section { blocks };
+        generate_section_xml(&sec, 0).expect("generate_section_xml failed")
+    }
+
+    fn zip_entry_names(path: &std::path::Path) -> Vec<String> {
+        let file = std::fs::File::open(path).expect("open zip");
+        let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+        (0..archive.len())
+            .map(|i| archive.by_index(i).unwrap().name().to_owned())
+            .collect()
+    }
+
+    fn doc_with_section(blocks: Vec<Block>) -> Document {
+        Document {
+            metadata: Metadata::default(),
+            sections: vec![Section { blocks }],
+            assets: Vec::new(),
+        }
+    }
+
+    // ── generate_section_xml: structural tests ────────────────────────────
+
+    #[test]
+    fn section_xml_empty_section_produces_valid_wrapper() {
+        let xml = section_xml(vec![]);
+        assert!(xml.contains("<hs:sec"), "root element missing: {xml}");
+        assert!(xml.contains("</hs:sec>"), "closing tag missing: {xml}");
+        assert!(xml.contains(r#"xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section""#));
+    }
+
+    #[test]
+    fn section_xml_paragraph_plain_text() {
+        let xml = section_xml(vec![Block::Paragraph {
+            inlines: vec![inline("hello world")],
+        }]);
+        assert!(xml.contains("<hp:p>"), "paragraph open: {xml}");
+        assert!(xml.contains("</hp:p>"), "paragraph close: {xml}");
+        assert!(xml.contains("<hp:t>"), "text run open: {xml}");
+        assert!(xml.contains("hello world"), "text content: {xml}");
+    }
+
+    #[test]
+    fn section_xml_empty_paragraph() {
+        let xml = section_xml(vec![Block::Paragraph { inlines: vec![] }]);
+        assert!(xml.contains("<hp:p>"));
+        assert!(xml.contains("</hp:p>"));
+    }
+
+    #[test]
+    fn section_xml_heading_level_1() {
+        let xml = section_xml(vec![Block::Heading {
+            level: 1,
+            inlines: vec![inline("Title")],
+        }]);
+        assert!(
+            xml.contains(r#"hp:styleIDRef="Heading1""#),
+            "h1 style ref: {xml}"
+        );
+        assert!(xml.contains("Title"));
+    }
+
+    #[test]
+    fn section_xml_heading_level_6() {
+        let xml = section_xml(vec![Block::Heading {
+            level: 6,
+            inlines: vec![inline("Deep")],
+        }]);
+        assert!(xml.contains(r#"hp:styleIDRef="Heading6""#), "{xml}");
+        assert!(xml.contains("Deep"));
+    }
+
+    #[test]
+    fn section_xml_bold_inline_emits_charpr() {
+        let xml = section_xml(vec![Block::Paragraph {
+            inlines: vec![bold_inline("strong")],
+        }]);
+        assert!(xml.contains("<hp:charPr"), "charPr element: {xml}");
+        assert!(xml.contains(r#"bold="true""#), "bold attr: {xml}");
+        assert!(xml.contains("strong"));
+    }
+
+    #[test]
+    fn section_xml_italic_inline_emits_charpr() {
+        let xml = section_xml(vec![Block::Paragraph {
+            inlines: vec![italic_inline("em")],
+        }]);
+        assert!(xml.contains(r#"italic="true""#), "{xml}");
+    }
+
+    #[test]
+    fn section_xml_underline_inline_emits_charpr() {
+        let xml = section_xml(vec![Block::Paragraph {
+            inlines: vec![underline_inline("ul")],
+        }]);
+        assert!(xml.contains(r#"underline="bottom""#), "{xml}");
+    }
+
+    #[test]
+    fn section_xml_strikethrough_inline_emits_charpr() {
+        let xml = section_xml(vec![Block::Paragraph {
+            inlines: vec![Inline {
+                text: "del".into(),
+                strikethrough: true,
+                ..Inline::default()
+            }],
+        }]);
+        assert!(xml.contains(r#"strikeout="line""#), "{xml}");
+    }
+
+    #[test]
+    fn section_xml_plain_inline_has_no_charpr() {
+        let xml = section_xml(vec![Block::Paragraph {
+            inlines: vec![inline("plain")],
+        }]);
+        // No formatting → no hp:charPr element should be emitted
+        assert!(!xml.contains("<hp:charPr"), "unexpected charPr: {xml}");
+    }
+
+    #[test]
+    fn section_xml_nested_inlines_bold_then_italic() {
+        let xml = section_xml(vec![Block::Paragraph {
+            inlines: vec![bold_inline("B"), italic_inline("I")],
+        }]);
+        assert!(xml.contains(r#"bold="true""#), "{xml}");
+        assert!(xml.contains(r#"italic="true""#), "{xml}");
+        assert!(xml.contains("B"));
+        assert!(xml.contains("I"));
+    }
+
+    #[test]
+    fn section_xml_image_block() {
+        let xml = section_xml(vec![Block::Image {
+            src: "image001.png".into(),
+            alt: "a cat".into(),
+        }]);
+        assert!(xml.contains("<hp:p>"), "{xml}");
+        assert!(
+            xml.contains(r#"hp:binaryItemIDRef="image001.png""#),
+            "{xml}"
+        );
+        assert!(xml.contains(r#"alt="a cat""#), "{xml}");
+        assert!(xml.contains("<hp:img"), "{xml}");
+    }
+
+    #[test]
+    fn section_xml_table_2x2() {
+        let cell = |text: &str| TableCell {
+            blocks: vec![Block::Paragraph {
+                inlines: vec![inline(text)],
+            }],
+            colspan: 1,
+            rowspan: 1,
+        };
+        let xml = section_xml(vec![Block::Table {
+            col_count: 2,
+            rows: vec![
+                TableRow {
+                    cells: vec![cell("A"), cell("B")],
+                    is_header: false,
+                },
+                TableRow {
+                    cells: vec![cell("C"), cell("D")],
+                    is_header: false,
+                },
+            ],
+        }]);
+        assert!(xml.contains("<hp:tbl>"), "tbl open: {xml}");
+        assert!(xml.contains("</hp:tbl>"), "tbl close: {xml}");
+        assert_eq!(xml.matches("<hp:tr>").count(), 2, "two rows: {xml}");
+        assert_eq!(xml.matches("<hp:tc>").count(), 4, "four cells: {xml}");
+        assert!(xml.contains("A"), "{xml}");
+        assert!(xml.contains("D"), "{xml}");
+    }
+
+    #[test]
+    fn section_xml_table_colspan_rowspan_present() {
+        // Documents the current behavior: colspan/rowspan values exist on
+        // the TableCell struct but the writer does NOT emit cellAddr or span
+        // attributes on <hp:tc>. This test pins that (missing) behavior so
+        // future work that adds span support can be detected as a regression
+        // or upgrade.
+        let wide_cell = TableCell {
+            blocks: vec![],
+            colspan: 2,
+            rowspan: 1,
+        };
+        let xml = section_xml(vec![Block::Table {
+            col_count: 2,
+            rows: vec![TableRow {
+                cells: vec![wide_cell],
+                is_header: false,
+            }],
+        }]);
+        // The hp:tc element is emitted but without colspan/rowspan attributes.
+        assert!(xml.contains("<hp:tc>"), "plain tc emitted: {xml}");
+        // Confirm span attributes are absent (expected limitation).
+        assert!(!xml.contains("colspan"), "colspan should not appear: {xml}");
+        assert!(!xml.contains("rowspan"), "rowspan should not appear: {xml}");
+    }
+
+    #[test]
+    fn section_xml_math_block() {
+        let xml = section_xml(vec![Block::Math {
+            display: true,
+            tex: r"E = mc^2".into(),
+        }]);
+        assert!(xml.contains("<hp:equation>"), "equation open: {xml}");
+        assert!(xml.contains("</hp:equation>"), "equation close: {xml}");
+        assert!(xml.contains(r"E = mc^2"), "{xml}");
+    }
+
+    #[test]
+    fn section_xml_ordered_list() {
+        let xml = section_xml(vec![Block::List {
+            ordered: true,
+            start: 1,
+            items: vec![
+                ListItem {
+                    blocks: vec![Block::Paragraph {
+                        inlines: vec![inline("first")],
+                    }],
+                    children: vec![],
+                },
+                ListItem {
+                    blocks: vec![Block::Paragraph {
+                        inlines: vec![inline("second")],
+                    }],
+                    children: vec![],
+                },
+            ],
+        }]);
+        assert!(xml.contains("first"), "{xml}");
+        assert!(xml.contains("second"), "{xml}");
+        assert_eq!(xml.matches("<hp:p>").count(), 2, "{xml}");
+    }
+
+    #[test]
+    fn section_xml_unordered_list() {
+        let xml = section_xml(vec![Block::List {
+            ordered: false,
+            start: 1,
+            items: vec![ListItem {
+                blocks: vec![Block::Paragraph {
+                    inlines: vec![inline("bullet")],
+                }],
+                children: vec![],
+            }],
+        }]);
+        assert!(xml.contains("bullet"), "{xml}");
+    }
+
+    #[test]
+    fn section_xml_footnote_block() {
+        let xml = section_xml(vec![Block::Footnote {
+            id: "fn1".into(),
+            content: vec![Block::Paragraph {
+                inlines: vec![inline("footnote text")],
+            }],
+        }]);
+        assert!(xml.contains("footnote text"), "{xml}");
+    }
+
+    #[test]
+    fn section_xml_blockquote() {
+        let xml = section_xml(vec![Block::BlockQuote {
+            blocks: vec![Block::Paragraph {
+                inlines: vec![inline("quoted")],
+            }],
+        }]);
+        assert!(xml.contains("quoted"), "{xml}");
+        assert!(xml.contains("<hp:p>"), "{xml}");
+    }
+
+    #[test]
+    fn section_xml_horizontal_rule() {
+        let xml = section_xml(vec![Block::HorizontalRule]);
+        assert!(xml.contains("<hp:p>"), "{xml}");
+        // The writer emits a line of em-dashes as a visual rule.
+        assert!(xml.contains("───"), "{xml}");
+    }
+
+    #[test]
+    fn section_xml_code_block() {
+        let xml = section_xml(vec![Block::CodeBlock {
+            language: Some("rust".into()),
+            code: "fn main() {}".into(),
+        }]);
+        assert!(xml.contains("<hp:p>"), "{xml}");
+        assert!(xml.contains(r#"hp:charPrIDRef="code""#), "{xml}");
+        assert!(xml.contains("fn main() {}"), "{xml}");
+    }
+
+    #[test]
+    fn section_xml_multiple_blocks_ordering() {
+        let xml = section_xml(vec![
+            Block::Heading {
+                level: 2,
+                inlines: vec![inline("Section")],
+            },
+            Block::Paragraph {
+                inlines: vec![inline("Body text")],
+            },
+        ]);
+        // The heading must come before the paragraph in document order.
+        let heading_pos = xml.find("Section").expect("heading text");
+        let para_pos = xml.find("Body text").expect("para text");
+        assert!(heading_pos < para_pos, "heading before paragraph: {xml}");
+    }
+
+    // ── write_hwpx integration: ZIP entry presence ─────────────────────────
+
+    #[test]
+    fn write_hwpx_empty_doc_produces_required_entries() {
+        let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+        let doc = Document::new();
+        write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+        let entries = zip_entry_names(tmp.path());
+        assert!(entries.contains(&"mimetype".to_owned()), "{entries:?}");
+        assert!(
+            entries.contains(&"META-INF/container.xml".to_owned()),
+            "{entries:?}"
+        );
+        assert!(
+            entries.contains(&"Contents/header.xml".to_owned()),
+            "{entries:?}"
+        );
+        assert!(
+            entries.contains(&"Contents/content.hpf".to_owned()),
+            "{entries:?}"
+        );
+        assert!(
+            entries.contains(&"Contents/section0.xml".to_owned()),
+            "{entries:?}"
+        );
+    }
+
+    #[test]
+    fn write_hwpx_mimetype_is_stored_uncompressed() {
+        // HWPX spec: mimetype must use Stored (no compression).
+        let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+        write_hwpx(&Document::new(), tmp.path(), None).expect("write");
+
+        let file = std::fs::File::open(tmp.path()).expect("open");
+        let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+        let entry = archive.by_name("mimetype").expect("mimetype entry");
+        assert_eq!(
+            entry.compression(),
+            zip::CompressionMethod::Stored,
+            "mimetype must be Stored"
+        );
+    }
+
+    #[test]
+    fn write_hwpx_mimetype_content() {
+        let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+        write_hwpx(&Document::new(), tmp.path(), None).expect("write");
+
+        let file = std::fs::File::open(tmp.path()).expect("open");
+        let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+        let mut entry = archive.by_name("mimetype").expect("mimetype entry");
+        let mut content = String::new();
+        entry.read_to_string(&mut content).expect("read");
+        assert_eq!(content, "application/hwpx+zip");
+    }
+
+    #[test]
+    fn write_hwpx_single_section_produces_section0_xml() {
+        let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+        let doc = doc_with_section(vec![Block::Paragraph {
+            inlines: vec![inline("hello")],
+        }]);
+        write_hwpx(&doc, tmp.path(), None).expect("write");
+
+        let entries = zip_entry_names(tmp.path());
+        assert!(
+            entries.contains(&"Contents/section0.xml".to_owned()),
+            "{entries:?}"
+        );
+        // With one explicit section there should NOT be a duplicate section0.
+        assert_eq!(
+            entries.iter().filter(|e| e.contains("section")).count(),
+            1,
+            "exactly one section entry: {entries:?}"
+        );
+    }
+
+    #[test]
+    fn write_hwpx_two_sections_produces_section0_and_section1() {
+        let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+        let doc = Document {
+            metadata: Metadata::default(),
+            sections: vec![
+                Section {
+                    blocks: vec![Block::Paragraph {
+                        inlines: vec![inline("s0")],
+                    }],
+                },
+                Section {
+                    blocks: vec![Block::Paragraph {
+                        inlines: vec![inline("s1")],
+                    }],
+                },
+            ],
+            assets: Vec::new(),
+        };
+        write_hwpx(&doc, tmp.path(), None).expect("write");
+
+        let entries = zip_entry_names(tmp.path());
+        assert!(
+            entries.contains(&"Contents/section0.xml".to_owned()),
+            "{entries:?}"
+        );
+        assert!(
+            entries.contains(&"Contents/section1.xml".to_owned()),
+            "{entries:?}"
+        );
+    }
+
+    #[test]
+    fn write_hwpx_with_bindata_asset_produces_bindata_entry() {
+        let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+        let doc = Document {
+            metadata: Metadata::default(),
+            sections: Vec::new(),
+            assets: vec![Asset {
+                name: "photo.png".into(),
+                data: vec![0x89, 0x50, 0x4e, 0x47],
+                mime_type: "image/png".into(),
+            }],
+        };
+        write_hwpx(&doc, tmp.path(), None).expect("write");
+
+        let entries = zip_entry_names(tmp.path());
+        assert!(
+            entries.contains(&"BinData/photo.png".to_owned()),
+            "{entries:?}"
+        );
+    }
+
+    #[test]
+    fn write_hwpx_asset_with_path_prefix_uses_basename_only() {
+        let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+        let doc = Document {
+            metadata: Metadata::default(),
+            sections: Vec::new(),
+            assets: vec![Asset {
+                name: "/some/nested/path/image.jpg".into(),
+                data: vec![0xFF, 0xD8],
+                mime_type: "image/jpeg".into(),
+            }],
+        };
+        write_hwpx(&doc, tmp.path(), None).expect("write");
+
+        let entries = zip_entry_names(tmp.path());
+        // Only the basename should be used inside BinData/.
+        assert!(
+            entries.contains(&"BinData/image.jpg".to_owned()),
+            "{entries:?}"
+        );
+        assert!(
+            !entries.iter().any(|e| e.contains("/some/nested/")),
+            "path prefix must be stripped: {entries:?}"
+        );
+    }
+
+    #[test]
+    fn write_hwpx_header_xml_contains_title_and_author() {
+        let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+        let doc = Document {
+            metadata: Metadata {
+                title: Some("My Title".into()),
+                author: Some("Alice".into()),
+                ..Metadata::default()
+            },
+            sections: Vec::new(),
+            assets: Vec::new(),
+        };
+        write_hwpx(&doc, tmp.path(), None).expect("write");
+
+        let file = std::fs::File::open(tmp.path()).expect("open");
+        let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+        let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+        let mut content = String::new();
+        entry.read_to_string(&mut content).expect("read");
+        assert!(content.contains("My Title"), "{content}");
+        assert!(content.contains("Alice"), "{content}");
+    }
+
+    #[test]
+    fn write_hwpx_content_hpf_references_sections() {
+        let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+        let doc = doc_with_section(vec![]);
+        write_hwpx(&doc, tmp.path(), None).expect("write");
+
+        let file = std::fs::File::open(tmp.path()).expect("open");
+        let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+        let mut entry = archive
+            .by_name("Contents/content.hpf")
+            .expect("content.hpf");
+        let mut content = String::new();
+        entry.read_to_string(&mut content).expect("read");
+        assert!(content.contains("section0.xml"), "{content}");
+    }
+}
