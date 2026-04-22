@@ -121,13 +121,22 @@
   - 리뷰 수정 4건 (HIGH): 멀티라인 이스케이프, H7 clamp, 파일 분할, byte→chars
   - 475 테스트 (437 unit + 11 CLI + 27 roundtrip, 0 failures)
 
+- [x] Phase 7: 모듈 분할 + 이미지 임베딩 + 배포 준비 (f10633c):
+  - hwpx/reader.rs 분할: ParseContext → context.rs (932→696행)
+  - hwp/reader.rs 분할: shape parsers → shapes.rs (827→703행)
+  - HWPX writer: BinData 이미지 임베딩 (ZIP 출력에 바이너리 포함)
+  - Cargo.toml: exclude 필드 추가, cargo publish --dry-run 통과 (93.8 KiB)
+  - no-assert 테스트 assertion 강화 (eqedit, parser soft_break)
+  - 모든 프로덕션 파일 800행 이하 달성
+  - 478 테스트 (440 unit + 11 CLI + 27 roundtrip, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
-- [ ] Phase 7: HWPX 라이터 고도화 (스타일, 이미지, 템플릿)
-- [ ] Phase 8: CLI 완성 + 배포
+- [ ] Phase 8: HWPX 라이터 고도화 (스타일, 템플릿)
+- [ ] Phase 9: CLI 완성 + 배포 (cargo publish)
 
 ## 중기 개선 로드맵 (Phase 1.5)
 
