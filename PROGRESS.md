@@ -108,13 +108,26 @@
   - 12 roundtrip 테스트 (math, footnote, image, frontmatter, Korean, escaped text)
   - 359 테스트 (322 unit + 11 CLI + 26 roundtrip, 0 failures)
 
+- [x] Phase 6: 커버리지 + crates.io 준비 + 엣지케이스 (11d91c0):
+  - cargo-tarpaulin 커버리지: 75.64% → 82.28% (80%+ 달성)
+  - 100 unit 테스트 추가 (record, model, convert, summary, writer, parser)
+  - README.md 재작성 (배지, 설치, CLI/라이브러리 사용법, 아키텍처)
+  - Cargo.toml: homepage, documentation, readme 필드 추가
+  - escape_paragraph_line_start: 멀티라인 안전, #/>/-/*/+/1./--- 커버
+  - detect_heading_level: H7 → H6 clamp (.min(6))
+  - text.len() → text.chars().count() (CJK heading 감지 정확도)
+  - parser.rs, convert.rs 테스트 분리 (800행 제약 준수)
+  - nested `<u><sub>` 파서 테스트, roundtrip code_block 2-pass 테스트
+  - 리뷰 수정 4건 (HIGH): 멀티라인 이스케이프, H7 clamp, 파일 분할, byte→chars
+  - 475 테스트 (437 unit + 11 CLI + 27 roundtrip, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
-- [ ] Phase 5: HWPX 라이터 고도화 (스타일, 이미지, 템플릿)
-- [ ] Phase 6: CLI 완성 + 배포
+- [ ] Phase 7: HWPX 라이터 고도화 (스타일, 이미지, 템플릿)
+- [ ] Phase 8: CLI 완성 + 배포
 
 ## 중기 개선 로드맵 (Phase 1.5)
 
