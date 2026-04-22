@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: Phase 4 완료 (Writer 고도화 + MD 안전성)
+## 현재 상태: Phase 5 완료 (Parser 고도화 + 테스트 커버리지)
 
 ### 완료
 
@@ -99,6 +99,15 @@
   - 18 인라인 엣지케이스 + 4 cellAddr 테스트
   - 320 테스트 (306 unit + 14 integration, 0 failures)
 
+- [x] Phase 5: Parser 고도화 + 테스트 커버리지 (8360c8f):
+  - MD parser: InlineStyle에 underline/subscript 추가 + HtmlInline 상태머신
+  - `<u>`/`</u>`, `<sub>`/`</sub>` 태그 → IR underline/subscript 플래그
+  - close-tag restoration: 부모 스타일 복원 (중첩 안전)
+  - 16 parser 테스트 (frontmatter, footnote, math, image, 인라인 스타일)
+  - 11 CLI 통합 테스트 (help, version, 에러 처리, end-to-end HWPX↔MD)
+  - 12 roundtrip 테스트 (math, footnote, image, frontmatter, Korean, escaped text)
+  - 359 테스트 (322 unit + 11 CLI + 26 roundtrip, 0 failures)
+
 ### 진행 중
 
 없음
@@ -174,6 +183,30 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-04-22 — Phase 5: Parser 고도화 + 테스트 커버리지 (8360c8f)
+
+**MD parser 개선**:
+- InlineStyle: underline, subscript 필드 추가
+- HtmlInline 상태머신: `<u>`/`<sub>` open/close 태그 추적
+- close-tag: 부모 스타일 값으로 복원 (중첩 시 외부 플래그 보존)
+- 16 단위 테스트: frontmatter(4), footnote/math/image(4), 인라인 스타일(7), 통합(1)
+
+**CLI 통합 테스트 (11건)**:
+- --help, --version, 서브커맨드 help (×3)
+- 에러: 존재하지 않는 파일, 미지원 형식
+- End-to-end: MD→HWPX→MD 파이프라인, HWPX ZIP 구조 검증
+
+**Roundtrip 테스트 (12건 추가, 총 26건)**:
+- IR→MD→IR: display math, footnote, image, nested list, frontmatter
+- MD→IR→MD 안정성: math, footnote, escaped text, image, HTML colspan table
+- 엣지: empty document, Korean unicode
+
+**리뷰**:
+- 리뷰어가 parser.rs를 실수로 revert → 재적용 후 검증
+- LOW 3건: nested `<u><sub>` 조합 테스트, unclosed tag 테스트, code block 2-pass
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 359 테스트 (322 unit + 11 CLI + 26 roundtrip)
 
 ### 2026-04-22 — Phase 4: Writer 고도화 + MD 안전성 (c9780c5)
 
