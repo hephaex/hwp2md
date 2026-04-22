@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: Phase 3 완료 (HWPX 고도화 — 목록/각주/BinData)
+## 현재 상태: Phase 3b 완료 (모듈 분할 + 테스트 확충)
 
 ### 완료
 
@@ -77,12 +77,22 @@
   - 교차 테스트 5건 (image-in-footnote, image-in-list, linebreak-in-list, resolve-in-footnote/list)
   - 243 테스트 (229 unit + 14 integration, 0 failures)
 
+- [x] Phase 3b: 모듈 분할 + 테스트 확충 (35ea51f):
+  - reader.rs 분할: 1895→931행 (테스트 968행 → reader_tests.rs 분리)
+  - ParseContext 디스패치 메서드: active_text_buf(), push_inline(), push_block_scoped()
+  - 5+ 핸들러 라우팅 중복 제거 (handle_text, end:t, lineBreak, img, noteRef, ctrl)
+  - writer.rs 테스트 31건 (generate_section_xml 22건 + write_hwpx ZIP 9건)
+  - convert.rs 테스트 39건 (count_chars 21건 + write_assets 3건 + orchestrator 4건)
+  - count_chars 버그 수정: `_ => 0` → exhaustive match (Footnote 재귀 누락)
+  - count_chars: .len() → .chars().count() (CJK 안전)
+  - 리뷰 수정 2건 (HIGH): 디스패치 우선순위 통일 문서화, chars().count() 일관성
+  - 302 테스트 (288 unit + 14 integration, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
-- [ ] Phase 3b: HWPX 라우팅 리팩토링 (ParseContext 디스패치 메서드 통합)
 - [ ] Phase 4: Markdown 렌더러 고도화 (GFM 검증, 이미지 옵션)
 - [ ] Phase 5: HWPX 라이터 고도화 (스타일, 이미지, 템플릿)
 - [ ] Phase 6: CLI 완성 + 배포
@@ -115,6 +125,7 @@
 
 ### 아키텍처
 - [x] reader.rs 서브모듈 분할 (2057→828+781+434+238) ✅
+- [x] hwpx/reader.rs 분할 (1895→931+968) + ParseContext dispatch ✅ (35ea51f)
 - [ ] ParseContext 19필드 → 타입 상태 패턴 또는 빌더 분리
 - [ ] Reader/Writer trait 정의 (HWP/HWPX/MD 공통 인터페이스)
 - [x] HwpDocument → IR 변환에서 제어 문자 파싱 (테이블/이미지/각주) ✅
@@ -144,7 +155,7 @@
 - [x] 각주 참조 (noteRef, ctrl) ✅
 - [x] BinData 참조 해결 (build_bin_map + resolve_bin_refs) ✅
 - [x] 교차 컨텍스트 라우팅 수정 (lineBreak/img/noteRef) ✅
-- [ ] ParseContext 디스패치 메서드 통합 (active_text_buf/push_inline/push_block)
+- [x] ParseContext 디스패치 메서드 통합 ✅ (35ea51f)
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ### HWPX 테스트 — Phase 2d
@@ -153,6 +164,31 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-04-22 — Phase 3b: 모듈 분할 + 테스트 확충 (35ea51f)
+
+**reader.rs 분할**:
+- 테스트 968행 → src/hwpx/reader_tests.rs 분리 (`#[path]` 패턴)
+- reader.rs: 1895→931행 (800행 가이드라인 근접)
+- ParseContext dispatch: active_text_buf(), push_inline(), push_block_scoped()
+- 5+ 핸들러에서 if/else 라우팅 체인 제거
+
+**writer.rs 테스트 (31건)**:
+- generate_section_xml: paragraph, heading, charPr(bold/italic/underline/strikeout), image, table, math, list, footnote, blockquote, code block, horizontal rule, ordering
+- write_hwpx ZIP: required entries, mimetype stored uncompressed, sections, BinData asset, metadata, content.hpf
+- colspan/rowspan limitation documented (cellAddr not emitted)
+
+**convert.rs 테스트 (39건) + 버그 수정**:
+- count_chars exhaustive match: `_ => 0` 제거, Footnote content 재귀 추가
+- .len() → .chars().count() (CodeBlock/Math, CJK 안전)
+- write_assets: 정상 추출 + path traversal 방어 검증
+- orchestrator: 확장자 검증, md→hwpx→md 라운드트립
+
+**리뷰 수정 (2 HIGH)**:
+- H1: 디스패치 우선순위 통일 (footnote > list_item > cell) 문서화
+- H2: count_chars .len() → .chars().count() 일관성
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 302 테스트 (288 unit + 14 integration)
 
 ### 2026-04-22 — Phase 3: HWPX 고도화 (bf57712)
 
