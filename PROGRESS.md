@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: Phase 2c 완료 (EQEDIT→LaTeX + GitHub Actions CI)
+## 현재 상태: Phase 2d 완료 (HWPX 테스트 + Dead code 정리)
 
 ### 완료
 
@@ -59,12 +59,20 @@
   - 42 EQEDIT 테스트 추가
   - 187 테스트 (173 unit + 14 integration, 0 failures)
 
+- [x] Phase 2d: HWPX 테스트 + Dead code 정리 (5e297d7):
+  - hwpx/reader.rs: 42 단위 테스트 추가 (parse_section_xml, guess_mime_from_name)
+    - 단락, 제목, charPr(bold/italic/underline/strikeout), 테이블(colspan/rowspan),
+      이미지, 수식, 목록, 줄바꿈, MIME 타입 (13종)
+  - record.rs: 6개 dead code 경고 수정 (per-item #[allow(dead_code)])
+  - CI 호환: clippy -D warnings 0 경고
+  - 229 테스트 (215 unit + 14 integration, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
-- [ ] Phase 3: HWPX 파싱 고도화 (스타일, colspan, BinData)
+- [ ] Phase 3: HWPX 고도화 (BinData 참조, 각주/미주, 스타일 상속, 중첩 테이블)
 - [ ] Phase 4: Markdown 렌더러 고도화 (GFM 검증, 이미지 옵션)
 - [ ] Phase 5: HWPX 라이터 고도화 (스타일, 이미지, 템플릿)
 - [ ] Phase 6: CLI 완성 + 배포
@@ -119,7 +127,27 @@
 - [ ] crates.io 배포 준비
 - [ ] 배치 변환 CLI 옵션
 
+### HWPX 테스트 — Phase 2d
+- [x] parse_section_xml 단위 테스트 42건 ✅ (5e297d7)
+- [x] Dead code clippy 경고 0건 (CI 호환) ✅
+- [ ] 샘플 HWPX 파일 기반 통합 테스트
+
 ## 변경 이력
+
+### 2026-04-22 — Phase 2d: HWPX 테스트 + Dead code 정리 (5e297d7)
+
+**HWPX reader 테스트**:
+- 42 단위 테스트 추가 (기존 8건 → 50건)
+- parse_section_xml: 단락, 제목(styleIDRef), charPr(bold/italic/underline/strikeout),
+  테이블(colspan/rowspan/cellAddr), 이미지, 수식, 목록, lineBreak
+- guess_mime_from_name: 8개 확장자 + 대소문자 + 미지 확장자 (13건)
+- 리뷰 수정: underline/strikeout 테스트 추가, colSpan=0 기본값 테스트, 테스트명 정정
+
+**Dead code 정리**:
+- record.rs: 6개 경고 → per-item `#[allow(dead_code)]` (HWP 스펙 상수, 향후 사용)
+- rustfmt 정리: reader.rs, summary.rs 주석 정렬
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 229 테스트 (215 unit + 14 integration)
 
 ### 2026-04-22 — Phase 2c: EQEDIT→LaTeX + GitHub Actions CI (37d2645 + da92270)
 
