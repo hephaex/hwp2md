@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: Phase 2d 완료 (HWPX 테스트 + Dead code 정리)
+## 현재 상태: Phase 3 완료 (HWPX 고도화 — 목록/각주/BinData)
 
 ### 완료
 
@@ -67,12 +67,22 @@
   - CI 호환: clippy -D warnings 0 경고
   - 229 테스트 (215 unit + 14 integration, 0 failures)
 
+- [x] Phase 3: HWPX 고도화 (bf57712):
+  - charPr 리팩토링: apply_charpr_attrs() 헬퍼로 Start/Empty 중복 제거
+  - `<li>/<hp:li>` 핸들러: ParseContext에 list_item 컨텍스트 추가, ListItem 생성
+  - 각주/미주 파싱: `<hp:fn>`, `<hp:en>`, `<hp:footnote>`, `<hp:endnote>` → IR Footnote
+  - 각주 참조: `<hp:noteRef>`, `<hp:ctrl id="fn">` → inline footnote_ref
+  - BinData 참조 해결: build_bin_map + resolve_bin_refs (재귀, 모든 컨테이너 블록)
+  - 리뷰 수정 4건 (HIGH): Footnote/List/BlockQuote 재귀, lineBreak/img/noteRef 컨텍스트 라우팅
+  - 교차 테스트 5건 (image-in-footnote, image-in-list, linebreak-in-list, resolve-in-footnote/list)
+  - 243 테스트 (229 unit + 14 integration, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
-- [ ] Phase 3: HWPX 고도화 (BinData 참조, 각주/미주, 스타일 상속, 중첩 테이블)
+- [ ] Phase 3b: HWPX 라우팅 리팩토링 (ParseContext 디스패치 메서드 통합)
 - [ ] Phase 4: Markdown 렌더러 고도화 (GFM 검증, 이미지 옵션)
 - [ ] Phase 5: HWPX 라이터 고도화 (스타일, 이미지, 템플릿)
 - [ ] Phase 6: CLI 완성 + 배포
@@ -127,12 +137,51 @@
 - [ ] crates.io 배포 준비
 - [ ] 배치 변환 CLI 옵션
 
+### HWPX 파서 — Phase 3 완료
+- [x] charPr 중복 제거 (apply_charpr_attrs 헬퍼) ✅
+- [x] `<li>` 핸들러 + list_item 컨텍스트 ✅
+- [x] 각주/미주 파싱 (fn/en/footnote/endnote) ✅
+- [x] 각주 참조 (noteRef, ctrl) ✅
+- [x] BinData 참조 해결 (build_bin_map + resolve_bin_refs) ✅
+- [x] 교차 컨텍스트 라우팅 수정 (lineBreak/img/noteRef) ✅
+- [ ] ParseContext 디스패치 메서드 통합 (active_text_buf/push_inline/push_block)
+- [ ] 샘플 HWPX 파일 기반 통합 테스트
+
 ### HWPX 테스트 — Phase 2d
 - [x] parse_section_xml 단위 테스트 42건 ✅ (5e297d7)
 - [x] Dead code clippy 경고 0건 (CI 호환) ✅
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-04-22 — Phase 3: HWPX 고도화 (bf57712)
+
+**charPr 리팩토링**:
+- apply_charpr_attrs() 헬퍼로 Start/Empty 핸들러 중복 제거
+
+**목록 `<li>` 핸들러**:
+- ParseContext에 in_list_item, list_item_blocks/inlines/text 필드 추가
+- flush_list_item_paragraph() 헬퍼, `<li>`/`<hp:li>` Start/End 핸들링
+- `<ol>/<ul>` → List 블록에 실제 ListItem 생성
+
+**각주/미주 파싱**:
+- ParseContext에 in_footnote, footnote_id/blocks/inlines/text 필드 추가
+- `<hp:fn>`, `<hp:en>`, `<hp:footnote>`, `<hp:endnote>` → IR Block::Footnote
+- `<hp:noteRef noteId="">`, `<hp:ctrl id="fn" idRef="">` → inline footnote_ref
+
+**BinData 참조 해결**:
+- build_bin_map(): BinData/ ZIP 경로에서 stem→full_path HashMap 구축
+- resolve_bin_refs(): IR 블록 트리 재귀 순회, binaryItemIDRef 치환
+- read_hwpx()에서 섹션 파싱 후 자동 적용
+
+**리뷰 수정 (4 HIGH)**:
+- H1: resolve_block_bin_refs에 Footnote/List/BlockQuote 재귀 추가 + exhaustive match
+- H2: lineBreak → in_list_item 라우팅 추가
+- H3: noteRef/ctrl → in_footnote/in_list_item 라우팅 추가
+- H4: img/picture → in_footnote/in_list_item 라우팅 추가
+- 교차 테스트 5건 (image/linebreak in footnote/list, resolve in footnote/list)
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 243 테스트 (229 unit + 14 integration)
 
 ### 2026-04-22 — Phase 2d: HWPX 테스트 + Dead code 정리 (5e297d7)
 
