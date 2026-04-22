@@ -17,6 +17,8 @@ pub(crate) struct ParseContext {
     pub(crate) current_italic: bool,
     pub(crate) current_underline: bool,
     pub(crate) current_strike: bool,
+    pub(crate) current_superscript: bool,
+    pub(crate) current_subscript: bool,
     pub(crate) heading_level: Option<u8>,
     pub(crate) table_rows: Vec<ir::TableRow>,
     pub(crate) current_row_cells: Vec<ir::TableCell>,
@@ -57,6 +59,8 @@ impl Default for ParseContext {
             current_italic: false,
             current_underline: false,
             current_strike: false,
+            current_superscript: false,
+            current_subscript: false,
             heading_level: None,
             table_rows: Vec::new(),
             current_row_cells: Vec::new(),
@@ -158,6 +162,10 @@ pub(crate) fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut Pa
                 ctx.current_strike =
                     !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0"
             }
+            "supscript" | "hp:supscript" => {
+                ctx.current_superscript = val.as_ref() == "superscript";
+                ctx.current_subscript = val.as_ref() == "subscript";
+            }
             _ => {}
         }
     }
@@ -172,6 +180,8 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
             italic: ctx.current_italic,
             underline: ctx.current_underline,
             strikethrough: ctx.current_strike,
+            superscript: ctx.current_superscript,
+            subscript: ctx.current_subscript,
             ..ir::Inline::default()
         });
     }
@@ -198,6 +208,8 @@ pub(crate) fn flush_cell_paragraph(ctx: &mut ParseContext) {
             italic: ctx.current_italic,
             underline: ctx.current_underline,
             strikethrough: ctx.current_strike,
+            superscript: ctx.current_superscript,
+            subscript: ctx.current_subscript,
             ..ir::Inline::default()
         });
     }
@@ -217,6 +229,8 @@ pub(crate) fn flush_list_item_paragraph(ctx: &mut ParseContext) {
             italic: ctx.current_italic,
             underline: ctx.current_underline,
             strikethrough: ctx.current_strike,
+            superscript: ctx.current_superscript,
+            subscript: ctx.current_subscript,
             ..ir::Inline::default()
         });
     }
@@ -238,6 +252,8 @@ pub(crate) fn flush_footnote_paragraph(ctx: &mut ParseContext) {
             italic: ctx.current_italic,
             underline: ctx.current_underline,
             strikethrough: ctx.current_strike,
+            superscript: ctx.current_superscript,
+            subscript: ctx.current_subscript,
             ..ir::Inline::default()
         });
     }

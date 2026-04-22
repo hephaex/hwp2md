@@ -39,6 +39,9 @@ pub(crate) fn parse_char_shape(data: &[u8]) -> CharShape {
         shape.italic = (attr & 0x02) != 0;
         shape.underline = (attr & 0x04) != 0;
         shape.strikethrough = (attr & 0x40) != 0;
+        let sub_super = (attr >> 16) & 0x03;
+        shape.superscript = sub_super == 1;
+        shape.subscript = sub_super == 2;
     }
 
     // Color at bytes 54-57.
@@ -55,7 +58,8 @@ pub(crate) fn parse_para_shape(data: &[u8]) -> ParaShape {
         return shape;
     }
 
-    let alignment_val = data[0] & 0x07;
+    let attr1 = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+    let alignment_val = attr1 & 0x07;
     shape.alignment = match alignment_val {
         0 => Alignment::Justify,
         1 => Alignment::Left,
@@ -63,6 +67,11 @@ pub(crate) fn parse_para_shape(data: &[u8]) -> ParaShape {
         3 => Alignment::Center,
         _ => Alignment::Left,
     };
+    let head_type = (attr1 >> 24) & 0x03;
+    if head_type == 1 {
+        let para_level = ((attr1 >> 26) & 0x07) as u8;
+        shape.heading_type = Some(para_level);
+    }
 
     if data.len() >= 16 {
         shape.margin_left = i32::from_le_bytes([data[4], data[5], data[6], data[7]]);
