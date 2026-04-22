@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: Phase 3b 완료 (모듈 분할 + 테스트 확충)
+## 현재 상태: Phase 4 완료 (Writer 고도화 + MD 안전성)
 
 ### 완료
 
@@ -88,12 +88,22 @@
   - 리뷰 수정 2건 (HIGH): 디스패치 우선순위 통일 문서화, chars().count() 일관성
   - 302 테스트 (288 unit + 14 integration, 0 failures)
 
+- [x] Phase 4: Writer 고도화 + MD 안전성 (c9780c5):
+  - HWPX writer: `<hp:cellAddr colSpan rowSpan/>` 출력 (span > 1일 때)
+  - HWPX writer: 테스트 분리 → writer_tests.rs (814→279행)
+  - MD writer: escape_inline() 추가 (7종 GFM 메타문자 이스케이프)
+  - MD writer: 빈 텍스트 formatting marker 방지 (`****` 버그)
+  - MD writer: cell_to_text exhaustive match (catch-all 제거)
+  - MD writer: 테스트 분리 → writer_tests.rs (876→310행)
+  - Block enum match 전수 감사: 코드베이스 전체 catch-all 0건
+  - 18 인라인 엣지케이스 + 4 cellAddr 테스트
+  - 320 테스트 (306 unit + 14 integration, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
-- [ ] Phase 4: Markdown 렌더러 고도화 (GFM 검증, 이미지 옵션)
 - [ ] Phase 5: HWPX 라이터 고도화 (스타일, 이미지, 템플릿)
 - [ ] Phase 6: CLI 완성 + 배포
 
@@ -164,6 +174,28 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-04-22 — Phase 4: Writer 고도화 + MD 안전성 (c9780c5)
+
+**HWPX writer**:
+- cellAddr colspan/rowspan: `<hp:cellAddr colSpan="N" rowSpan="N"/>` 출력 (span > 1)
+- 1×1 셀은 cellAddr 미출력 (OWPML 스키마 준수)
+- 테스트 분리: writer_tests.rs (writer.rs 814→279행)
+
+**MD writer**:
+- escape_inline(): 7종 GFM 메타문자 (\\ \` \* \_ \~ \[ \]) 이스케이프
+- 빈 텍스트 guard: bold/italic/strikethrough/underline/super/sub 마커 생략
+- cell_to_text: `_ => {}` catch-all → 9개 Block variant 명시
+- 테스트 분리: writer_tests.rs (writer.rs 876→310행)
+
+**Block enum 전수 감사**:
+- 코드베이스 전체 ir::Block match에서 catch-all 0건 확인
+- cell_to_text가 유일한 잔여 catch-all이었음 → 수정 완료
+
+**리뷰**:
+- MEDIUM 3건: md/writer 분할(완료), #/> 이스케이프(HWP 저빈도, 미착수), cellAddr colAddr/rowAddr(미착수)
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 320 테스트 (306 unit + 14 integration)
 
 ### 2026-04-22 — Phase 3b: 모듈 분할 + 테스트 확충 (35ea51f)
 
