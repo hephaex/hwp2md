@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: Phase 8 완료 (테스트 분리 + 통합 테스트 인프라 + 토크나이저 버그 수정)
+## 현재 상태: Phase 9a 완료 (rhwp 비교 분석 + MUST 버그 수정)
 
 ### 완료
 
@@ -139,12 +139,22 @@
   - cargo publish --dry-run 통과
   - 504 테스트 (442 unit + 11 CLI + 24 integration + 27 roundtrip, 0 failures)
 
+- [x] Phase 9a: rhwp 비교 분석 + MUST 버그 수정 (d108d62):
+  - rhwp (148K LOC) 대비 갭 분석: 파싱 정확도 중심
+  - MUST fix: CharShape superscript/subscript 파싱 (attr bits 16-17)
+  - MUST fix: ParaShape heading_type 파싱 (attr1 bits 24-25, outline level)
+  - MUST fix: HWPX charPr superscript/subscript 속성 + flush 전파
+  - 6 신규 테스트 (superscript/subscript/heading_type)
+  - 510 테스트 (448 unit + 11 CLI + 24 integration + 27 roundtrip, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
-- [ ] Phase 9: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성 + 배포 (cargo publish)
+- [ ] Phase 9b: 배포문서 복호화 (AES-128 ECB, LCG+XOR, ViewText 스트림)
+- [ ] Phase 9c: Lenient CFB 폴백 + Ruby 텍스트 컨트롤
+- [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성 + 배포 (cargo publish)
 
 ## 중기 개선 로드맵 (Phase 1.5)
 
@@ -213,6 +223,31 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-04-23 — Phase 9a: rhwp 비교 분석 + MUST 버그 수정 (d1cab3d + d108d62)
+
+**rhwp 비교 분석**:
+- rhwp (github.com/edwardkim/rhwp): 148K LOC, HWP 읽기/쓰기/렌더링/WASM
+- 주요 갭: 배포문서 복호화, Lenient CFB, 50+ 컨트롤, 891+ 테스트
+- 즉시 수정 가능한 MUST 버그 3건 발견
+
+**MUST 버그 수정 3건**:
+- CharShape: superscript/subscript 파싱 (attr bits 16-17) — shapes.rs
+- ParaShape: heading_type (outline level) 파싱 (attr1 bits 24-25) — shapes.rs
+- HWPX: charPr supscript 속성 파싱 + 4개 flush 함수 전파 — context.rs
+
+**6 신규 테스트**:
+- parse_char_shape_superscript_flag, _subscript_flag, _bold_and_superscript
+- parse_para_shape_heading_type_outline, _level_3, _no_heading
+
+**개선 로드맵 (SHOULD 이상)**:
+1. 배포문서 복호화 (AES-128, ~500 LOC)
+2. Lenient CFB 폴백 (~300 LOC)
+3. Ruby 텍스트 컨트롤 (~200 LOC)
+4. ParaShape numbering_id 리스트 감지 (~100 LOC)
+5. Table cell 메타데이터 (~150 LOC)
+
+**검증**: cargo check 0 에러, clippy 0 경고, 510 테스트 (448 unit + 11 CLI + 24 integration + 27 roundtrip)
 
 ### 2026-04-22 — Phase 8: 테스트 분리 + 통합 테스트 인프라 + 토크나이저 버그 수정 (ac63b6f)
 
