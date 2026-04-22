@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::error::Hwp2MdError;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::Read;
@@ -7,6 +5,7 @@ use std::io::Read;
 pub const HWPTAG_BEGIN: u16 = 0x0010;
 
 pub const HWPTAG_DOCUMENT_PROPERTIES: u16 = HWPTAG_BEGIN;
+#[allow(dead_code)]
 pub const HWPTAG_ID_MAPPINGS: u16 = HWPTAG_BEGIN + 1;
 pub const HWPTAG_BIN_DATA: u16 = HWPTAG_BEGIN + 2;
 pub const HWPTAG_FACE_NAME: u16 = HWPTAG_BEGIN + 3;
@@ -23,11 +22,15 @@ pub const HWPTAG_EQEDIT: u16 = HWPTAG_BEGIN + 71;
 /// GSOType record — contains picture/OLE shape specifics including BinData reference.
 pub const HWPTAG_GSOTYPE: u16 = HWPTAG_BEGIN + 67;
 
+#[allow(dead_code)]
 pub const CTRL_SECTION_DEF: u32 = ctrl_id(b"secd");
 pub const CTRL_TABLE: u32 = ctrl_id(b"tbl ");
+#[allow(dead_code)]
 pub const CTRL_EQUATION: u32 = ctrl_id(b"eqed");
 pub const CTRL_GSHAPE: u32 = ctrl_id(b"gso ");
+#[allow(dead_code)]
 pub const CTRL_HEADER: u32 = ctrl_id(b"daeh");
+#[allow(dead_code)]
 pub const CTRL_FOOTER: u32 = ctrl_id(b"toof");
 pub const CTRL_FOOTNOTE: u32 = ctrl_id(b"fn  ");
 pub const CTRL_ENDNOTE: u32 = ctrl_id(b"en  ");
@@ -47,6 +50,7 @@ pub struct Record {
 }
 
 impl Record {
+    #[allow(dead_code)]
     pub fn tag_name(&self) -> &'static str {
         match self.tag_id {
             HWPTAG_DOCUMENT_PROPERTIES => "DOCUMENT_PROPERTIES",

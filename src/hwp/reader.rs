@@ -24,10 +24,7 @@ fn parse_hwp_file(path: &Path) -> Result<HwpDocument, anyhow::Error> {
     let header = read_file_header(&mut cfb)?;
 
     if header.encrypted || header.has_drm {
-        return Err(Hwp2MdError::HwpParse(
-            "HWP file is encrypted or DRM-protected".into(),
-        )
-        .into());
+        return Err(Hwp2MdError::HwpParse("HWP file is encrypted or DRM-protected".into()).into());
     }
     if header.distributed {
         return Err(Hwp2MdError::HwpParse(
@@ -565,7 +562,9 @@ mod tests {
 
     // --- Helpers ---
 
-    fn encode_u16s(units: &[u16]) -> Vec<u8> { encode_u16s_test(units) }
+    fn encode_u16s(units: &[u16]) -> Vec<u8> {
+        encode_u16s_test(units)
+    }
 
     /// Build a 58-byte CharShape record with `flags` at offset 46 and `height` at offset 42.
     fn make_char_shape_data(flags: u32, height: i32) -> Vec<u8> {
@@ -808,10 +807,10 @@ mod tests {
         let mut buf = vec![0u8; 256];
         buf[0..17].copy_from_slice(b"HWP Document File");
         buf[35] = 5; // version major
-        // props byte 36: bit 1 = encrypted (0x02), bit 0 = compressed (0x01)
+                     // props byte 36: bit 1 = encrypted (0x02), bit 0 = compressed (0x01)
         buf[36] = 0x03; // compressed + encrypted
-        // We can't call read_file_header directly (it needs cfb),
-        // but we can verify the bit parsing logic:
+                        // We can't call read_file_header directly (it needs cfb),
+                        // but we can verify the bit parsing logic:
         let props = u32::from_le_bytes([buf[36], buf[37], buf[38], buf[39]]);
         assert!((props & 0x02) != 0, "encrypted bit should be set");
     }

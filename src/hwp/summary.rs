@@ -33,10 +33,7 @@ pub(crate) fn parse_summary_bytes(
     let empty = || (None, None, None, Vec::new());
 
     if raw.len() < 48 {
-        tracing::debug!(
-            "SummaryInformation: stream too short ({} bytes)",
-            raw.len()
-        );
+        tracing::debug!("SummaryInformation: stream too short ({} bytes)", raw.len());
         return empty();
     }
 
@@ -179,7 +176,7 @@ mod tests {
             prop_data.extend_from_slice(&(size as u32).to_le_bytes());
             prop_data.extend_from_slice(bytes);
             prop_data.push(0); // NUL
-            // Pad to 4-byte alignment
+                               // Pad to 4-byte alignment
             while prop_data.len() % 4 != 0 {
                 prop_data.push(0);
             }
@@ -196,10 +193,7 @@ mod tests {
 
     #[test]
     fn parse_summary_bytes_valid_title_and_author() {
-        let raw = build_summary_bytes(&[
-            (PROP_TITLE, "Test Doc"),
-            (PROP_AUTHOR, "Author Name"),
-        ]);
+        let raw = build_summary_bytes(&[(PROP_TITLE, "Test Doc"), (PROP_AUTHOR, "Author Name")]);
         let (title, author, subject, keywords) = parse_summary_bytes(&raw);
         assert_eq!(title.as_deref(), Some("Test Doc"));
         assert_eq!(author.as_deref(), Some("Author Name"));
