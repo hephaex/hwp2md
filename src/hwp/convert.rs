@@ -185,13 +185,13 @@ pub(crate) fn detect_heading_level(para: &HwpParagraph, doc_info: &DocInfo) -> O
     if ps_id < doc_info.para_shapes.len() {
         if let Some(level) = doc_info.para_shapes[ps_id].heading_type {
             if level < 7 {
-                return Some(level + 1);
+                return Some((level + 1).min(6));
             }
         }
     }
 
     let text = para.text.trim();
-    if text.len() < 100 {
+    if text.chars().count() < 100 {
         if let Some(first_cs) = para.char_shape_ids.first() {
             let cs_id = first_cs.1 as usize;
             if cs_id < doc_info.char_shapes.len() {
@@ -299,164 +299,5 @@ fn mime_to_ext(mime: &str) -> &'static str {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    // -----------------------------------------------------------------------
-    // control_to_block (IR conversion)
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn control_to_block_image_produces_image_block() {
-        let ctrl = HwpControl::Image {
-            bin_data_id: 7,
-            width: 100,
-            height: 200,
-        };
-        let doc_info = DocInfo::default();
-        let block = control_to_block(&ctrl, &doc_info).expect("Some");
-        assert!(
-            matches!(block, ir::Block::Image { ref src, .. } if src == "image_7.bin"),
-            "expected Image block with src=image_7.bin, got {block:?}"
-        );
-    }
-
-    #[test]
-    fn control_to_block_empty_table_produces_table_block() {
-        let ctrl = HwpControl::Table {
-            row_count: 2,
-            col_count: 3,
-            cells: Vec::new(),
-        };
-        let doc_info = DocInfo::default();
-        let block = control_to_block(&ctrl, &doc_info).expect("Some");
-        assert!(matches!(block, ir::Block::Table { col_count: 3, .. }));
-    }
-
-    #[test]
-    fn control_to_block_footnote_produces_footnote_block() {
-        let ctrl = HwpControl::FootnoteEndnote {
-            is_endnote: false,
-            paragraphs: Vec::new(),
-        };
-        let doc_info = DocInfo::default();
-        let block = control_to_block(&ctrl, &doc_info).expect("Some");
-        assert!(matches!(block, ir::Block::Footnote { .. }));
-    }
-
-    #[test]
-    fn control_to_block_page_break_returns_none() {
-        let ctrl = HwpControl::PageBreak;
-        let doc_info = DocInfo::default();
-        assert!(control_to_block(&ctrl, &doc_info).is_none());
-    }
-
-    #[test]
-    fn control_to_block_table_groups_cells_into_rows() {
-        // 2×2 table with 4 cells.
-        let make_cell = |row: u16, col: u16, text: &str| HwpTableCell {
-            row,
-            col,
-            row_span: 1,
-            col_span: 1,
-            paragraphs: vec![HwpParagraph {
-                text: text.to_string(),
-                char_shape_ids: Vec::new(),
-                para_shape_id: 0,
-                controls: Vec::new(),
-            }],
-        };
-        let ctrl = HwpControl::Table {
-            row_count: 2,
-            col_count: 2,
-            cells: vec![
-                make_cell(0, 0, "r0c0"),
-                make_cell(0, 1, "r0c1"),
-                make_cell(1, 0, "r1c0"),
-                make_cell(1, 1, "r1c1"),
-            ],
-        };
-        let doc_info = DocInfo::default();
-        let block = control_to_block(&ctrl, &doc_info).expect("Some");
-        if let ir::Block::Table { rows, col_count } = block {
-            assert_eq!(col_count, 2);
-            assert_eq!(rows.len(), 2);
-            assert_eq!(rows[0].cells.len(), 2);
-            assert_eq!(rows[1].cells.len(), 2);
-            // First row is marked as header.
-            assert!(rows[0].is_header);
-            assert!(!rows[1].is_header);
-        } else {
-            panic!("Expected Table block");
-        }
-    }
-
-    #[test]
-    fn control_to_block_caps_malformed_row_index() {
-        let ctrl = HwpControl::Table {
-            row_count: 1,
-            col_count: 1,
-            cells: vec![HwpTableCell {
-                row: 50_000, // absurdly large
-                col: 0,
-                row_span: 1,
-                col_span: 1,
-                paragraphs: vec![],
-            }],
-        };
-        let doc_info = DocInfo::default();
-        let block = control_to_block(&ctrl, &doc_info).expect("Some");
-        if let ir::Block::Table { rows, .. } = block {
-            // Row with index 50_000 should be silently dropped (cap is 10_000)
-            assert!(rows.len() <= 10_000);
-        } else {
-            panic!("Expected Table block");
-        }
-    }
-
-    #[test]
-    fn control_to_block_hyperlink_with_url_produces_paragraph() {
-        let ctrl = HwpControl::Hyperlink {
-            url: "https://example.com".into(),
-        };
-        let doc_info = DocInfo::default();
-        let block = control_to_block(&ctrl, &doc_info).expect("Some");
-        if let ir::Block::Paragraph { inlines } = block {
-            assert_eq!(inlines.len(), 1);
-            assert_eq!(inlines[0].text, "https://example.com");
-            assert_eq!(inlines[0].link.as_deref(), Some("https://example.com"));
-        } else {
-            panic!("Expected Paragraph block");
-        }
-    }
-
-    #[test]
-    fn control_to_block_hyperlink_empty_url_returns_none() {
-        let ctrl = HwpControl::Hyperlink { url: String::new() };
-        let doc_info = DocInfo::default();
-        assert!(control_to_block(&ctrl, &doc_info).is_none());
-    }
-
-    #[test]
-    fn control_to_block_hyperlink_javascript_url_rejected() {
-        let ctrl = HwpControl::Hyperlink {
-            url: "javascript:alert(1)".into(),
-        };
-        let doc_info = DocInfo::default();
-        assert!(control_to_block(&ctrl, &doc_info).is_none());
-    }
-
-    #[test]
-    fn is_safe_url_scheme_accepts_https() {
-        assert!(is_safe_url_scheme("https://example.com"));
-        assert!(is_safe_url_scheme("HTTP://EXAMPLE.COM"));
-        assert!(is_safe_url_scheme("mailto:user@example.com"));
-    }
-
-    #[test]
-    fn is_safe_url_scheme_rejects_dangerous() {
-        assert!(!is_safe_url_scheme("javascript:alert(1)"));
-        assert!(!is_safe_url_scheme("data:text/html,<h1>hi</h1>"));
-        assert!(!is_safe_url_scheme("vbscript:msgbox"));
-    }
-}
+#[path = "convert_tests.rs"]
+mod tests;

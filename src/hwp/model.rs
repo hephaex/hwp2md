@@ -45,6 +45,39 @@ impl std::fmt::Display for HwpVersion {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hwp_version_display_formats_correctly() {
+        let v = HwpVersion {
+            major: 5,
+            minor: 1,
+            micro: 0,
+            extra: 0,
+        };
+        assert_eq!(format!("{v}"), "5.1.0.0");
+    }
+
+    #[test]
+    fn hwp_version_default_is_all_zeros() {
+        let v = HwpVersion::default();
+        assert_eq!(format!("{v}"), "0.0.0.0");
+    }
+
+    #[test]
+    fn hwp_version_display_all_fields() {
+        let v = HwpVersion {
+            major: 5,
+            minor: 3,
+            micro: 2,
+            extra: 1,
+        };
+        assert_eq!(format!("{v}"), "5.3.2.1");
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct DocInfo {
     pub char_shapes: Vec<CharShape>,

@@ -229,4 +229,99 @@ mod tests {
         assert!(t.is_none());
         assert!(a.is_none());
     }
+
+    #[test]
+    fn parse_summary_bytes_subject_field() {
+        let raw = build_summary_bytes(&[
+            (PROP_TITLE, "Doc Title"),
+            (PROP_SUBJECT, "This is the subject"),
+        ]);
+        let (title, _author, subject, _keywords) = parse_summary_bytes(&raw);
+        assert_eq!(title.as_deref(), Some("Doc Title"));
+        assert_eq!(subject.as_deref(), Some("This is the subject"));
+    }
+
+    #[test]
+    fn parse_summary_bytes_keywords_comma_separated() {
+        let raw = build_summary_bytes(&[(PROP_KEYWORDS, "rust,hwp,converter")]);
+        let (_t, _a, _s, keywords) = parse_summary_bytes(&raw);
+        assert!(keywords.contains(&"rust".to_string()));
+        assert!(keywords.contains(&"hwp".to_string()));
+        assert!(keywords.contains(&"converter".to_string()));
+    }
+
+    #[test]
+    fn parse_summary_bytes_keywords_semicolon_separated() {
+        let raw = build_summary_bytes(&[(PROP_KEYWORDS, "alpha;beta;gamma")]);
+        let (_t, _a, _s, keywords) = parse_summary_bytes(&raw);
+        assert!(keywords.contains(&"alpha".to_string()));
+        assert!(keywords.contains(&"beta".to_string()));
+        assert!(keywords.contains(&"gamma".to_string()));
+    }
+
+    #[test]
+    fn parse_summary_bytes_keywords_space_separated() {
+        let raw = build_summary_bytes(&[(PROP_KEYWORDS, "one two three")]);
+        let (_t, _a, _s, keywords) = parse_summary_bytes(&raw);
+        assert!(keywords.contains(&"one".to_string()));
+        assert!(keywords.contains(&"two".to_string()));
+        assert!(keywords.contains(&"three".to_string()));
+    }
+
+    #[test]
+    fn parse_summary_bytes_all_fields() {
+        let raw = build_summary_bytes(&[
+            (PROP_TITLE, "Full Doc"),
+            (PROP_AUTHOR, "Full Author"),
+            (PROP_SUBJECT, "Full Subject"),
+            (PROP_KEYWORDS, "kw1,kw2"),
+        ]);
+        let (title, author, subject, keywords) = parse_summary_bytes(&raw);
+        assert_eq!(title.as_deref(), Some("Full Doc"));
+        assert_eq!(author.as_deref(), Some("Full Author"));
+        assert_eq!(subject.as_deref(), Some("Full Subject"));
+        assert_eq!(keywords, vec!["kw1", "kw2"]);
+    }
+
+    #[test]
+    fn parse_summary_bytes_section_offset_out_of_range_returns_none() {
+        // Build 48 bytes with valid BOM but section offset pointing beyond buffer.
+        let mut raw = vec![0u8; 48];
+        raw[0] = 0xFE;
+        raw[1] = 0xFF;
+        // Set section offset to 1000 (way beyond buf end).
+        let offset: u32 = 1000;
+        raw[44..48].copy_from_slice(&offset.to_le_bytes());
+        let (t, a, s, k) = parse_summary_bytes(&raw);
+        assert!(t.is_none());
+        assert!(a.is_none());
+        assert!(s.is_none());
+        assert!(k.is_empty());
+    }
+
+    #[test]
+    fn parse_summary_bytes_prop_directory_truncated_returns_none() {
+        // Build a buffer where prop_count is large but directory would exceed buffer.
+        let mut raw = vec![0u8; 60];
+        raw[0] = 0xFE;
+        raw[1] = 0xFF;
+        let sec_offset: u32 = 44;
+        raw[44..48].copy_from_slice(&sec_offset.to_le_bytes());
+        // sec_offset+4 = prop_count = 1000 (huge)
+        let prop_count: u32 = 1000;
+        raw[48..52].copy_from_slice(&prop_count.to_le_bytes());
+        let (t, a, s, k) = parse_summary_bytes(&raw);
+        assert!(t.is_none());
+        assert!(a.is_none());
+        assert!(s.is_none());
+        assert!(k.is_empty());
+    }
+
+    #[test]
+    fn parse_summary_bytes_unknown_prop_id_ignored() {
+        // An unknown property ID (not TITLE/AUTHOR/SUBJECT/KEYWORDS) should be skipped.
+        let raw = build_summary_bytes(&[(0xFF, "ignored value"), (PROP_TITLE, "Known Title")]);
+        let (title, _author, _subject, _keywords) = parse_summary_bytes(&raw);
+        assert_eq!(title.as_deref(), Some("Known Title"));
+    }
 }

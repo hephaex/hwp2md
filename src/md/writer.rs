@@ -62,7 +62,8 @@ fn write_block(out: &mut String, block: &ir::Block, indent: usize) {
         ir::Block::Paragraph { inlines } => {
             let text = render_inlines(inlines);
             if !text.trim().is_empty() {
-                out.push_str(&format!("{prefix}{text}\n\n"));
+                let safe = escape_paragraph_line_start(&text);
+                out.push_str(&format!("{prefix}{safe}\n\n"));
             }
         }
         ir::Block::Table { rows, col_count } => {
@@ -141,6 +142,38 @@ fn escape_inline(text: &str) -> String {
         }
     }
     out
+}
+
+fn escape_paragraph_line_start(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 8);
+    for (i, line) in text.split('\n').enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        if needs_line_start_escape(line) {
+            out.push('\\');
+        }
+        out.push_str(line);
+    }
+    out
+}
+
+fn needs_line_start_escape(line: &str) -> bool {
+    if line.starts_with('#') || line.starts_with('>') {
+        return true;
+    }
+    if line.starts_with("- ") || line.starts_with("* ") || line.starts_with("+ ") {
+        return true;
+    }
+    if line == "---" || line == "***" || line == "___" {
+        return true;
+    }
+    if let Some(rest) = line.split_once(". ") {
+        if rest.0.chars().all(|c| c.is_ascii_digit()) && !rest.0.is_empty() {
+            return true;
+        }
+    }
+    false
 }
 
 fn render_inlines(inlines: &[ir::Inline]) -> String {

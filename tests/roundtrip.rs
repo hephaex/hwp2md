@@ -797,3 +797,44 @@ fn roundtrip_unicode_korean_text() {
         "Korean paragraph text lost; para_text: {para_text:?}"
     );
 }
+
+#[test]
+fn roundtrip_code_block_two_pass_content_identical() {
+    // A multi-line code block with special characters must survive two full
+    // write→parse→write cycles with identical code content both times.
+    let code = "fn greet(name: &str) {\n    println!(\"Hello, {name}!\");\n    // a < b && c > d\n    let x = 1 * 2 + 3 - 4;\n}";
+    let original = make_doc(vec![ir::Block::CodeBlock {
+        language: Some("rust".into()),
+        code: code.to_string(),
+    }]);
+
+    let md1 = write_markdown(&original, false);
+    let doc2 = parse_markdown(&md1);
+    let md2 = write_markdown(&doc2, false);
+    let doc3 = parse_markdown(&md2);
+
+    let extract_code = |doc: &ir::Document| -> Option<String> {
+        first_blocks(doc).iter().find_map(|b| {
+            if let ir::Block::CodeBlock { code, .. } = b {
+                Some(code.clone())
+            } else {
+                None
+            }
+        })
+    };
+
+    let code2 = extract_code(&doc2).expect("code block missing after pass 1");
+    let code3 = extract_code(&doc3).expect("code block missing after pass 2");
+
+    assert_eq!(
+        code2.trim(),
+        code.trim(),
+        "code content changed after pass 1\npass1 md:\n{md1}"
+    );
+    assert_eq!(
+        code3.trim(),
+        code.trim(),
+        "code content changed after pass 2\npass2 md:\n{md2}"
+    );
+    assert_eq!(md1, md2, "markdown output not stable across two passes");
+}
