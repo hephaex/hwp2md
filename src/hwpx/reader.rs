@@ -2,6 +2,7 @@ use crate::error::Hwp2MdError;
 use crate::ir;
 use quick_xml::events::Event;
 use quick_xml::Reader;
+use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
 
@@ -16,18 +17,25 @@ pub fn read_hwpx(path: &Path) -> Result<ir::Document, anyhow::Error> {
         doc.metadata = metadata;
     }
 
+    // Build the BinData ID -> full ZIP path map before parsing sections so that
+    // binaryItemIDRef references can be resolved immediately.
+    let bin_files = find_bin_files(&mut archive);
+    let bin_map = build_bin_map(&bin_files);
+
     let section_files = find_section_files(&mut archive);
 
     for section_path in &section_files {
         match read_section_xml(&mut archive, section_path) {
-            Ok(section) => doc.sections.push(section),
+            Ok(mut section) => {
+                resolve_bin_refs(&mut section, &bin_map);
+                doc.sections.push(section);
+            }
             Err(e) => {
                 tracing::warn!("Failed to read {section_path}: {e}");
             }
         }
     }
 
-    let bin_files = find_bin_files(&mut archive);
     for bin_path in &bin_files {
         if let Ok(asset) = read_bin_asset(&mut archive, bin_path) {
             doc.assets.push(asset);
@@ -35,6 +43,76 @@ pub fn read_hwpx(path: &Path) -> Result<ir::Document, anyhow::Error> {
     }
 
     Ok(doc)
+}
+
+/// Build a map from bare BinData stem (e.g. `"BIN0001"`) to the full ZIP path
+/// (e.g. `"BinData/BIN0001.png"`).
+///
+/// When a section XML references `binaryItemIDRef="BIN0001"`, the parser stores
+/// `"BIN0001"` as the image src.  This map is used by [`resolve_bin_refs`] to
+/// replace that bare ID with the real path so downstream consumers can locate
+/// the asset.
+fn build_bin_map(bin_files: &[String]) -> HashMap<String, String> {
+    bin_files
+        .iter()
+        .filter_map(|path| {
+            let filename = path.rsplit('/').next()?;
+            let stem = filename
+                .rsplit_once('.')
+                .map(|(s, _)| s)
+                .unwrap_or(filename);
+            Some((stem.to_string(), path.clone()))
+        })
+        .collect()
+}
+
+/// Walk all blocks in `section` and replace any `Image { src }` whose `src`
+/// equals a key in `bin_map` with the corresponding full path.
+fn resolve_bin_refs(section: &mut ir::Section, bin_map: &HashMap<String, String>) {
+    for block in &mut section.blocks {
+        resolve_block_bin_refs(block, bin_map);
+    }
+}
+
+fn resolve_block_bin_refs(block: &mut ir::Block, bin_map: &HashMap<String, String>) {
+    match block {
+        ir::Block::Image { src, .. } => {
+            if let Some(full_path) = bin_map.get(src.as_str()) {
+                *src = full_path.clone();
+            }
+        }
+        ir::Block::Table { rows, .. } => {
+            for row in rows {
+                for cell in &mut row.cells {
+                    for b in &mut cell.blocks {
+                        resolve_block_bin_refs(b, bin_map);
+                    }
+                }
+            }
+        }
+        ir::Block::Footnote { content, .. } => {
+            for b in content {
+                resolve_block_bin_refs(b, bin_map);
+            }
+        }
+        ir::Block::List { items, .. } => {
+            for item in items {
+                for b in &mut item.blocks {
+                    resolve_block_bin_refs(b, bin_map);
+                }
+            }
+        }
+        ir::Block::BlockQuote { blocks } => {
+            for b in blocks {
+                resolve_block_bin_refs(b, bin_map);
+            }
+        }
+        ir::Block::Heading { .. }
+        | ir::Block::Paragraph { .. }
+        | ir::Block::CodeBlock { .. }
+        | ir::Block::HorizontalRule
+        | ir::Block::Math { .. } => {}
+    }
 }
 
 fn read_metadata(
@@ -243,8 +321,18 @@ struct ParseContext {
     list_ordered: bool,
     in_list: bool,
     list_items: Vec<ir::ListItem>,
+    in_list_item: bool,
+    list_item_blocks: Vec<ir::Block>,
+    list_item_inlines: Vec<ir::Inline>,
+    list_item_text: String,
     equation_text: String,
     in_equation: bool,
+    // footnote / endnote accumulation
+    in_footnote: bool,
+    footnote_id: String,
+    footnote_blocks: Vec<ir::Block>,
+    footnote_inlines: Vec<ir::Inline>,
+    footnote_text: String,
 }
 
 impl Default for ParseContext {
@@ -273,8 +361,45 @@ impl Default for ParseContext {
             list_ordered: false,
             in_list: false,
             list_items: Vec::new(),
+            in_list_item: false,
+            list_item_blocks: Vec::new(),
+            list_item_inlines: Vec::new(),
+            list_item_text: String::new(),
             equation_text: String::new(),
             in_equation: false,
+            in_footnote: false,
+            footnote_id: String::new(),
+            footnote_blocks: Vec::new(),
+            footnote_inlines: Vec::new(),
+            footnote_text: String::new(),
+        }
+    }
+}
+
+/// Parse `bold`, `italic`, `underline`, and `strikeout` attributes from a
+/// `<charPr>` or `<hp:charPr>` element and write them onto `ctx`.
+///
+/// Called from both `handle_start_element` (non-self-closing variant) and
+/// `handle_empty_element` (self-closing variant) so the two paths are
+/// guaranteed to behave identically.
+fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut ParseContext) {
+    for attr in e.attributes().flatten() {
+        let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+        let val = attr.unescape_value().unwrap_or_default();
+        match key {
+            "bold" | "hp:bold" => ctx.current_bold = val.as_ref() == "true" || val.as_ref() == "1",
+            "italic" | "hp:italic" => {
+                ctx.current_italic = val.as_ref() == "true" || val.as_ref() == "1"
+            }
+            "underline" | "hp:underline" => {
+                ctx.current_underline =
+                    !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0"
+            }
+            "strikeout" | "hp:strikeout" => {
+                ctx.current_strike =
+                    !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0"
+            }
+            _ => {}
         }
     }
 }
@@ -304,23 +429,7 @@ fn handle_start_element(local: &str, e: &quick_xml::events::BytesStart, ctx: &mu
             ctx.current_underline = false;
             ctx.current_strike = false;
         }
-        "charPr" | "hp:charPr" => {
-            for attr in e.attributes().flatten() {
-                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                let val = attr.unescape_value().unwrap_or_default().to_string();
-                match key {
-                    "bold" | "hp:bold" => ctx.current_bold = val == "true" || val == "1",
-                    "italic" | "hp:italic" => ctx.current_italic = val == "true" || val == "1",
-                    "underline" | "hp:underline" => {
-                        ctx.current_underline = !val.is_empty() && val != "none" && val != "0"
-                    }
-                    "strikeout" | "hp:strikeout" => {
-                        ctx.current_strike = !val.is_empty() && val != "none" && val != "0"
-                    }
-                    _ => {}
-                }
-            }
-        }
+        "charPr" | "hp:charPr" => apply_charpr_attrs(e, ctx),
         "t" | "hp:t" => {}
         "tbl" | "hp:tbl" => {
             ctx.in_table = true;
@@ -356,9 +465,30 @@ fn handle_start_element(local: &str, e: &quick_xml::events::BytesStart, ctx: &mu
             ctx.list_ordered = false;
             ctx.list_items.clear();
         }
+        "li" | "hp:li" => {
+            ctx.in_list_item = true;
+            ctx.list_item_blocks.clear();
+            ctx.list_item_inlines.clear();
+            ctx.list_item_text.clear();
+        }
         "equation" | "hp:equation" | "eqEdit" | "hp:eqEdit" => {
             ctx.in_equation = true;
             ctx.equation_text.clear();
+        }
+        "fn" | "hp:fn" | "footnote" | "hp:footnote" | "en" | "hp:en" | "endnote" | "hp:endnote" => {
+            let mut id = String::new();
+            for attr in e.attributes().flatten() {
+                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                if key == "id" || key == "hp:id" || key == "noteId" || key == "hp:noteId" {
+                    id = attr.unescape_value().unwrap_or_default().to_string();
+                    break;
+                }
+            }
+            ctx.in_footnote = true;
+            ctx.footnote_id = id;
+            ctx.footnote_blocks.clear();
+            ctx.footnote_inlines.clear();
+            ctx.footnote_text.clear();
         }
         _ => {}
     }
@@ -367,8 +497,12 @@ fn handle_start_element(local: &str, e: &quick_xml::events::BytesStart, ctx: &mu
 fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &mut ir::Section) {
     match local {
         "p" | "hp:p" => {
-            if ctx.in_cell {
+            if ctx.in_footnote {
+                flush_footnote_paragraph(ctx);
+            } else if ctx.in_cell {
                 flush_cell_paragraph(ctx);
+            } else if ctx.in_list_item {
+                flush_list_item_paragraph(ctx);
             } else {
                 flush_paragraph(ctx, section);
             }
@@ -388,8 +522,12 @@ fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &mut ir::Sec
                     strikethrough: ctx.current_strike,
                     ..ir::Inline::default()
                 };
-                if ctx.in_cell {
+                if ctx.in_footnote {
+                    ctx.footnote_inlines.push(inline);
+                } else if ctx.in_cell {
                     ctx.cell_inlines.push(inline);
+                } else if ctx.in_list_item {
+                    ctx.list_item_inlines.push(inline);
                 } else {
                     ctx.current_inlines.push(inline);
                 }
@@ -426,6 +564,15 @@ fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &mut ir::Sec
             });
             ctx.in_cell = false;
         }
+        "li" | "hp:li" => {
+            flush_list_item_paragraph(ctx);
+            let blocks = std::mem::take(&mut ctx.list_item_blocks);
+            ctx.list_items.push(ir::ListItem {
+                blocks,
+                children: Vec::new(),
+            });
+            ctx.in_list_item = false;
+        }
         "ol" | "ul" => {
             if !ctx.list_items.is_empty() {
                 let items = std::mem::take(&mut ctx.list_items);
@@ -444,6 +591,17 @@ fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &mut ir::Sec
             }
             ctx.in_equation = false;
         }
+        "fn" | "hp:fn" | "footnote" | "hp:footnote" | "en" | "hp:en" | "endnote" | "hp:endnote" => {
+            flush_footnote_paragraph(ctx);
+            if !ctx.footnote_blocks.is_empty() {
+                let id = std::mem::take(&mut ctx.footnote_id);
+                let content = std::mem::take(&mut ctx.footnote_blocks);
+                section.blocks.push(ir::Block::Footnote { id, content });
+            } else {
+                ctx.footnote_id.clear();
+            }
+            ctx.in_footnote = false;
+        }
         _ => {}
     }
 }
@@ -454,8 +612,12 @@ fn handle_text(text: &str, ctx: &mut ParseContext) {
         return;
     }
     if ctx.in_run {
-        if ctx.in_cell {
+        if ctx.in_footnote {
+            ctx.footnote_text.push_str(text);
+        } else if ctx.in_cell {
             ctx.cell_text.push_str(text);
+        } else if ctx.in_list_item {
+            ctx.list_item_text.push_str(text);
         } else {
             ctx.current_text.push_str(text);
         }
@@ -484,15 +646,24 @@ fn handle_empty_element(
                 }
             }
             if !src.is_empty() {
-                if ctx.in_cell {
-                    ctx.cell_blocks.push(ir::Block::Image { src, alt });
+                let img = ir::Block::Image { src, alt };
+                if ctx.in_footnote {
+                    ctx.footnote_blocks.push(img);
+                } else if ctx.in_list_item {
+                    ctx.list_item_blocks.push(img);
+                } else if ctx.in_cell {
+                    ctx.cell_blocks.push(img);
                 } else {
-                    section.blocks.push(ir::Block::Image { src, alt });
+                    section.blocks.push(img);
                 }
             }
         }
         "lineBreak" | "hp:lineBreak" => {
-            if ctx.in_cell {
+            if ctx.in_footnote {
+                ctx.footnote_text.push('\n');
+            } else if ctx.in_list_item {
+                ctx.list_item_text.push('\n');
+            } else if ctx.in_cell {
                 ctx.cell_text.push('\n');
             } else {
                 ctx.current_text.push('\n');
@@ -524,27 +695,66 @@ fn handle_empty_element(
             }
         }
         // <hp:charPr bold="true" italic="true" .../>  (self-closing variant)
-        // Mirrors the same attribute logic in handle_start_element for <hp:charPr>.
-        "charPr" | "hp:charPr" => {
+        // Delegates to apply_charpr_attrs -- same logic as the Start element path.
+        "charPr" | "hp:charPr" => apply_charpr_attrs(e, ctx),
+        // Footnote / endnote reference inline: a self-closing marker that records
+        // which footnote the current text position cites.
+        //
+        // Accepted forms:
+        //   <hp:noteRef noteId="1"/>
+        //   <hp:ctrl id="fn" idRef="1"/>
+        //   <hp:ctrl id="en" idRef="1"/>
+        "noteRef" | "hp:noteRef" => {
+            let mut note_id = String::new();
             for attr in e.attributes().flatten() {
                 let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                let val = attr.unescape_value().unwrap_or_default();
+                if key == "noteId" || key == "hp:noteId" || key == "id" || key == "hp:id" {
+                    note_id = attr.unescape_value().unwrap_or_default().to_string();
+                    break;
+                }
+            }
+            if !note_id.is_empty() {
+                let inline = ir::Inline {
+                    footnote_ref: Some(note_id),
+                    ..ir::Inline::default()
+                };
+                if ctx.in_footnote {
+                    ctx.footnote_inlines.push(inline);
+                } else if ctx.in_list_item {
+                    ctx.list_item_inlines.push(inline);
+                } else if ctx.in_cell {
+                    ctx.cell_inlines.push(inline);
+                } else {
+                    ctx.current_inlines.push(inline);
+                }
+            }
+        }
+        // <hp:ctrl id="fn" idRef="1"/> -- HWP-binary-style ctrl inline.
+        "ctrl" | "hp:ctrl" => {
+            let mut ctrl_kind = String::new();
+            let mut id_ref = String::new();
+            for attr in e.attributes().flatten() {
+                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                let val = attr.unescape_value().unwrap_or_default().to_string();
                 match key {
-                    "bold" | "hp:bold" => {
-                        ctx.current_bold = val.as_ref() == "true" || val.as_ref() == "1"
-                    }
-                    "italic" | "hp:italic" => {
-                        ctx.current_italic = val.as_ref() == "true" || val.as_ref() == "1"
-                    }
-                    "underline" | "hp:underline" => {
-                        ctx.current_underline =
-                            !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0"
-                    }
-                    "strikeout" | "hp:strikeout" => {
-                        ctx.current_strike =
-                            !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0"
-                    }
+                    "id" | "hp:id" => ctrl_kind = val,
+                    "idRef" | "hp:idRef" => id_ref = val,
                     _ => {}
+                }
+            }
+            if (ctrl_kind == "fn" || ctrl_kind == "en") && !id_ref.is_empty() {
+                let inline = ir::Inline {
+                    footnote_ref: Some(id_ref),
+                    ..ir::Inline::default()
+                };
+                if ctx.in_footnote {
+                    ctx.footnote_inlines.push(inline);
+                } else if ctx.in_list_item {
+                    ctx.list_item_inlines.push(inline);
+                } else if ctx.in_cell {
+                    ctx.cell_inlines.push(inline);
+                } else {
+                    ctx.current_inlines.push(inline);
                 }
             }
         }
@@ -597,10 +807,50 @@ fn flush_cell_paragraph(ctx: &mut ParseContext) {
     }
 }
 
+fn flush_list_item_paragraph(ctx: &mut ParseContext) {
+    if !ctx.list_item_text.is_empty() {
+        let text = std::mem::take(&mut ctx.list_item_text);
+        ctx.list_item_inlines.push(ir::Inline {
+            text,
+            bold: ctx.current_bold,
+            italic: ctx.current_italic,
+            underline: ctx.current_underline,
+            strikethrough: ctx.current_strike,
+            ..ir::Inline::default()
+        });
+    }
+
+    if !ctx.list_item_inlines.is_empty() {
+        let inlines = std::mem::take(&mut ctx.list_item_inlines);
+        ctx.list_item_blocks.push(ir::Block::Paragraph { inlines });
+    }
+}
+
+/// Flush any pending run text and inline list from within a footnote/endnote
+/// paragraph into `footnote_blocks`.  Mirrors the logic of `flush_cell_paragraph`.
+fn flush_footnote_paragraph(ctx: &mut ParseContext) {
+    if !ctx.footnote_text.is_empty() {
+        let text = std::mem::take(&mut ctx.footnote_text);
+        ctx.footnote_inlines.push(ir::Inline {
+            text,
+            bold: ctx.current_bold,
+            italic: ctx.current_italic,
+            underline: ctx.current_underline,
+            strikethrough: ctx.current_strike,
+            ..ir::Inline::default()
+        });
+    }
+
+    if !ctx.footnote_inlines.is_empty() {
+        let inlines = std::mem::take(&mut ctx.footnote_inlines);
+        ctx.footnote_blocks.push(ir::Block::Paragraph { inlines });
+    }
+}
+
 pub(crate) fn parse_heading_style(style_ref: &str) -> Option<u8> {
     let lower = style_ref.to_lowercase();
     if lower.contains("heading") || lower.contains("제목") || lower.contains("개요") {
-        // Extract the trailing number so "Heading12" → 12, "제목 10" → 10
+        // Extract the trailing number so "Heading12" -> 12, "제목 10" -> 10
         let num_str: String = style_ref
             .chars()
             .rev()
@@ -692,13 +942,13 @@ mod tests {
 
     #[test]
     fn parse_heading_style_korean_title() {
-        // "제목1" → 1
+        // "제목1" -> 1
         assert_eq!(parse_heading_style("제목1"), Some(1));
     }
 
     #[test]
     fn parse_heading_style_korean_outline_3() {
-        // "개요3" → 3
+        // "개요3" -> 3
         assert_eq!(parse_heading_style("개요3"), Some(3));
     }
 
@@ -714,7 +964,7 @@ mod tests {
 
     #[test]
     fn parse_heading_style_heading_no_digit_defaults_to_1() {
-        // "Heading" without a trailing digit → defaults to level 1.
+        // "Heading" without a trailing digit -> defaults to level 1.
         assert_eq!(parse_heading_style("Heading"), Some(1));
     }
 
@@ -724,7 +974,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // parse_section_xml — helper for asserting on the returned Section
+    // parse_section_xml -- helper for asserting on the returned Section
     // -----------------------------------------------------------------------
 
     /// Unwrap the section and panic with a descriptive message on error.
@@ -733,7 +983,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // parse_section_xml — empty / minimal documents
+    // parse_section_xml -- empty / minimal documents
     // -----------------------------------------------------------------------
 
     #[test]
@@ -754,12 +1004,12 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // parse_section_xml — simple paragraph
+    // parse_section_xml -- simple paragraph
     // -----------------------------------------------------------------------
 
     #[test]
     fn simple_paragraph_text() {
-        // Compact XML — no whitespace text nodes between tags (matches real HWPX).
+        // Compact XML -- no whitespace text nodes between tags (matches real HWPX).
         let xml = r#"<root><hp:p><hp:run><hp:t>Hello World</hp:t></hp:run></hp:p></root>"#;
         let s = section(xml);
         assert_eq!(s.blocks.len(), 1);
@@ -804,7 +1054,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // parse_section_xml — heading via styleIDRef
+    // parse_section_xml -- heading via styleIDRef
     // -----------------------------------------------------------------------
 
     #[test]
@@ -837,12 +1087,12 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // parse_section_xml — bold / italic via Start-element charPr
+    // parse_section_xml -- bold / italic via Start-element charPr
     // -----------------------------------------------------------------------
 
     #[test]
     fn bold_text_via_charpr_start_element() {
-        // Start-element charPr (non-self-closing) — handled by handle_start_element.
+        // Start-element charPr (non-self-closing) -- handled by handle_start_element.
         let xml = r#"<root><hp:p><hp:run><hp:charPr bold="true" italic="false"></hp:charPr><hp:t>bold text</hp:t></hp:run></hp:p></root>"#;
         let s = section(xml);
         match &s.blocks[0] {
@@ -856,7 +1106,7 @@ mod tests {
 
     #[test]
     fn italic_text_via_charpr_empty_element() {
-        // Self-closing charPr — handled by handle_empty_element.
+        // Self-closing charPr -- handled by handle_empty_element.
         let xml = r#"<root><hp:p><hp:run><hp:charPr bold="false" italic="true"/><hp:t>italic text</hp:t></hp:run></hp:p></root>"#;
         let s = section(xml);
         match &s.blocks[0] {
@@ -912,7 +1162,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // parse_section_xml — lineBreak (empty element)
+    // parse_section_xml -- lineBreak (empty element)
     // -----------------------------------------------------------------------
 
     #[test]
@@ -936,7 +1186,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // parse_section_xml — image (empty element)
+    // parse_section_xml -- image (empty element)
     // -----------------------------------------------------------------------
 
     #[test]
@@ -964,7 +1214,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // parse_section_xml — equation
+    // parse_section_xml -- equation
     // -----------------------------------------------------------------------
 
     #[test]
@@ -1005,7 +1255,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // parse_section_xml — table
+    // parse_section_xml -- table
     // -----------------------------------------------------------------------
 
     #[test]
@@ -1045,7 +1295,7 @@ mod tests {
 
     #[test]
     fn table_col_count_from_colcnt_attribute() {
-        // colCnt="3" but only 2 cells per row — col_count must be max(3, 2) = 3.
+        // colCnt="3" but only 2 cells per row -- col_count must be max(3, 2) = 3.
         let xml = concat!(
             r#"<root><hp:tbl colCnt="3"><hp:tr>"#,
             r#"<hp:tc><hp:p><hp:run><hp:t>X</hp:t></hp:run></hp:p></hp:tc>"#,
@@ -1169,7 +1419,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // parse_section_xml — list
+    // parse_section_xml -- list
     // -----------------------------------------------------------------------
 
     #[test]
@@ -1230,7 +1480,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // guess_mime_from_name — all extensions
+    // guess_mime_from_name -- all extensions
     // -----------------------------------------------------------------------
 
     #[test]
@@ -1302,5 +1552,344 @@ mod tests {
     #[test]
     fn guess_mime_case_insensitive_svg() {
         assert_eq!(guess_mime_from_name("LOGO.SVG"), "image/svg+xml");
+    }
+
+    // -----------------------------------------------------------------------
+    // BinData reference resolution -- resolve_bin_refs + build_bin_map
+    // -----------------------------------------------------------------------
+
+    /// Helper: build a section containing a single top-level Image block.
+    fn make_image_section(src: &str) -> ir::Section {
+        ir::Section {
+            blocks: vec![ir::Block::Image {
+                src: src.to_string(),
+                alt: String::new(),
+            }],
+        }
+    }
+
+    #[test]
+    fn resolve_bin_refs_replaces_image_src() {
+        // An Image whose src matches a BinData stem must be updated to the
+        // full ZIP path, including the extension.
+        let bin_files = vec!["BinData/BIN0001.png".to_string()];
+        let bin_map = build_bin_map(&bin_files);
+
+        let mut section = make_image_section("BIN0001");
+        resolve_bin_refs(&mut section, &bin_map);
+
+        match &section.blocks[0] {
+            ir::Block::Image { src, .. } => {
+                assert_eq!(
+                    src, "BinData/BIN0001.png",
+                    "src must be resolved to full path"
+                );
+            }
+            other => panic!("expected Image, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resolve_bin_refs_no_match_leaves_src_unchanged() {
+        // An Image with a src that has no entry in the bin_map must not be
+        // modified -- e.g. when src is already a full filename or an URL.
+        let bin_files = vec!["BinData/BIN0001.png".to_string()];
+        let bin_map = build_bin_map(&bin_files);
+
+        let mut section = make_image_section("img.png");
+        resolve_bin_refs(&mut section, &bin_map);
+
+        match &section.blocks[0] {
+            ir::Block::Image { src, .. } => {
+                assert_eq!(src, "img.png", "unmatched src must remain unchanged");
+            }
+            other => panic!("expected Image, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resolve_bin_refs_inside_table_cell() {
+        // resolve_block_bin_refs must recurse into Table -> rows -> cells -> blocks.
+        let bin_files = vec!["BinData/BIN0002.jpg".to_string()];
+        let bin_map = build_bin_map(&bin_files);
+
+        let cell_image = ir::Block::Image {
+            src: "BIN0002".to_string(),
+            alt: String::new(),
+        };
+        let cell = ir::TableCell {
+            blocks: vec![cell_image],
+            colspan: 1,
+            rowspan: 1,
+        };
+        let row = ir::TableRow {
+            cells: vec![cell],
+            is_header: false,
+        };
+        let mut section = ir::Section {
+            blocks: vec![ir::Block::Table {
+                rows: vec![row],
+                col_count: 1,
+            }],
+        };
+
+        resolve_bin_refs(&mut section, &bin_map);
+
+        match &section.blocks[0] {
+            ir::Block::Table { rows, .. } => match &rows[0].cells[0].blocks[0] {
+                ir::Block::Image { src, .. } => {
+                    assert_eq!(
+                        src, "BinData/BIN0002.jpg",
+                        "image inside table cell must be resolved"
+                    );
+                }
+                other => panic!("expected Image inside cell, got {other:?}"),
+            },
+            other => panic!("expected Table, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bin_map_from_bin_files() {
+        // build_bin_map must produce a map with stem keys and full-path values.
+        // It must handle both prefixes (BinData/ and Contents/BinData/).
+        let bin_files = vec![
+            "BinData/BIN0001.png".to_string(),
+            "BinData/BIN0002.jpg".to_string(),
+            "Contents/BinData/BIN0003.emf".to_string(),
+        ];
+        let map = build_bin_map(&bin_files);
+
+        assert_eq!(
+            map.get("BIN0001").map(String::as_str),
+            Some("BinData/BIN0001.png")
+        );
+        assert_eq!(
+            map.get("BIN0002").map(String::as_str),
+            Some("BinData/BIN0002.jpg")
+        );
+        assert_eq!(
+            map.get("BIN0003").map(String::as_str),
+            Some("Contents/BinData/BIN0003.emf")
+        );
+        assert_eq!(map.len(), 3, "map must contain exactly 3 entries");
+    }
+    // -----------------------------------------------------------------------
+    // parse_section_xml -- footnote / endnote parsing
+    // -----------------------------------------------------------------------
+
+    fn first_footnote(s: &ir::Section) -> (&str, &[ir::Block]) {
+        match &s.blocks[0] {
+            ir::Block::Footnote { id, content } => (id.as_str(), content.as_slice()),
+            other => panic!("expected Block::Footnote, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn footnote_produces_footnote_block() {
+        let xml = r#"<root><hp:fn id="1"><hp:p><hp:run><hp:t>note text</hp:t></hp:run></hp:p></hp:fn></root>"#;
+        let s = section(xml);
+        assert_eq!(s.blocks.len(), 1, "one footnote block expected");
+        let (id, content) = first_footnote(&s);
+        assert_eq!(id, "1");
+        assert_eq!(
+            content.len(),
+            1,
+            "footnote must have exactly one inner block"
+        );
+        match &content[0] {
+            ir::Block::Paragraph { inlines } => {
+                assert_eq!(inlines[0].text, "note text");
+            }
+            other => panic!("expected Paragraph inside footnote, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn endnote_produces_footnote_block() {
+        let xml = r#"<root><hp:en id="2"><hp:p><hp:run><hp:t>end note</hp:t></hp:run></hp:p></hp:en></root>"#;
+        let s = section(xml);
+        assert_eq!(s.blocks.len(), 1);
+        let (id, content) = first_footnote(&s);
+        assert_eq!(id, "2");
+        match &content[0] {
+            ir::Block::Paragraph { inlines } => {
+                assert_eq!(inlines[0].text, "end note");
+            }
+            other => panic!("expected Paragraph inside endnote block, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn footnote_alt_tag_name() {
+        let xml = r#"<root><hp:footnote id="3"><hp:p><hp:run><hp:t>alt tag</hp:t></hp:run></hp:p></hp:footnote></root>"#;
+        let s = section(xml);
+        assert_eq!(s.blocks.len(), 1);
+        let (id, content) = first_footnote(&s);
+        assert_eq!(id, "3");
+        match &content[0] {
+            ir::Block::Paragraph { inlines } => {
+                assert_eq!(inlines[0].text, "alt tag");
+            }
+            other => panic!("expected Paragraph inside footnote (alt tag), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn note_ref_produces_footnote_ref_inline() {
+        // <hp:noteRef noteId="1"/> produces an Inline with footnote_ref set and empty text.
+        let xml = r#"<root><hp:p><hp:noteRef noteId="1"/></hp:p></root>"#;
+        let s = section(xml);
+        assert_eq!(s.blocks.len(), 1, "one paragraph block expected");
+        match &s.blocks[0] {
+            ir::Block::Paragraph { inlines } => {
+                assert_eq!(inlines.len(), 1, "one inline expected");
+                assert_eq!(
+                    inlines[0].footnote_ref.as_deref(),
+                    Some("1"),
+                    "inline must carry footnote_ref=\"1\""
+                );
+                assert!(
+                    inlines[0].text.is_empty(),
+                    "footnote_ref inline must have empty text"
+                );
+            }
+            other => panic!("expected Paragraph, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn empty_footnote_ignored() {
+        let xml = r#"<root><hp:fn id="1"></hp:fn></root>"#;
+        let s = section(xml);
+        assert!(
+            s.blocks.is_empty(),
+            "empty footnote must not produce a Block::Footnote"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Cross-cutting: context x element combinations
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn image_inside_footnote_goes_to_footnote_blocks() {
+        let xml = r#"<root><hp:fn id="1"><hp:img src="fig.png" alt="fn-img"/></hp:fn></root>"#;
+        let s = section(xml);
+        assert_eq!(s.blocks.len(), 1);
+        match &s.blocks[0] {
+            ir::Block::Footnote { content, .. } => {
+                assert!(
+                    content
+                        .iter()
+                        .any(|b| matches!(b, ir::Block::Image { src, .. } if src == "fig.png")),
+                    "footnote must contain the image block"
+                );
+            }
+            other => panic!("expected Footnote, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn image_inside_list_item_goes_to_list_item_blocks() {
+        let xml = r#"<root><ul><li><hp:img src="pic.png" alt="li-img"/></li></ul></root>"#;
+        let s = section(xml);
+        assert_eq!(s.blocks.len(), 1);
+        match &s.blocks[0] {
+            ir::Block::List { items, .. } => {
+                assert_eq!(items.len(), 1);
+                assert!(
+                    items[0]
+                        .blocks
+                        .iter()
+                        .any(|b| matches!(b, ir::Block::Image { src, .. } if src == "pic.png")),
+                    "list item must contain the image block"
+                );
+            }
+            other => panic!("expected List, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn linebreak_inside_list_item_appends_newline() {
+        let xml = r#"<root><ul><li><hp:p><hp:run><hp:t>before</hp:t><hp:lineBreak/></hp:run></hp:p></li></ul></root>"#;
+        let s = section(xml);
+        match &s.blocks[0] {
+            ir::Block::List { items, .. } => {
+                let text: String = items[0]
+                    .blocks
+                    .iter()
+                    .filter_map(|b| match b {
+                        ir::Block::Paragraph { inlines } => {
+                            Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+                        }
+                        _ => None,
+                    })
+                    .collect();
+                assert!(
+                    text.contains('\n'),
+                    "lineBreak in list item must produce newline; got: {text:?}"
+                );
+            }
+            other => panic!("expected List, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resolve_bin_refs_inside_footnote() {
+        let bin_map: HashMap<String, String> =
+            [("BIN0002".to_string(), "BinData/BIN0002.jpg".to_string())]
+                .into_iter()
+                .collect();
+        let mut section = ir::Section {
+            blocks: vec![ir::Block::Footnote {
+                id: "1".to_string(),
+                content: vec![ir::Block::Image {
+                    src: "BIN0002".to_string(),
+                    alt: String::new(),
+                }],
+            }],
+        };
+        resolve_bin_refs(&mut section, &bin_map);
+        match &section.blocks[0] {
+            ir::Block::Footnote { content, .. } => match &content[0] {
+                ir::Block::Image { src, .. } => {
+                    assert_eq!(src, "BinData/BIN0002.jpg");
+                }
+                other => panic!("expected Image, got {other:?}"),
+            },
+            other => panic!("expected Footnote, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resolve_bin_refs_inside_list() {
+        let bin_map: HashMap<String, String> =
+            [("BIN0003".to_string(), "BinData/BIN0003.png".to_string())]
+                .into_iter()
+                .collect();
+        let mut section = ir::Section {
+            blocks: vec![ir::Block::List {
+                ordered: false,
+                start: 1,
+                items: vec![ir::ListItem {
+                    blocks: vec![ir::Block::Image {
+                        src: "BIN0003".to_string(),
+                        alt: String::new(),
+                    }],
+                    children: Vec::new(),
+                }],
+            }],
+        };
+        resolve_bin_refs(&mut section, &bin_map);
+        match &section.blocks[0] {
+            ir::Block::List { items, .. } => match &items[0].blocks[0] {
+                ir::Block::Image { src, .. } => {
+                    assert_eq!(src, "BinData/BIN0003.png");
+                }
+                other => panic!("expected Image, got {other:?}"),
+            },
+            other => panic!("expected List, got {other:?}"),
+        }
     }
 }
