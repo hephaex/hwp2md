@@ -24,8 +24,12 @@ pub(crate) fn hwp_to_ir(hwp: &HwpDocument) -> ir::Document {
         let mut ir_section = ir::Section { blocks: Vec::new() };
 
         for para in &section.paragraphs {
-            let blocks =
-                paragraph_to_blocks_counted(para, &hwp.doc_info, &mut footnote_counter, &mut endnote_counter);
+            let blocks = paragraph_to_blocks_counted(
+                para,
+                &hwp.doc_info,
+                &mut footnote_counter,
+                &mut endnote_counter,
+            );
             ir_section.blocks.extend(blocks);
         }
 
@@ -266,6 +270,25 @@ pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<
                     }],
                 })
             }
+        }
+        HwpControl::Ruby {
+            base_text,
+            ruby_text,
+        } => {
+            if base_text.is_empty() && ruby_text.is_empty() {
+                return None;
+            }
+            Some(ir::Block::Paragraph {
+                inlines: vec![ir::Inline {
+                    text: base_text.clone(),
+                    ruby: if ruby_text.is_empty() {
+                        None
+                    } else {
+                        Some(ruby_text.clone())
+                    },
+                    ..ir::Inline::default()
+                }],
+            })
         }
         HwpControl::PageBreak | HwpControl::ColumnBreak => None,
     }

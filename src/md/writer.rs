@@ -238,6 +238,12 @@ fn render_inlines(inlines: &[ir::Inline]) -> String {
             }
         }
 
+        if let Some(ref annotation) = inline.ruby {
+            if !annotation.is_empty() {
+                text = format!("<ruby>{text}<rt>{}</rt></ruby>", escape_html(annotation));
+            }
+        }
+
         if let Some(ref url) = inline.link {
             if is_safe_url_scheme(url) {
                 if url.contains(')') {

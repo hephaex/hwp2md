@@ -862,3 +862,56 @@ fn build_inlines_face_id_out_of_bounds_font_name_is_none() {
     let inlines = build_inlines(&para, &doc_info);
     assert!(inlines[0].font_name.is_none());
 }
+
+// -----------------------------------------------------------------------
+// control_to_block — HwpControl::Ruby
+// -----------------------------------------------------------------------
+
+#[test]
+fn control_to_block_ruby_with_both_texts_produces_paragraph() {
+    let ctrl = HwpControl::Ruby {
+        base_text: "漢字".into(),
+        ruby_text: "한자".into(),
+    };
+    let doc_info = DocInfo::default();
+    let block = control_to_block(&ctrl, &doc_info).expect("should return Some");
+    if let ir::Block::Paragraph { inlines } = block {
+        assert_eq!(inlines.len(), 1);
+        assert_eq!(inlines[0].text, "漢字");
+        assert_eq!(inlines[0].ruby.as_deref(), Some("한자"));
+    } else {
+        panic!("expected Paragraph, got {block:?}");
+    }
+}
+
+#[test]
+fn control_to_block_ruby_with_empty_ruby_text_no_annotation() {
+    let ctrl = HwpControl::Ruby {
+        base_text: "漢字".into(),
+        ruby_text: String::new(),
+    };
+    let doc_info = DocInfo::default();
+    let block = control_to_block(&ctrl, &doc_info).expect("should return Some for non-empty base");
+    if let ir::Block::Paragraph { inlines } = block {
+        assert_eq!(inlines[0].text, "漢字");
+        assert!(
+            inlines[0].ruby.is_none(),
+            "empty ruby_text must produce None annotation"
+        );
+    } else {
+        panic!("expected Paragraph, got {block:?}");
+    }
+}
+
+#[test]
+fn control_to_block_ruby_both_empty_returns_none() {
+    let ctrl = HwpControl::Ruby {
+        base_text: String::new(),
+        ruby_text: String::new(),
+    };
+    let doc_info = DocInfo::default();
+    assert!(
+        control_to_block(&ctrl, &doc_info).is_none(),
+        "both empty must return None"
+    );
+}

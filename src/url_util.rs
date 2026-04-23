@@ -1,5 +1,6 @@
-pub(crate) const SAFE_URL_SCHEMES: &[&str] =
-    &["http://", "https://", "mailto:", "tel:", "ftp://", "ftps://"];
+pub(crate) const SAFE_URL_SCHEMES: &[&str] = &[
+    "http://", "https://", "mailto:", "tel:", "ftp://", "ftps://",
+];
 
 pub(crate) fn is_safe_url_scheme(url: &str) -> bool {
     let lower = url.to_ascii_lowercase();

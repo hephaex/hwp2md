@@ -598,7 +598,10 @@ fn render_inlines_link_without_paren_uses_plain_syntax() {
         link: Some("https://example.com/plain".into()),
         ..Default::default()
     }];
-    assert_eq!(render_inlines(&inlines), "[click](https://example.com/plain)");
+    assert_eq!(
+        render_inlines(&inlines),
+        "[click](https://example.com/plain)"
+    );
 }
 
 // Issue 6: Markdown metacharacters in inline text must be escaped.
@@ -941,7 +944,10 @@ fn write_markdown_html_table_cell_script_tag_is_escaped() {
     }];
     let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2 }]);
     let md = write_markdown(&doc, false);
-    assert!(md.contains("<table>"), "must use HTML table path; got: {md}");
+    assert!(
+        md.contains("<table>"),
+        "must use HTML table path; got: {md}"
+    );
     assert!(
         !md.contains("<script>"),
         "raw <script> tag must be entity-escaped; got: {md}"
@@ -966,7 +972,10 @@ fn write_markdown_html_table_cell_ampersand_escaped() {
     }];
     let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2 }]);
     let md = write_markdown(&doc, false);
-    assert!(md.contains("&amp;"), "& must be escaped to &amp;; got: {md}");
+    assert!(
+        md.contains("&amp;"),
+        "& must be escaped to &amp;; got: {md}"
+    );
 }
 
 // -----------------------------------------------------------------------
@@ -1149,8 +1158,14 @@ fn write_markdown_html_table_first_row_not_header_uses_td() {
     }];
     let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2 }]);
     let md = write_markdown(&doc, false);
-    assert!(md.contains("<td"), "row with is_header=false must use <td…>; got: {md:?}");
-    assert!(!md.contains("<th"), "row with is_header=false must not use <th…>; got: {md:?}");
+    assert!(
+        md.contains("<td"),
+        "row with is_header=false must use <td…>; got: {md:?}"
+    );
+    assert!(
+        !md.contains("<th"),
+        "row with is_header=false must not use <th…>; got: {md:?}"
+    );
 }
 
 #[test]
@@ -1271,5 +1286,103 @@ fn render_inlines_color_applied_before_link() {
     assert_eq!(
         out,
         "[<span style=\"color:#0000FF\">click</span>](https://example.com)"
+    );
+}
+
+// -----------------------------------------------------------------------
+// render_inlines — ruby annotation field
+// -----------------------------------------------------------------------
+
+#[test]
+fn render_inlines_ruby_annotation_produces_html_tags() {
+    let inlines = vec![ir::Inline {
+        text: "漢字".into(),
+        ruby: Some("한자".into()),
+        ..ir::Inline::default()
+    }];
+    assert_eq!(render_inlines(&inlines), "<ruby>漢字<rt>한자</rt></ruby>");
+}
+
+#[test]
+fn render_inlines_ruby_annotation_none_no_ruby_tags() {
+    let inlines = vec![ir::Inline {
+        text: "漢字".into(),
+        ruby: None,
+        ..ir::Inline::default()
+    }];
+    let out = render_inlines(&inlines);
+    assert!(
+        !out.contains("<ruby>"),
+        "no ruby tags when annotation is None; got: {out}"
+    );
+    assert!(
+        out.contains("漢字"),
+        "base text must still appear; got: {out}"
+    );
+}
+
+#[test]
+fn render_inlines_ruby_empty_annotation_no_ruby_tags() {
+    // Some("") — annotation present but empty — must not emit HTML ruby tags.
+    let inlines = vec![ir::Inline {
+        text: "漢字".into(),
+        ruby: Some(String::new()),
+        ..ir::Inline::default()
+    }];
+    let out = render_inlines(&inlines);
+    assert!(
+        !out.contains("<ruby>"),
+        "empty annotation must not emit ruby tags; got: {out}"
+    );
+}
+
+#[test]
+fn render_inlines_ruby_annotation_html_special_chars_escaped() {
+    // Annotation text containing '<', '>', '&' must be entity-escaped.
+    let inlines = vec![ir::Inline {
+        text: "base".into(),
+        ruby: Some("a<b>&c".into()),
+        ..ir::Inline::default()
+    }];
+    let out = render_inlines(&inlines);
+    assert!(out.contains("&lt;"), "< must be escaped; got: {out}");
+    assert!(out.contains("&gt;"), "> must be escaped; got: {out}");
+    assert!(out.contains("&amp;"), "& must be escaped; got: {out}");
+    assert!(
+        !out.contains("<b>"),
+        "raw < must not appear unescaped; got: {out}"
+    );
+}
+
+#[test]
+fn render_inlines_ruby_with_bold_base_text() {
+    // Bold decoration on base text applies before the ruby wrapper.
+    let inlines = vec![ir::Inline {
+        text: "漢字".into(),
+        bold: true,
+        ruby: Some("한자".into()),
+        ..ir::Inline::default()
+    }];
+    let out = render_inlines(&inlines);
+    // Bold markers must be inside the <ruby> wrapper.
+    assert!(
+        out.contains("<ruby>**漢字**<rt>한자</rt></ruby>"),
+        "got: {out}"
+    );
+}
+
+#[test]
+fn write_markdown_paragraph_with_ruby_inline() {
+    let doc = make_doc_with_blocks(vec![ir::Block::Paragraph {
+        inlines: vec![ir::Inline {
+            text: "漢字".into(),
+            ruby: Some("한자".into()),
+            ..ir::Inline::default()
+        }],
+    }]);
+    let md = write_markdown(&doc, false);
+    assert!(
+        md.contains("<ruby>漢字<rt>한자</rt></ruby>"),
+        "paragraph must contain ruby HTML; got: {md}"
     );
 }

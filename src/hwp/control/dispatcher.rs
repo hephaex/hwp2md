@@ -1,10 +1,11 @@
-use crate::hwp::model::*;
-use crate::hwp::reader::{extract_paragraph_text, parse_char_shape_refs};
-use crate::hwp::record::*;
 use super::common::find_children_end;
 use super::hyperlink::parse_hyperlink_url;
 use super::image::parse_gshape_ctrl;
+use super::ruby::parse_ruby_ctrl;
 use super::table::parse_table_ctrl;
+use crate::hwp::model::*;
+use crate::hwp::reader::{extract_paragraph_text, parse_char_shape_refs};
+use crate::hwp::record::*;
 
 /// Extract `HwpParagraph`s from records in `[start, end)`, treating them as a
 /// self-contained sub-stream (e.g. a table cell or footnote body).
@@ -137,6 +138,17 @@ pub(crate) fn parse_ctrl_header_at(records: &[Record], ctrl_idx: usize) -> Optio
                 None
             } else {
                 Some(HwpControl::Hyperlink { url })
+            }
+        }
+        CTRL_RUBY => {
+            if let Some(ruby_text) = parse_ruby_ctrl(rec) {
+                Some(HwpControl::Ruby {
+                    base_text: String::new(),
+                    ruby_text,
+                })
+            } else {
+                tracing::debug!("CTRL_RUBY at index {ctrl_idx}: data too short, skipping");
+                None
             }
         }
         CTRL_PAGE_BREAK => Some(HwpControl::PageBreak),

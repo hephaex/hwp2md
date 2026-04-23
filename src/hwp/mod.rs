@@ -2,6 +2,7 @@ mod control;
 mod convert;
 pub(crate) mod crypto;
 pub(crate) mod eqedit;
+mod lenient;
 mod model;
 mod reader;
 mod record;

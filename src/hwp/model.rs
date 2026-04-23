@@ -175,6 +175,10 @@ pub enum HwpControl {
         is_endnote: bool,
         paragraphs: Vec<HwpParagraph>,
     },
+    Ruby {
+        base_text: String,
+        ruby_text: String,
+    },
     PageBreak,
     ColumnBreak,
 }

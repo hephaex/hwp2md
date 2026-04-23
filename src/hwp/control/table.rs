@@ -1,7 +1,7 @@
-use crate::hwp::model::*;
-use crate::hwp::record::*;
 use super::common::find_children_end;
 use super::dispatcher::extract_paragraphs_from_range;
+use crate::hwp::model::*;
+use crate::hwp::record::*;
 
 /// Parse a `CTRL_TABLE` subtree starting at `ctrl_idx` in `records`.
 ///
@@ -53,20 +53,32 @@ pub(crate) fn parse_table_ctrl(
                 };
                 let col_span = if rec.data.len() >= 8 {
                     let v = u16::from_le_bytes([rec.data[6], rec.data[7]]);
-                    if v == 0 { 1 } else { v }
+                    if v == 0 {
+                        1
+                    } else {
+                        v
+                    }
                 } else {
                     1
                 };
                 let row_span = if rec.data.len() >= 10 {
                     let v = u16::from_le_bytes([rec.data[8], rec.data[9]]);
-                    if v == 0 { 1 } else { v }
+                    if v == 0 {
+                        1
+                    } else {
+                        v
+                    }
                 } else {
                     1
                 };
 
                 // Vertical alignment is stored at byte 26 of the LIST_HEADER data.
                 // Values: 0 = top, 1 = center, 2 = bottom.
-                let vertical_align = if rec.data.len() >= 27 { rec.data[26] } else { 0 };
+                let vertical_align = if rec.data.len() >= 27 {
+                    rec.data[26]
+                } else {
+                    0
+                };
 
                 // Cells in row 0 are considered header cells.
                 let is_header = row == 0;

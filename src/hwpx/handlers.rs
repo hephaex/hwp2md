@@ -2,7 +2,7 @@ use crate::ir;
 
 use super::context::{
     apply_charpr_attrs, flush_cell_paragraph, flush_footnote_paragraph, flush_list_item_paragraph,
-    flush_paragraph, ParseContext,
+    flush_paragraph, ParseContext, RubyPart,
 };
 
 pub(super) fn handle_start_element(
@@ -80,8 +80,19 @@ pub(super) fn handle_start_element(
             ctx.in_equation = true;
             ctx.equation_text.clear();
         }
-        "fn" | "hp:fn" | "footnote" | "hp:footnote" | "en" | "hp:en" | "endnote"
-        | "hp:endnote" => {
+        "ruby" | "hp:ruby" => {
+            ctx.in_ruby = true;
+            ctx.ruby_base_text.clear();
+            ctx.ruby_annotation_text.clear();
+            ctx.ruby_current_part = RubyPart::None;
+        }
+        "rubyText" | "hp:rubyText" => {
+            ctx.ruby_current_part = RubyPart::Annotation;
+        }
+        "baseText" | "hp:baseText" => {
+            ctx.ruby_current_part = RubyPart::Base;
+        }
+        "fn" | "hp:fn" | "footnote" | "hp:footnote" | "en" | "hp:en" | "endnote" | "hp:endnote" => {
             let mut id = String::new();
             for attr in e.attributes().flatten() {
                 let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
@@ -100,11 +111,7 @@ pub(super) fn handle_start_element(
     }
 }
 
-pub(super) fn handle_end_element(
-    local: &str,
-    ctx: &mut ParseContext,
-    section: &mut ir::Section,
-) {
+pub(super) fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &mut ir::Section) {
     match local {
         "p" | "hp:p" => {
             if ctx.in_footnote {
@@ -191,8 +198,28 @@ pub(super) fn handle_end_element(
             }
             ctx.in_equation = false;
         }
-        "fn" | "hp:fn" | "footnote" | "hp:footnote" | "en" | "hp:en" | "endnote"
-        | "hp:endnote" => {
+        "rubyText" | "hp:rubyText" | "baseText" | "hp:baseText" => {
+            ctx.ruby_current_part = RubyPart::None;
+        }
+        "ruby" | "hp:ruby" => {
+            let base = std::mem::take(&mut ctx.ruby_base_text);
+            let annotation = std::mem::take(&mut ctx.ruby_annotation_text);
+            if !base.is_empty() || !annotation.is_empty() {
+                let inline = ir::Inline {
+                    text: base,
+                    ruby: if annotation.is_empty() {
+                        None
+                    } else {
+                        Some(annotation)
+                    },
+                    ..ir::Inline::default()
+                };
+                ctx.push_inline(inline);
+            }
+            ctx.in_ruby = false;
+            ctx.ruby_current_part = RubyPart::None;
+        }
+        "fn" | "hp:fn" | "footnote" | "hp:footnote" | "en" | "hp:en" | "endnote" | "hp:endnote" => {
             flush_footnote_paragraph(ctx);
             if !ctx.footnote_blocks.is_empty() {
                 let id = std::mem::take(&mut ctx.footnote_id);
@@ -210,6 +237,14 @@ pub(super) fn handle_end_element(
 pub(super) fn handle_text(text: &str, ctx: &mut ParseContext) {
     if ctx.in_equation {
         ctx.equation_text.push_str(text);
+        return;
+    }
+    if ctx.in_ruby {
+        match ctx.ruby_current_part {
+            RubyPart::Base => ctx.ruby_base_text.push_str(text),
+            RubyPart::Annotation => ctx.ruby_annotation_text.push_str(text),
+            RubyPart::None => {}
+        }
         return;
     }
     if ctx.in_run {

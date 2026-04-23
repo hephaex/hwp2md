@@ -47,6 +47,21 @@ pub(crate) struct ParseContext {
     pub(crate) footnote_blocks: Vec<ir::Block>,
     pub(crate) footnote_inlines: Vec<ir::Inline>,
     pub(crate) footnote_text: String,
+    // ruby annotation accumulation
+    pub(crate) in_ruby: bool,
+    pub(crate) ruby_base_text: String,
+    pub(crate) ruby_annotation_text: String,
+    /// Which sub-element of `<hp:ruby>` is currently active.
+    pub(crate) ruby_current_part: RubyPart,
+}
+
+/// Which child element of a `<hp:ruby>` block is currently being parsed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum RubyPart {
+    #[default]
+    None,
+    Base,
+    Annotation,
 }
 
 impl Default for ParseContext {
@@ -89,6 +104,10 @@ impl Default for ParseContext {
             footnote_blocks: Vec::new(),
             footnote_inlines: Vec::new(),
             footnote_text: String::new(),
+            in_ruby: false,
+            ruby_base_text: String::new(),
+            ruby_annotation_text: String::new(),
+            ruby_current_part: RubyPart::None,
         }
     }
 }

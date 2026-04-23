@@ -4,6 +4,7 @@ use crate::hwp::convert::hwp_to_ir;
 use crate::hwp::crypto::{
     decrypt_seed, decrypt_viewtext, extract_aes_key, HWPTAG_DISTRIBUTE_DOC_DATA,
 };
+use crate::hwp::lenient;
 use crate::hwp::model::*;
 use crate::hwp::record::*;
 use crate::hwp::summary::read_summary_info;
@@ -17,9 +18,20 @@ use std::path::Path;
 mod shapes;
 pub(crate) use shapes::{parse_bin_data_entry, parse_char_shape, parse_para_shape};
 
+/// Read an HWP file, returning an IR [`ir::Document`].
+///
+/// If normal CFB-based parsing fails (e.g. the file is corrupted or truncated),
+/// a lenient raw-scan fallback is attempted automatically.  The fallback
+/// document carries `metadata.title = Some("(recovered)")` to signal partial
+/// content.
 pub fn read_hwp(path: &Path) -> Result<ir::Document, Hwp2MdError> {
-    let hwp_doc = parse_hwp_file(path)?;
-    Ok(hwp_to_ir(&hwp_doc))
+    match parse_hwp_file(path) {
+        Ok(hwp_doc) => Ok(hwp_to_ir(&hwp_doc)),
+        Err(e) => {
+            tracing::warn!("Normal HWP parse failed ({e}), attempting lenient recovery");
+            lenient::try_lenient_read(path)
+        }
+    }
 }
 
 fn parse_hwp_file(path: &Path) -> Result<HwpDocument, Hwp2MdError> {

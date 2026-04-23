@@ -1,5 +1,5 @@
-use crate::hwp::record::*;
 use super::common::find_children_end;
+use crate::hwp::record::*;
 
 /// Parse the GShapeObject CTRL_HEADER subtree starting at `ctrl_idx`.
 ///
@@ -47,8 +47,7 @@ pub(crate) fn parse_gshape_ctrl(records: &[Record], ctrl_idx: usize) -> (u16, u3
 pub(crate) fn find_gsotype_bin_id(records: &[Record], start: usize, end: usize) -> u16 {
     for rec in records.iter().skip(start).take(end.saturating_sub(start)) {
         if rec.tag_id == HWPTAG_GSOTYPE && rec.data.len() >= 4 {
-            let kind =
-                u32::from_le_bytes([rec.data[0], rec.data[1], rec.data[2], rec.data[3]]);
+            let kind = u32::from_le_bytes([rec.data[0], rec.data[1], rec.data[2], rec.data[3]]);
             if kind == 0 && rec.data.len() >= 6 {
                 let candidate = u16::from_le_bytes([rec.data[4], rec.data[5]]);
                 if candidate > 0 {
@@ -63,9 +62,7 @@ pub(crate) fn find_gsotype_bin_id(records: &[Record], start: usize, end: usize) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hwp::record::{
-        CTRL_GSHAPE, HWPTAG_CTRL_HEADER, HWPTAG_GSOTYPE, HWPTAG_PARA_HEADER,
-    };
+    use crate::hwp::record::{CTRL_GSHAPE, HWPTAG_CTRL_HEADER, HWPTAG_GSOTYPE, HWPTAG_PARA_HEADER};
 
     #[test]
     fn find_gsotype_bin_id_returns_id_from_picture_record() {

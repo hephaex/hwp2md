@@ -97,6 +97,10 @@ pub struct Inline {
     /// Font name resolved from the DocInfo face_names table.
     /// Not rendered in Markdown output; preserved for HWPX round-trip fidelity.
     pub font_name: Option<String>,
+    /// Ruby annotation text.  When `Some`, the inline's `text` is the base
+    /// character(s) and this field holds the small annotation above them.
+    /// Rendered as `<ruby>base<rt>annotation</rt></ruby>` in Markdown output.
+    pub ruby: Option<String>,
 }
 
 impl Inline {
@@ -171,6 +175,7 @@ mod tests {
         assert!(i.footnote_ref.is_none());
         assert!(i.color.is_none());
         assert!(i.font_name.is_none());
+        assert!(i.ruby.is_none());
     }
 
     #[test]
@@ -188,6 +193,7 @@ mod tests {
         assert!(i.footnote_ref.is_none());
         assert!(i.color.is_none());
         assert!(i.font_name.is_none());
+        assert!(i.ruby.is_none());
     }
 
     #[test]
@@ -195,6 +201,18 @@ mod tests {
         let i = Inline::default();
         assert!(i.color.is_none());
         assert!(i.font_name.is_none());
+        assert!(i.ruby.is_none());
+    }
+
+    #[test]
+    fn inline_ruby_field_roundtrips() {
+        let i = Inline {
+            text: "漢字".into(),
+            ruby: Some("한자".into()),
+            ..Inline::default()
+        };
+        assert_eq!(i.text, "漢字");
+        assert_eq!(i.ruby.as_deref(), Some("한자"));
     }
 
     #[test]

@@ -15,7 +15,9 @@ pub(crate) fn find_children_end(records: &[Record], parent_idx: usize) -> usize 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hwp::record::{HWPTAG_CTRL_HEADER, HWPTAG_LIST_HEADER, HWPTAG_PARA_HEADER, HWPTAG_TABLE};
+    use crate::hwp::record::{
+        HWPTAG_CTRL_HEADER, HWPTAG_LIST_HEADER, HWPTAG_PARA_HEADER, HWPTAG_TABLE,
+    };
 
     fn make_record(tag_id: u16, level: u16) -> Record {
         Record {
