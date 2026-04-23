@@ -1,5 +1,26 @@
 use crate::ir;
 
+const SAFE_URL_SCHEMES: &[&str] = &["http://", "https://", "mailto:", "tel:", "ftp://", "ftps://"];
+
+fn is_safe_url_scheme(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    SAFE_URL_SCHEMES.iter().any(|s| lower.starts_with(s))
+}
+
+fn escape_html(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
 pub fn write_markdown(doc: &ir::Document, frontmatter: bool) -> String {
     let mut out = String::new();
 
@@ -118,7 +139,7 @@ fn write_block(out: &mut String, block: &ir::Block, indent: usize) {
             if *display {
                 out.push_str(&format!("{prefix}$$\n{prefix}{tex}\n{prefix}$$\n\n"));
             } else {
-                out.push_str(&format!("{prefix}${tex}$"));
+                out.push_str(&format!("{prefix}${tex}$\n\n"));
             }
         }
     }
@@ -224,7 +245,10 @@ fn render_inlines(inlines: &[ir::Inline]) -> String {
         }
 
         if let Some(ref url) = inline.link {
-            text = format!("[{text}]({url})");
+            if is_safe_url_scheme(url) {
+                text = format!("[{text}]({url})");
+            }
+            // Unsafe schemes (e.g. javascript:) are dropped — emit the label only.
         }
         if let Some(ref id) = inline.footnote_ref {
             text = format!("{text}[^{id}]");
@@ -276,9 +300,9 @@ fn write_table(out: &mut String, rows: &[ir::TableRow], col_count: usize) {
 
 fn write_html_table(out: &mut String, rows: &[ir::TableRow]) {
     out.push_str("<table>\n");
-    for (ri, row) in rows.iter().enumerate() {
+    for row in rows {
         out.push_str("  <tr>\n");
-        let tag = if ri == 0 { "th" } else { "td" };
+        let tag = if row.is_header { "th" } else { "td" };
         for cell in &row.cells {
             let mut attrs = String::new();
             if cell.colspan > 1 {
@@ -287,7 +311,7 @@ fn write_html_table(out: &mut String, rows: &[ir::TableRow]) {
             if cell.rowspan > 1 {
                 attrs.push_str(&format!(" rowspan=\"{}\"", cell.rowspan));
             }
-            let text = cell_to_text(cell);
+            let text = escape_html(&cell_to_text(cell));
             out.push_str(&format!("    <{tag}{attrs}>{text}</{tag}>\n"));
         }
         out.push_str("  </tr>\n");

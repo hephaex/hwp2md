@@ -23,11 +23,15 @@ pub(crate) fn hwp_to_ir(hwp: &HwpDocument) -> ir::Document {
     doc.metadata.subject = hwp.summary_subject.clone();
     doc.metadata.keywords = hwp.summary_keywords.clone();
 
+    let mut footnote_counter: u32 = 0;
+    let mut endnote_counter: u32 = 0;
+
     for section in &hwp.sections {
         let mut ir_section = ir::Section { blocks: Vec::new() };
 
         for para in &section.paragraphs {
-            let blocks = paragraph_to_blocks(para, &hwp.doc_info);
+            let blocks =
+                paragraph_to_blocks_counted(para, &hwp.doc_info, &mut footnote_counter, &mut endnote_counter);
             ir_section.blocks.extend(blocks);
         }
 
@@ -45,6 +49,81 @@ pub(crate) fn hwp_to_ir(hwp: &HwpDocument) -> ir::Document {
     }
 
     doc
+}
+
+/// Counter-aware variant used by `hwp_to_ir` to assign unique sequential IDs
+/// to footnotes and endnotes across the whole document.
+fn paragraph_to_blocks_counted(
+    para: &HwpParagraph,
+    doc_info: &DocInfo,
+    footnote_counter: &mut u32,
+    endnote_counter: &mut u32,
+) -> Vec<ir::Block> {
+    let mut blocks: Vec<ir::Block> = Vec::new();
+
+    for ctrl in &para.controls {
+        if let Some(block) =
+            control_to_block_counted(ctrl, doc_info, footnote_counter, endnote_counter)
+        {
+            blocks.push(block);
+        }
+    }
+
+    let text = para.text.trim();
+    if !text.is_empty() {
+        let heading_level = detect_heading_level(para, doc_info);
+        let inlines = build_inlines(para, doc_info);
+        if !inlines.is_empty() {
+            let ps_id = para.para_shape_id as usize;
+            if ps_id < doc_info.para_shapes.len() {
+                if let Some(nid) = doc_info.para_shapes[ps_id].numbering_id {
+                    tracing::debug!(
+                        numbering_id = nid,
+                        "paragraph may be a list item; full list conversion not yet implemented"
+                    );
+                }
+            }
+
+            if let Some(level) = heading_level {
+                blocks.push(ir::Block::Heading { level, inlines });
+            } else {
+                blocks.push(ir::Block::Paragraph { inlines });
+            }
+        }
+    }
+
+    blocks
+}
+
+/// Counter-aware variant of `control_to_block` that assigns sequential IDs
+/// to footnotes (`footnote-1`, `footnote-2`, …) and endnotes (`endnote-1`, …).
+fn control_to_block_counted(
+    ctrl: &HwpControl,
+    doc_info: &DocInfo,
+    footnote_counter: &mut u32,
+    endnote_counter: &mut u32,
+) -> Option<ir::Block> {
+    if let HwpControl::FootnoteEndnote {
+        is_endnote,
+        paragraphs,
+    } = ctrl
+    {
+        let content: Vec<ir::Block> = paragraphs
+            .iter()
+            .flat_map(|p| {
+                paragraph_to_blocks_counted(p, doc_info, footnote_counter, endnote_counter)
+            })
+            .collect();
+        let id = if *is_endnote {
+            *endnote_counter += 1;
+            format!("endnote-{endnote_counter}")
+        } else {
+            *footnote_counter += 1;
+            format!("footnote-{footnote_counter}")
+        };
+        return Some(ir::Block::Footnote { id, content });
+    }
+    control_to_block(ctrl, doc_info)
 }
 
 pub(crate) fn paragraph_to_blocks(para: &HwpParagraph, doc_info: &DocInfo) -> Vec<ir::Block> {

@@ -498,6 +498,84 @@ fn render_inlines_empty_text_link() {
     assert_eq!(render_inlines(&inlines), "[](https://example.com)");
 }
 
+// -----------------------------------------------------------------------
+// Security S1: inline link URL scheme validation
+// -----------------------------------------------------------------------
+
+// javascript: URL must be stripped — only the label text is emitted.
+#[test]
+fn render_inlines_javascript_link_emits_text_only() {
+    let inlines = vec![ir::Inline {
+        text: "click me".into(),
+        link: Some("javascript:alert(1)".into()),
+        ..Default::default()
+    }];
+    let out = render_inlines(&inlines);
+    assert!(
+        !out.contains("javascript:"),
+        "javascript: scheme must be dropped; got: {out:?}"
+    );
+    assert!(
+        out.contains("click me"),
+        "label text must still be emitted; got: {out:?}"
+    );
+    assert!(
+        !out.contains("]("),
+        "link syntax must not be present; got: {out:?}"
+    );
+}
+
+// data: URL must also be blocked.
+#[test]
+fn render_inlines_data_url_emits_text_only() {
+    let inlines = vec![ir::Inline {
+        text: "img".into(),
+        link: Some("data:text/html,<script>alert(1)</script>".into()),
+        ..Default::default()
+    }];
+    let out = render_inlines(&inlines);
+    assert!(
+        !out.contains("data:"),
+        "data: scheme must be dropped; got: {out:?}"
+    );
+}
+
+// Safe schemes must still produce link syntax.
+#[test]
+fn render_inlines_https_link_emitted() {
+    let inlines = vec![ir::Inline {
+        text: "safe".into(),
+        link: Some("https://example.com".into()),
+        ..Default::default()
+    }];
+    assert_eq!(render_inlines(&inlines), "[safe](https://example.com)");
+}
+
+#[test]
+fn render_inlines_mailto_link_emitted() {
+    let inlines = vec![ir::Inline {
+        text: "email".into(),
+        link: Some("mailto:user@example.com".into()),
+        ..Default::default()
+    }];
+    assert_eq!(render_inlines(&inlines), "[email](mailto:user@example.com)");
+}
+
+// Case-insensitive: JAVASCRIPT: must also be rejected.
+#[test]
+fn render_inlines_javascript_link_case_insensitive() {
+    let inlines = vec![ir::Inline {
+        text: "xss".into(),
+        link: Some("JAVASCRIPT:alert(1)".into()),
+        ..Default::default()
+    }];
+    let out = render_inlines(&inlines);
+    assert!(
+        !out.contains("JAVASCRIPT:"),
+        "uppercase JAVASCRIPT: must be dropped; got: {out:?}"
+    );
+}
+
 // Issue 6: Markdown metacharacters in inline text must be escaped.
 #[test]
 fn render_inlines_escapes_asterisk() {
@@ -820,6 +898,53 @@ fn write_markdown_list_item_with_multiple_blocks() {
 }
 
 // -----------------------------------------------------------------------
+// Security S2: HTML table cell text must be entity-escaped
+// -----------------------------------------------------------------------
+
+#[test]
+fn write_markdown_html_table_cell_script_tag_is_escaped() {
+    // A cell containing a <script> tag must NOT appear verbatim in the output.
+    let rows = vec![ir::TableRow {
+        cells: vec![ir::TableCell {
+            blocks: vec![ir::Block::Paragraph {
+                inlines: vec![plain("<script>alert(1)</script>")],
+            }],
+            colspan: 2,
+            rowspan: 1,
+        }],
+        is_header: true,
+    }];
+    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2 }]);
+    let md = write_markdown(&doc, false);
+    assert!(md.contains("<table>"), "must use HTML table path; got: {md}");
+    assert!(
+        !md.contains("<script>"),
+        "raw <script> tag must be entity-escaped; got: {md}"
+    );
+    assert!(
+        md.contains("&lt;script&gt;"),
+        "must contain entity-escaped &lt;script&gt;; got: {md}"
+    );
+}
+
+#[test]
+fn write_markdown_html_table_cell_ampersand_escaped() {
+    let rows = vec![ir::TableRow {
+        cells: vec![ir::TableCell {
+            blocks: vec![ir::Block::Paragraph {
+                inlines: vec![plain("AT&T")],
+            }],
+            colspan: 2,
+            rowspan: 1,
+        }],
+        is_header: true,
+    }];
+    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2 }]);
+    let md = write_markdown(&doc, false);
+    assert!(md.contains("&amp;"), "& must be escaped to &amp;; got: {md}");
+}
+
+// -----------------------------------------------------------------------
 // HTML table — rowspan attribute
 // -----------------------------------------------------------------------
 
@@ -905,6 +1030,102 @@ fn paragraph_multiline_second_line_gt_escaped() {
         md.contains("\\> second"),
         "second-line > must be escaped; got: {md:?}"
     );
+}
+
+// -----------------------------------------------------------------------
+// L2 fix: inline math block must emit a trailing blank line
+// -----------------------------------------------------------------------
+
+#[test]
+fn write_markdown_inline_math_has_trailing_blank_line() {
+    let doc = make_doc_with_blocks(vec![ir::Block::Math {
+        display: false,
+        tex: "x+y".into(),
+    }]);
+    let md = write_markdown(&doc, false);
+    // Must end with two newlines so the next block is separated.
+    assert!(
+        md.contains("$x+y$\n\n"),
+        "inline math must be followed by a blank line; got: {md:?}"
+    );
+}
+
+#[test]
+fn write_markdown_inline_math_followed_by_paragraph_has_blank_line() {
+    let doc = make_doc_with_blocks(vec![
+        ir::Block::Math {
+            display: false,
+            tex: "a^2".into(),
+        },
+        ir::Block::Paragraph {
+            inlines: vec![plain("next paragraph")],
+        },
+    ]);
+    let md = write_markdown(&doc, false);
+    // There must be a blank line between the math block and the paragraph.
+    assert!(
+        md.contains("$a^2$\n\nnext paragraph"),
+        "inline math and following paragraph must be separated by a blank line; got: {md:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// L3 fix: HTML table header uses row.is_header, not row index
+// -----------------------------------------------------------------------
+
+#[test]
+fn write_markdown_html_table_second_row_is_header_uses_th() {
+    // Only the second row is marked is_header — first row should use <td>.
+    let rows = vec![
+        ir::TableRow {
+            cells: vec![ir::TableCell {
+                blocks: vec![ir::Block::Paragraph {
+                    inlines: vec![plain("data")],
+                }],
+                colspan: 2, // force HTML fallback
+                rowspan: 1,
+            }],
+            is_header: false,
+        },
+        ir::TableRow {
+            cells: vec![ir::TableCell {
+                blocks: vec![ir::Block::Paragraph {
+                    inlines: vec![plain("header")],
+                }],
+                colspan: 1,
+                rowspan: 1,
+            }],
+            is_header: true,
+        },
+    ];
+    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2 }]);
+    let md = write_markdown(&doc, false);
+    // First row (is_header=false) → <td…>; second row (is_header=true) → <th…>
+    let first_td_pos = md.find("<td").expect("<td must appear in output");
+    let second_th_pos = md.rfind("<th").expect("<th must appear in output");
+    assert!(
+        first_td_pos < second_th_pos,
+        "<td (row 0) must appear before <th (row 1); got: {md:?}"
+    );
+}
+
+#[test]
+fn write_markdown_html_table_first_row_not_header_uses_td() {
+    // When is_header=false on row 0, it must NOT use <th>.
+    let rows = vec![ir::TableRow {
+        cells: vec![ir::TableCell {
+            blocks: vec![ir::Block::Paragraph {
+                inlines: vec![plain("cell")],
+            }],
+            colspan: 2,
+            rowspan: 1,
+        }],
+        is_header: false,
+    }];
+    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2 }]);
+    let md = write_markdown(&doc, false);
+    assert!(md.contains("<td"), "row with is_header=false must use <td…>; got: {md:?}");
+    assert!(!md.contains("<th"), "row with is_header=false must not use <th…>; got: {md:?}");
 }
 
 #[test]

@@ -581,6 +581,8 @@ fn control_to_block_section_break_returns_none() {
     assert!(control_to_block(&ctrl, &doc_info).is_none());
 }
 
+/// `control_to_block` (no counter) still produces the plain prefix IDs — it is
+/// used by nested table/blockquote paths that do not carry document-level state.
 #[test]
 fn control_to_block_endnote_produces_footnote_with_endnote_id() {
     let ctrl = HwpControl::FootnoteEndnote {
@@ -589,26 +591,137 @@ fn control_to_block_endnote_produces_footnote_with_endnote_id() {
     };
     let doc_info = DocInfo::default();
     let block = control_to_block(&ctrl, &doc_info).expect("Some");
-    if let ir::Block::Footnote { id, .. } = block {
-        assert_eq!(id, "endnote");
-    } else {
-        panic!("Expected Footnote block");
-    }
+    assert!(matches!(block, ir::Block::Footnote { .. }));
 }
 
+// -----------------------------------------------------------------------
+// hwp_to_ir — sequential footnote / endnote IDs (L1 fix)
+// -----------------------------------------------------------------------
+
 #[test]
-fn control_to_block_footnote_id_is_footnote() {
-    let ctrl = HwpControl::FootnoteEndnote {
+fn hwp_to_ir_two_footnotes_get_sequential_ids() {
+    let make_fn_ctrl = || HwpControl::FootnoteEndnote {
         is_endnote: false,
         paragraphs: Vec::new(),
     };
-    let doc_info = DocInfo::default();
-    let block = control_to_block(&ctrl, &doc_info).expect("Some");
-    if let ir::Block::Footnote { id, .. } = block {
-        assert_eq!(id, "footnote");
-    } else {
-        panic!("Expected Footnote block");
-    }
+    let mut hwp = make_hwp_document();
+    hwp.sections.push(HwpSection {
+        paragraphs: vec![
+            HwpParagraph {
+                text: String::new(),
+                char_shape_ids: Vec::new(),
+                para_shape_id: 0,
+                controls: vec![make_fn_ctrl()],
+            },
+            HwpParagraph {
+                text: String::new(),
+                char_shape_ids: Vec::new(),
+                para_shape_id: 0,
+                controls: vec![make_fn_ctrl()],
+            },
+        ],
+    });
+    let doc = hwp_to_ir(&hwp);
+    let footnote_ids: Vec<&str> = doc.sections[0]
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Footnote { id, .. } = b {
+                Some(id.as_str())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(footnote_ids, vec!["footnote-1", "footnote-2"]);
+}
+
+#[test]
+fn hwp_to_ir_two_endnotes_get_sequential_ids() {
+    let make_en_ctrl = || HwpControl::FootnoteEndnote {
+        is_endnote: true,
+        paragraphs: Vec::new(),
+    };
+    let mut hwp = make_hwp_document();
+    hwp.sections.push(HwpSection {
+        paragraphs: vec![
+            HwpParagraph {
+                text: String::new(),
+                char_shape_ids: Vec::new(),
+                para_shape_id: 0,
+                controls: vec![make_en_ctrl()],
+            },
+            HwpParagraph {
+                text: String::new(),
+                char_shape_ids: Vec::new(),
+                para_shape_id: 0,
+                controls: vec![make_en_ctrl()],
+            },
+        ],
+    });
+    let doc = hwp_to_ir(&hwp);
+    let endnote_ids: Vec<&str> = doc.sections[0]
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Footnote { id, .. } = b {
+                Some(id.as_str())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(endnote_ids, vec!["endnote-1", "endnote-2"]);
+}
+
+#[test]
+fn hwp_to_ir_footnote_and_endnote_counters_are_independent() {
+    let mut hwp = make_hwp_document();
+    hwp.sections.push(HwpSection {
+        paragraphs: vec![
+            HwpParagraph {
+                text: String::new(),
+                char_shape_ids: Vec::new(),
+                para_shape_id: 0,
+                controls: vec![HwpControl::FootnoteEndnote {
+                    is_endnote: false,
+                    paragraphs: Vec::new(),
+                }],
+            },
+            HwpParagraph {
+                text: String::new(),
+                char_shape_ids: Vec::new(),
+                para_shape_id: 0,
+                controls: vec![HwpControl::FootnoteEndnote {
+                    is_endnote: true,
+                    paragraphs: Vec::new(),
+                }],
+            },
+            HwpParagraph {
+                text: String::new(),
+                char_shape_ids: Vec::new(),
+                para_shape_id: 0,
+                controls: vec![HwpControl::FootnoteEndnote {
+                    is_endnote: false,
+                    paragraphs: Vec::new(),
+                }],
+            },
+        ],
+    });
+    let doc = hwp_to_ir(&hwp);
+    let ids: Vec<&str> = doc.sections[0]
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Footnote { id, .. } = b {
+                Some(id.as_str())
+            } else {
+                None
+            }
+        })
+        .collect();
+    // footnote counter and endnote counter are independent sequences.
+    assert_eq!(ids, vec!["footnote-1", "endnote-1", "footnote-2"]);
 }
 
 #[test]

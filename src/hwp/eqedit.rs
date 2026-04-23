@@ -146,7 +146,7 @@ fn consume_brace_group(chars: &[char], start: usize) -> (String, usize) {
         if c == '{' {
             depth += 1;
         } else if c == '}' {
-            depth -= 1;
+            depth = depth.saturating_sub(1);
             if depth == 0 {
                 i += 1;
                 return (s, i);
