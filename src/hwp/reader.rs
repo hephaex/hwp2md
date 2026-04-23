@@ -152,20 +152,36 @@ fn read_file_header(cfb: &mut cfb::CompoundFile<std::fs::File>) -> Result<FileHe
 const MAX_DECOMPRESSED: u64 = 256 * 1024 * 1024;
 
 pub(crate) fn decompress_stream(data: &[u8]) -> Result<Vec<u8>, Hwp2MdError> {
+    decompress_stream_limited(data, MAX_DECOMPRESSED)
+}
+
+/// Decompress `data` (deflate with zlib fallback), rejecting output that
+/// exceeds `limit` bytes.
+///
+/// Reading `limit + 1` bytes via [`Read::take`] lets us distinguish a
+/// legitimately-sized stream (output < limit) from one that was cut off at
+/// the limit (output == limit + 1, meaning more data remains).
+fn decompress_stream_limited(data: &[u8], limit: u64) -> Result<Vec<u8>, Hwp2MdError> {
     let mut out = Vec::new();
     let decoder = DeflateDecoder::new(data);
-    if let Err(e) = decoder.take(MAX_DECOMPRESSED).read_to_end(&mut out) {
+    if let Err(e) = decoder.take(limit + 1).read_to_end(&mut out) {
         tracing::debug!("Deflate failed, trying zlib: {e}");
     } else {
+        if out.len() as u64 > limit {
+            return Err(Hwp2MdError::DecompressionBomb(limit));
+        }
         return Ok(out);
     }
 
     out.clear();
     let decoder = flate2::read::ZlibDecoder::new(data);
     decoder
-        .take(MAX_DECOMPRESSED)
+        .take(limit + 1)
         .read_to_end(&mut out)
         .map_err(|e| Hwp2MdError::Decompress(format!("zlib fallback: {e}")))?;
+    if out.len() as u64 > limit {
+        return Err(Hwp2MdError::DecompressionBomb(limit));
+    }
     Ok(out)
 }
 

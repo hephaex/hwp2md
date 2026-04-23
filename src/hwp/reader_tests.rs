@@ -280,6 +280,59 @@ fn decompress_stream_invalid_data_returns_error() {
 }
 
 #[test]
+fn decompress_stream_deflate_bomb_returns_error() {
+    use crate::error::Hwp2MdError;
+    use flate2::{write::DeflateEncoder, Compression};
+    use std::io::Write;
+
+    // Compress 32 zero bytes; use a limit of 16 so the output exceeds it.
+    let original = vec![0u8; 32];
+    let mut enc = DeflateEncoder::new(Vec::new(), Compression::default());
+    enc.write_all(&original).unwrap();
+    let compressed = enc.finish().unwrap();
+
+    let err = decompress_stream_limited(&compressed, 16).unwrap_err();
+    assert!(
+        matches!(err, Hwp2MdError::DecompressionBomb(16)),
+        "expected DecompressionBomb(16), got {err:?}"
+    );
+}
+
+#[test]
+fn decompress_stream_zlib_bomb_returns_error() {
+    use crate::error::Hwp2MdError;
+    use flate2::{write::ZlibEncoder, Compression};
+    use std::io::Write;
+
+    // Compress 32 zero bytes with zlib; limit to 16 bytes.
+    let original = vec![0u8; 32];
+    let mut enc = ZlibEncoder::new(Vec::new(), Compression::default());
+    enc.write_all(&original).unwrap();
+    let compressed = enc.finish().unwrap();
+
+    let err = decompress_stream_limited(&compressed, 16).unwrap_err();
+    assert!(
+        matches!(err, Hwp2MdError::DecompressionBomb(16)),
+        "expected DecompressionBomb(16), got {err:?}"
+    );
+}
+
+#[test]
+fn decompress_stream_exactly_at_limit_succeeds() {
+    use flate2::{write::DeflateEncoder, Compression};
+    use std::io::Write;
+
+    // Compress exactly 16 bytes; limit is also 16 — must succeed (not a bomb).
+    let original = vec![0xABu8; 16];
+    let mut enc = DeflateEncoder::new(Vec::new(), Compression::default());
+    enc.write_all(&original).unwrap();
+    let compressed = enc.finish().unwrap();
+
+    let decompressed = decompress_stream_limited(&compressed, 16).unwrap();
+    assert_eq!(decompressed, original);
+}
+
+#[test]
 fn read_file_header_encrypted_bit_sets_encrypted() {
     let mut buf = vec![0u8; 256];
     buf[0..17].copy_from_slice(b"HWP Document File");

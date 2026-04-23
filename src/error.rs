@@ -20,6 +20,9 @@ pub enum Hwp2MdError {
     #[error("decompression error: {0}")]
     Decompress(String),
 
+    #[error("decompression bomb: output exceeded {0} bytes")]
+    DecompressionBomb(u64),
+
     #[error("invalid record: {0}")]
     InvalidRecord(String),
 
