@@ -576,6 +576,31 @@ fn render_inlines_javascript_link_case_insensitive() {
     );
 }
 
+// URL containing ')' must use angle-bracket syntax to avoid breaking link parsing.
+#[test]
+fn render_inlines_link_with_paren_uses_angle_bracket_syntax() {
+    let inlines = vec![ir::Inline {
+        text: "click".into(),
+        link: Some("https://example.com/foo(bar)".into()),
+        ..Default::default()
+    }];
+    assert_eq!(
+        render_inlines(&inlines),
+        "[click](<https://example.com/foo(bar)>)"
+    );
+}
+
+// URL without ')' must still use plain parenthesis syntax.
+#[test]
+fn render_inlines_link_without_paren_uses_plain_syntax() {
+    let inlines = vec![ir::Inline {
+        text: "click".into(),
+        link: Some("https://example.com/plain".into()),
+        ..Default::default()
+    }];
+    assert_eq!(render_inlines(&inlines), "[click](https://example.com/plain)");
+}
+
 // Issue 6: Markdown metacharacters in inline text must be escaped.
 #[test]
 fn render_inlines_escapes_asterisk() {

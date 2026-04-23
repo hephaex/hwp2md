@@ -244,6 +244,18 @@ fn parse_para_shape_no_heading() {
     assert_eq!(ps.heading_type, None);
 }
 
+// --- size limit constants ---
+
+#[test]
+fn size_limit_constants_are_reasonable() {
+    // Both limits must be strictly positive and at most 1 GiB so that
+    // allocation in tests and production code stays bounded.
+    assert!(MAX_DECOMPRESSED > 0);
+    assert!(MAX_DECOMPRESSED <= 1024 * 1024 * 1024);
+    assert!(MAX_CFB_STREAM > 0);
+    assert!(MAX_CFB_STREAM <= 1024 * 1024 * 1024);
+}
+
 // --- decompress_stream ---
 
 #[test]

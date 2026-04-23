@@ -17,12 +17,12 @@ use std::path::Path;
 mod shapes;
 pub(crate) use shapes::{parse_bin_data_entry, parse_char_shape, parse_para_shape};
 
-pub fn read_hwp(path: &Path) -> Result<ir::Document, anyhow::Error> {
+pub fn read_hwp(path: &Path) -> Result<ir::Document, Hwp2MdError> {
     let hwp_doc = parse_hwp_file(path)?;
     Ok(hwp_to_ir(&hwp_doc))
 }
 
-fn parse_hwp_file(path: &Path) -> Result<HwpDocument, anyhow::Error> {
+fn parse_hwp_file(path: &Path) -> Result<HwpDocument, Hwp2MdError> {
     let file = std::fs::File::open(path)?;
     let mut cfb = cfb::CompoundFile::open(file)
         .map_err(|e| Hwp2MdError::HwpParse(format!("CFB open: {e}")))?;
@@ -30,7 +30,9 @@ fn parse_hwp_file(path: &Path) -> Result<HwpDocument, anyhow::Error> {
     let header = read_file_header(&mut cfb)?;
 
     if header.encrypted || header.has_drm {
-        return Err(Hwp2MdError::HwpParse("HWP file is encrypted or DRM-protected".into()).into());
+        return Err(Hwp2MdError::HwpParse(
+            "HWP file is encrypted or DRM-protected".into(),
+        ));
     }
 
     let doc_info = read_doc_info(&mut cfb, header.compressed)?;
@@ -59,8 +61,7 @@ fn parse_hwp_file(path: &Path) -> Result<HwpDocument, anyhow::Error> {
             None => {
                 return Err(Hwp2MdError::HwpParse(
                     "distributed HWP has no DISTRIBUTE_DOC_DATA record".into(),
-                )
-                .into());
+                ));
             }
         };
 
@@ -151,6 +152,9 @@ fn read_file_header(cfb: &mut cfb::CompoundFile<std::fs::File>) -> Result<FileHe
 /// Maximum decompressed size to prevent decompression bombs (256 MB).
 const MAX_DECOMPRESSED: u64 = 256 * 1024 * 1024;
 
+/// Maximum size for a raw CFB stream read from untrusted HWP input (256 MB).
+const MAX_CFB_STREAM: u64 = 256 * 1024 * 1024;
+
 pub(crate) fn decompress_stream(data: &[u8]) -> Result<Vec<u8>, Hwp2MdError> {
     decompress_stream_limited(data, MAX_DECOMPRESSED)
 }
@@ -197,12 +201,12 @@ fn read_stream_bytes(
     path: &str,
     compressed: bool,
 ) -> Result<Vec<u8>, Hwp2MdError> {
-    let mut stream = cfb
+    let stream = cfb
         .open_stream(path)
         .map_err(|e| Hwp2MdError::HwpParse(format!("open stream '{path}': {e}")))?;
 
     let mut raw = Vec::new();
-    stream.read_to_end(&mut raw)?;
+    stream.take(MAX_CFB_STREAM).read_to_end(&mut raw)?;
 
     if compressed {
         decompress_stream(&raw)
@@ -286,12 +290,12 @@ fn read_distributed_section(
     path: &str,
     aes_key: &[u8; 16],
 ) -> Result<HwpSection, Hwp2MdError> {
-    let mut stream = cfb
+    let stream = cfb
         .open_stream(path)
         .map_err(|e| Hwp2MdError::HwpParse(format!("open distributed stream '{path}': {e}")))?;
 
     let mut raw = Vec::new();
-    stream.read_to_end(&mut raw)?;
+    stream.take(MAX_CFB_STREAM).read_to_end(&mut raw)?;
 
     // AES-128 ECB decrypt.
     let decrypted = decrypt_viewtext(&raw, aes_key)
@@ -420,9 +424,9 @@ fn read_bin_data(
                 (idx + 1) as u16
             };
             let path = format!("BinData/BIN{:04X}", id);
-            if let Ok(mut stream) = cfb.open_stream(&path) {
+            if let Ok(stream) = cfb.open_stream(&path) {
                 let mut data = Vec::new();
-                stream.read_to_end(&mut data)?;
+                stream.take(MAX_CFB_STREAM).read_to_end(&mut data)?;
                 bin_data.insert(id, data);
             }
         }
@@ -431,9 +435,9 @@ fn read_bin_data(
         for i in 1..=100u16 {
             let path = format!("BinData/BIN{:04X}", i);
             match cfb.open_stream(&path) {
-                Ok(mut stream) => {
+                Ok(stream) => {
                     let mut data = Vec::new();
-                    stream.read_to_end(&mut data)?;
+                    stream.take(MAX_CFB_STREAM).read_to_end(&mut data)?;
                     bin_data.insert(i, data);
                 }
                 Err(_) => {

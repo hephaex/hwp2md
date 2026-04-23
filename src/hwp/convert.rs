@@ -1,13 +1,7 @@
 use crate::hwp::eqedit::eqedit_to_latex;
 use crate::hwp::model::*;
 use crate::ir;
-
-const SAFE_URL_SCHEMES: &[&str] = &["http://", "https://", "mailto:", "ftp://", "ftps://"];
-
-fn is_safe_url_scheme(url: &str) -> bool {
-    let lower = url.to_ascii_lowercase();
-    SAFE_URL_SCHEMES.iter().any(|s| lower.starts_with(s))
-}
+use crate::url_util::is_safe_url_scheme;
 
 /// HWP font height is in 1/100 point units (HWP internal unit).
 /// e.g. 1600 = 16pt, 1400 = 14pt, 1200 = 12pt.

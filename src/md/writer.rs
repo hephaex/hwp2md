@@ -1,11 +1,5 @@
 use crate::ir;
-
-const SAFE_URL_SCHEMES: &[&str] = &["http://", "https://", "mailto:", "tel:", "ftp://", "ftps://"];
-
-fn is_safe_url_scheme(url: &str) -> bool {
-    let lower = url.to_ascii_lowercase();
-    SAFE_URL_SCHEMES.iter().any(|s| lower.starts_with(s))
-}
+use crate::url_util::is_safe_url_scheme;
 
 fn escape_html(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -246,7 +240,11 @@ fn render_inlines(inlines: &[ir::Inline]) -> String {
 
         if let Some(ref url) = inline.link {
             if is_safe_url_scheme(url) {
-                text = format!("[{text}]({url})");
+                if url.contains(')') {
+                    text = format!("[{text}](<{url}>)");
+                } else {
+                    text = format!("[{text}]({url})");
+                }
             }
             // Unsafe schemes (e.g. javascript:) are dropped — emit the label only.
         }

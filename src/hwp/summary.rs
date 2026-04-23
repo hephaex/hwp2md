@@ -1,5 +1,8 @@
 use std::io::Read;
 
+/// Maximum size for a raw CFB stream read from untrusted HWP input (256 MB).
+const MAX_CFB_STREAM: u64 = 256 * 1024 * 1024;
+
 const PROP_TITLE: u32 = 0x02;
 const PROP_SUBJECT: u32 = 0x03;
 const PROP_AUTHOR: u32 = 0x04;
@@ -13,8 +16,8 @@ pub(crate) fn read_summary_info(
     let stream_name = "\x05SummaryInformation";
     let mut raw = Vec::new();
     match cfb.open_stream(stream_name) {
-        Ok(mut s) => {
-            if s.read_to_end(&mut raw).is_err() {
+        Ok(s) => {
+            if s.take(MAX_CFB_STREAM).read_to_end(&mut raw).is_err() {
                 tracing::debug!("SummaryInformation: read failed");
                 return (None, None, None, Vec::new());
             }

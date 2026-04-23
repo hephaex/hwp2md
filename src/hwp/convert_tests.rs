@@ -148,20 +148,6 @@ fn control_to_block_hyperlink_javascript_url_rejected() {
     assert!(control_to_block(&ctrl, &doc_info).is_none());
 }
 
-#[test]
-fn is_safe_url_scheme_accepts_https() {
-    assert!(is_safe_url_scheme("https://example.com"));
-    assert!(is_safe_url_scheme("HTTP://EXAMPLE.COM"));
-    assert!(is_safe_url_scheme("mailto:user@example.com"));
-}
-
-#[test]
-fn is_safe_url_scheme_rejects_dangerous() {
-    assert!(!is_safe_url_scheme("javascript:alert(1)"));
-    assert!(!is_safe_url_scheme("data:text/html,<h1>hi</h1>"));
-    assert!(!is_safe_url_scheme("vbscript:msgbox"));
-}
-
 // -----------------------------------------------------------------------
 // guess_mime
 // -----------------------------------------------------------------------
