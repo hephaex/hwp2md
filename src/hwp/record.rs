@@ -22,8 +22,6 @@ pub const HWPTAG_EQEDIT: u16 = HWPTAG_BEGIN + 71;
 /// GSOType record — contains picture/OLE shape specifics including BinData reference.
 pub const HWPTAG_GSOTYPE: u16 = HWPTAG_BEGIN + 67;
 
-#[allow(dead_code)]
-pub const CTRL_SECTION_DEF: u32 = ctrl_id(b"secd");
 pub const CTRL_TABLE: u32 = ctrl_id(b"tbl ");
 #[allow(dead_code)]
 pub const CTRL_EQUATION: u32 = ctrl_id(b"eqed");

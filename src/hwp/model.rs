@@ -176,7 +176,6 @@ pub enum HwpControl {
         paragraphs: Vec<HwpParagraph>,
     },
     PageBreak,
-    SectionBreak,
     ColumnBreak,
 }
 

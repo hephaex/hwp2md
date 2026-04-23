@@ -273,7 +273,7 @@ pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<
                 })
             }
         }
-        HwpControl::PageBreak | HwpControl::SectionBreak | HwpControl::ColumnBreak => None,
+        HwpControl::PageBreak | HwpControl::ColumnBreak => None,
     }
 }
 

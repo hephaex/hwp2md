@@ -1,5 +1,5 @@
 use crate::error::Hwp2MdError;
-use crate::hwp::control::{find_children_end, parse_ctrl_header_at};
+use crate::hwp::control::extract_paragraphs_from_range;
 use crate::hwp::convert::hwp_to_ir;
 use crate::hwp::crypto::{
     decrypt_seed, decrypt_viewtext, extract_aes_key, HWPTAG_DISTRIBUTE_DOC_DATA,
@@ -164,25 +164,32 @@ pub(crate) fn decompress_stream(data: &[u8]) -> Result<Vec<u8>, Hwp2MdError> {
 fn decompress_stream_limited(data: &[u8], limit: u64) -> Result<Vec<u8>, Hwp2MdError> {
     let mut out = Vec::new();
     let decoder = DeflateDecoder::new(data);
-    if let Err(e) = decoder.take(limit + 1).read_to_end(&mut out) {
-        tracing::debug!("Deflate failed, trying zlib: {e}");
-    } else {
-        if out.len() as u64 > limit {
-            return Err(Hwp2MdError::DecompressionBomb(limit));
+    let deflate_err = match decoder.take(limit + 1).read_to_end(&mut out) {
+        Ok(_) => {
+            if out.len() as u64 > limit {
+                return Err(Hwp2MdError::DecompressionBomb(limit));
+            }
+            return Ok(out);
         }
-        return Ok(out);
-    }
+        Err(e) => {
+            tracing::debug!("Deflate failed, trying zlib: {e}");
+            e
+        }
+    };
 
     out.clear();
     let decoder = flate2::read::ZlibDecoder::new(data);
-    decoder
-        .take(limit + 1)
-        .read_to_end(&mut out)
-        .map_err(|e| Hwp2MdError::Decompress(format!("zlib fallback: {e}")))?;
-    if out.len() as u64 > limit {
-        return Err(Hwp2MdError::DecompressionBomb(limit));
+    match decoder.take(limit + 1).read_to_end(&mut out) {
+        Ok(_) => {
+            if out.len() as u64 > limit {
+                return Err(Hwp2MdError::DecompressionBomb(limit));
+            }
+            Ok(out)
+        }
+        Err(zlib_err) => Err(Hwp2MdError::Decompress(format!(
+            "deflate failed: {deflate_err}; zlib also failed: {zlib_err}"
+        ))),
     }
-    Ok(out)
 }
 
 fn read_stream_bytes(
@@ -299,72 +306,8 @@ fn read_distributed_section(
 }
 
 fn parse_section_from_records(records: &[Record]) -> HwpSection {
-    let mut section = HwpSection {
-        paragraphs: Vec::new(),
-    };
-    let mut current_para: Option<HwpParagraph> = None;
-    let mut rec_idx: usize = 0;
-
-    while rec_idx < records.len() {
-        let rec = &records[rec_idx];
-        match rec.tag_id {
-            HWPTAG_PARA_HEADER => {
-                if let Some(para) = current_para.take() {
-                    section.paragraphs.push(para);
-                }
-                let para_shape_id = if rec.data.len() >= 6 {
-                    u16::from_le_bytes([rec.data[4], rec.data[5]])
-                } else {
-                    0
-                };
-                current_para = Some(HwpParagraph {
-                    text: String::new(),
-                    char_shape_ids: Vec::new(),
-                    para_shape_id,
-                    controls: Vec::new(),
-                });
-                rec_idx += 1;
-            }
-            HWPTAG_PARA_TEXT => {
-                if let Some(ref mut para) = current_para {
-                    para.text = extract_paragraph_text(&rec.data);
-                }
-                rec_idx += 1;
-            }
-            HWPTAG_PARA_CHAR_SHAPE => {
-                if let Some(ref mut para) = current_para {
-                    para.char_shape_ids = parse_char_shape_refs(&rec.data);
-                }
-                rec_idx += 1;
-            }
-            HWPTAG_EQEDIT => {
-                if let Some(ref mut para) = current_para {
-                    let (script, _) = read_utf16le_str(&rec.data, 2);
-                    if !script.is_empty() {
-                        para.controls.push(HwpControl::Equation { script });
-                    }
-                }
-                rec_idx += 1;
-            }
-            HWPTAG_CTRL_HEADER => {
-                if let Some(ctrl) = parse_ctrl_header_at(records, rec_idx) {
-                    if let Some(ref mut para) = current_para {
-                        para.controls.push(ctrl);
-                    }
-                }
-                rec_idx = find_children_end(records, rec_idx);
-            }
-            _ => {
-                rec_idx += 1;
-            }
-        }
-    }
-
-    if let Some(para) = current_para {
-        section.paragraphs.push(para);
-    }
-
-    section
+    let paragraphs = extract_paragraphs_from_range(records, 0, records.len());
+    HwpSection { paragraphs }
 }
 
 pub(crate) fn read_section_stream(

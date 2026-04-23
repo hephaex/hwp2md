@@ -574,13 +574,6 @@ fn control_to_block_column_break_returns_none() {
     assert!(control_to_block(&ctrl, &doc_info).is_none());
 }
 
-#[test]
-fn control_to_block_section_break_returns_none() {
-    let ctrl = HwpControl::SectionBreak;
-    let doc_info = DocInfo::default();
-    assert!(control_to_block(&ctrl, &doc_info).is_none());
-}
-
 /// `control_to_block` (no counter) still produces the plain prefix IDs — it is
 /// used by nested table/blockquote paths that do not carry document-level state.
 #[test]

@@ -188,11 +188,54 @@ pub(crate) fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut Pa
     }
 }
 
+/// Drain accumulated `text` + `inlines` into `blocks` as a `Paragraph`.
+///
+/// If `text` is non-empty an `ir::Inline` is built from `text` and the
+/// supplied style fields and appended to `inlines` first.  If `inlines` is
+/// still empty after that step nothing is pushed to `blocks`.
+///
+/// Style fields are passed individually (rather than `&ParseContext`) so that
+/// callers can split the borrow between the mutable text/inline buffers and
+/// the style fields without a borrow-checker conflict.
+#[allow(clippy::too_many_arguments)]
+fn flush_inlines_to_blocks(
+    text: &mut String,
+    inlines: &mut Vec<ir::Inline>,
+    blocks: &mut Vec<ir::Block>,
+    bold: bool,
+    italic: bool,
+    underline: bool,
+    strike: bool,
+    superscript: bool,
+    subscript: bool,
+    color: &Option<String>,
+) {
+    if !text.is_empty() {
+        let t = std::mem::take(text);
+        inlines.push(ir::Inline {
+            text: t,
+            bold,
+            italic,
+            underline,
+            strikethrough: strike,
+            superscript,
+            subscript,
+            color: color.clone(),
+            ..ir::Inline::default()
+        });
+    }
+    if !inlines.is_empty() {
+        let i = std::mem::take(inlines);
+        blocks.push(ir::Block::Paragraph { inlines: i });
+    }
+}
+
 pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section) {
+    // Flush any trailing text run into the inline buffer first.
     if !ctx.current_text.is_empty() {
-        let text = std::mem::take(&mut ctx.current_text);
+        let t = std::mem::take(&mut ctx.current_text);
         ctx.current_inlines.push(ir::Inline {
-            text,
+            text: t,
             bold: ctx.current_bold,
             italic: ctx.current_italic,
             underline: ctx.current_underline,
@@ -203,11 +246,9 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
             ..ir::Inline::default()
         });
     }
-
     if ctx.current_inlines.is_empty() {
         return;
     }
-
     let inlines = std::mem::take(&mut ctx.current_inlines);
     let block = if let Some(level) = ctx.heading_level {
         ir::Block::Heading { level, inlines }
@@ -218,69 +259,48 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
 }
 
 pub(crate) fn flush_cell_paragraph(ctx: &mut ParseContext) {
-    if !ctx.cell_text.is_empty() {
-        let text = std::mem::take(&mut ctx.cell_text);
-        ctx.cell_inlines.push(ir::Inline {
-            text,
-            bold: ctx.current_bold,
-            italic: ctx.current_italic,
-            underline: ctx.current_underline,
-            strikethrough: ctx.current_strike,
-            superscript: ctx.current_superscript,
-            subscript: ctx.current_subscript,
-            color: ctx.current_color.clone(),
-            ..ir::Inline::default()
-        });
-    }
-
-    if !ctx.cell_inlines.is_empty() {
-        let inlines = std::mem::take(&mut ctx.cell_inlines);
-        ctx.cell_blocks.push(ir::Block::Paragraph { inlines });
-    }
+    flush_inlines_to_blocks(
+        &mut ctx.cell_text,
+        &mut ctx.cell_inlines,
+        &mut ctx.cell_blocks,
+        ctx.current_bold,
+        ctx.current_italic,
+        ctx.current_underline,
+        ctx.current_strike,
+        ctx.current_superscript,
+        ctx.current_subscript,
+        &ctx.current_color,
+    );
 }
 
 pub(crate) fn flush_list_item_paragraph(ctx: &mut ParseContext) {
-    if !ctx.list_item_text.is_empty() {
-        let text = std::mem::take(&mut ctx.list_item_text);
-        ctx.list_item_inlines.push(ir::Inline {
-            text,
-            bold: ctx.current_bold,
-            italic: ctx.current_italic,
-            underline: ctx.current_underline,
-            strikethrough: ctx.current_strike,
-            superscript: ctx.current_superscript,
-            subscript: ctx.current_subscript,
-            color: ctx.current_color.clone(),
-            ..ir::Inline::default()
-        });
-    }
-
-    if !ctx.list_item_inlines.is_empty() {
-        let inlines = std::mem::take(&mut ctx.list_item_inlines);
-        ctx.list_item_blocks.push(ir::Block::Paragraph { inlines });
-    }
+    flush_inlines_to_blocks(
+        &mut ctx.list_item_text,
+        &mut ctx.list_item_inlines,
+        &mut ctx.list_item_blocks,
+        ctx.current_bold,
+        ctx.current_italic,
+        ctx.current_underline,
+        ctx.current_strike,
+        ctx.current_superscript,
+        ctx.current_subscript,
+        &ctx.current_color,
+    );
 }
 
 /// Flush any pending run text and inline list from within a footnote/endnote
 /// paragraph into `footnote_blocks`.  Mirrors the logic of `flush_cell_paragraph`.
 pub(crate) fn flush_footnote_paragraph(ctx: &mut ParseContext) {
-    if !ctx.footnote_text.is_empty() {
-        let text = std::mem::take(&mut ctx.footnote_text);
-        ctx.footnote_inlines.push(ir::Inline {
-            text,
-            bold: ctx.current_bold,
-            italic: ctx.current_italic,
-            underline: ctx.current_underline,
-            strikethrough: ctx.current_strike,
-            superscript: ctx.current_superscript,
-            subscript: ctx.current_subscript,
-            color: ctx.current_color.clone(),
-            ..ir::Inline::default()
-        });
-    }
-
-    if !ctx.footnote_inlines.is_empty() {
-        let inlines = std::mem::take(&mut ctx.footnote_inlines);
-        ctx.footnote_blocks.push(ir::Block::Paragraph { inlines });
-    }
+    flush_inlines_to_blocks(
+        &mut ctx.footnote_text,
+        &mut ctx.footnote_inlines,
+        &mut ctx.footnote_blocks,
+        ctx.current_bold,
+        ctx.current_italic,
+        ctx.current_underline,
+        ctx.current_strike,
+        ctx.current_superscript,
+        ctx.current_subscript,
+        &ctx.current_color,
+    );
 }

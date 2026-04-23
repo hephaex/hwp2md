@@ -1,6 +1,7 @@
 use crate::hwp::model::*;
 use crate::hwp::record::*;
-use super::common::{extract_paragraphs_from_range, find_children_end};
+use super::common::find_children_end;
+use super::dispatcher::extract_paragraphs_from_range;
 
 /// Parse a `CTRL_TABLE` subtree starting at `ctrl_idx` in `records`.
 ///
