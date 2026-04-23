@@ -966,3 +966,118 @@ fn resolve_bin_refs_inside_list() {
         other => panic!("expected List, got {other:?}"),
     }
 }
+
+// -----------------------------------------------------------------------
+// apply_charpr_attrs — color attribute parsing
+// -----------------------------------------------------------------------
+
+fn make_bytes_start_with_attrs(tag: &str, attrs: &[(&str, &str)]) -> Vec<u8> {
+    let mut xml = format!("<{tag}");
+    for (k, v) in attrs {
+        xml.push_str(&format!(" {k}=\"{v}\""));
+    }
+    xml.push('>');
+    xml.into_bytes()
+}
+
+fn apply_attrs_via_xml(tag: &str, attrs: &[(&str, &str)]) -> super::context::ParseContext {
+    use quick_xml::events::BytesStart;
+    let xml_bytes = make_bytes_start_with_attrs(tag, attrs);
+    // Parse just the start tag bytes.
+    let start_bytes = xml_bytes
+        .iter()
+        .take_while(|&&b| b != b'>')
+        .cloned()
+        .collect::<Vec<_>>();
+    let e = BytesStart::from_content(
+        std::str::from_utf8(&start_bytes[1..]).unwrap(), // strip leading '<'
+        tag.len(),
+    );
+    let mut ctx = super::context::ParseContext::default();
+    super::context::apply_charpr_attrs(&e, &mut ctx);
+    ctx
+}
+
+#[test]
+fn apply_charpr_attrs_color_sets_current_color() {
+    let ctx = apply_attrs_via_xml("charPr", &[("color", "#FF0000")]);
+    assert_eq!(ctx.current_color.as_deref(), Some("#FF0000"));
+}
+
+#[test]
+fn apply_charpr_attrs_color_without_hash_normalises() {
+    let ctx = apply_attrs_via_xml("charPr", &[("color", "FF0000")]);
+    assert_eq!(ctx.current_color.as_deref(), Some("#FF0000"));
+}
+
+#[test]
+fn apply_charpr_attrs_black_color_sets_none() {
+    let ctx = apply_attrs_via_xml("charPr", &[("color", "#000000")]);
+    assert!(
+        ctx.current_color.is_none(),
+        "black color must not be propagated"
+    );
+}
+
+#[test]
+fn apply_charpr_attrs_black_color_without_hash_sets_none() {
+    let ctx = apply_attrs_via_xml("charPr", &[("color", "000000")]);
+    assert!(ctx.current_color.is_none());
+}
+
+#[test]
+fn apply_charpr_attrs_empty_color_sets_none() {
+    let ctx = apply_attrs_via_xml("charPr", &[("color", "")]);
+    assert!(ctx.current_color.is_none());
+}
+
+#[test]
+fn apply_charpr_attrs_hp_color_prefix_accepted() {
+    let ctx = apply_attrs_via_xml("hp:charPr", &[("hp:color", "0000FF")]);
+    assert_eq!(ctx.current_color.as_deref(), Some("#0000FF"));
+}
+
+#[test]
+fn apply_charpr_attrs_color_lowercase_normalised_to_upper() {
+    let ctx = apply_attrs_via_xml("charPr", &[("color", "ff0000")]);
+    assert_eq!(ctx.current_color.as_deref(), Some("#FF0000"));
+}
+
+// -----------------------------------------------------------------------
+// flush_paragraph — color propagation into ir::Inline
+// -----------------------------------------------------------------------
+
+#[test]
+fn flush_paragraph_propagates_color_to_inline() {
+    let mut ctx = super::context::ParseContext::default();
+    ctx.in_paragraph = true;
+    ctx.current_text = "colored".to_string();
+    ctx.current_color = Some("#00FF00".to_string());
+
+    let mut section = crate::ir::Section { blocks: Vec::new() };
+    super::context::flush_paragraph(&mut ctx, &mut section);
+
+    assert_eq!(section.blocks.len(), 1);
+    if let crate::ir::Block::Paragraph { inlines } = &section.blocks[0] {
+        assert_eq!(inlines[0].color.as_deref(), Some("#00FF00"));
+    } else {
+        panic!("Expected Paragraph block");
+    }
+}
+
+#[test]
+fn flush_paragraph_no_color_propagates_none() {
+    let mut ctx = super::context::ParseContext::default();
+    ctx.in_paragraph = true;
+    ctx.current_text = "plain".to_string();
+    ctx.current_color = None;
+
+    let mut section = crate::ir::Section { blocks: Vec::new() };
+    super::context::flush_paragraph(&mut ctx, &mut section);
+
+    if let crate::ir::Block::Paragraph { inlines } = &section.blocks[0] {
+        assert!(inlines[0].color.is_none());
+    } else {
+        panic!("Expected Paragraph block");
+    }
+}

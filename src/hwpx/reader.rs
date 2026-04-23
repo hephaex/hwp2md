@@ -411,19 +411,17 @@ fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &mut ir::Sec
         "run" | "hp:run" => {
             ctx.in_run = false;
         }
-        "t" | "hp:t" => {
-            if !ctx.current_text.is_empty() {
-                let text = std::mem::take(&mut ctx.current_text);
-                let inline = ir::Inline {
-                    text,
-                    bold: ctx.current_bold,
-                    italic: ctx.current_italic,
-                    underline: ctx.current_underline,
-                    strikethrough: ctx.current_strike,
-                    ..ir::Inline::default()
-                };
-                ctx.push_inline(inline);
-            }
+        "t" | "hp:t" if !ctx.current_text.is_empty() => {
+            let text = std::mem::take(&mut ctx.current_text);
+            let inline = ir::Inline {
+                text,
+                bold: ctx.current_bold,
+                italic: ctx.current_italic,
+                underline: ctx.current_underline,
+                strikethrough: ctx.current_strike,
+                ..ir::Inline::default()
+            };
+            ctx.push_inline(inline);
         }
         "tbl" | "hp:tbl" => {
             let col_count = ctx.col_count.max(

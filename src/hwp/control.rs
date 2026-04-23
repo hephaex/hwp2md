@@ -157,6 +157,17 @@ pub(crate) fn parse_table_ctrl(
                     1
                 };
 
+                // Vertical alignment is stored at byte 26 of the LIST_HEADER data.
+                // Values: 0 = top, 1 = center, 2 = bottom.
+                let vertical_align = if rec.data.len() >= 27 {
+                    rec.data[26]
+                } else {
+                    0
+                };
+
+                // Cells in row 0 are considered header cells.
+                let is_header = row == 0;
+
                 let cell_end = find_children_end(records, idx);
                 let paragraphs = extract_paragraphs_from_range(records, idx + 1, cell_end);
 
@@ -165,6 +176,8 @@ pub(crate) fn parse_table_ctrl(
                     col,
                     row_span,
                     col_span,
+                    vertical_align,
+                    is_header,
                     paragraphs,
                 });
                 idx = cell_end;
@@ -787,5 +800,93 @@ mod tests {
             data,
         }];
         assert!(parse_ctrl_header_at(&records, 0).is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // HwpTableCell: vertical_align and is_header
+    // -----------------------------------------------------------------------
+
+    /// Build a LIST_HEADER record with an explicit vertical_align byte at offset 26.
+    /// The data is padded to at least 27 bytes so the parser can read byte 26.
+    fn make_list_header_with_valign(
+        level: u16,
+        col: u16,
+        row: u16,
+        col_span: u16,
+        row_span: u16,
+        vertical_align: u8,
+    ) -> Record {
+        let mut data = vec![0u8; 27];
+        data[2..4].copy_from_slice(&col.to_le_bytes());
+        data[4..6].copy_from_slice(&row.to_le_bytes());
+        data[6..8].copy_from_slice(&col_span.to_le_bytes());
+        data[8..10].copy_from_slice(&row_span.to_le_bytes());
+        data[26] = vertical_align;
+        make_record_with_data(HWPTAG_LIST_HEADER, level, data)
+    }
+
+    #[test]
+    fn parse_table_ctrl_cell_row0_is_header_true() {
+        // A cell in row 0 must have is_header == true.
+        let records = vec![
+            make_ctrl_header_table(0),
+            make_table_record(1, 1, 1),
+            make_list_header_record(1, 0, 0, 1, 1), // row = 0
+        ];
+        let (_rows, _cols, cells) = parse_table_ctrl(&records, 0);
+        assert_eq!(cells.len(), 1);
+        assert!(cells[0].is_header, "row 0 cell must be is_header");
+    }
+
+    #[test]
+    fn parse_table_ctrl_cell_row1_is_header_false() {
+        // A cell in row 1 must have is_header == false.
+        let records = vec![
+            make_ctrl_header_table(0),
+            make_table_record(1, 2, 1),
+            make_list_header_record(1, 0, 1, 1, 1), // row = 1
+        ];
+        let (_rows, _cols, cells) = parse_table_ctrl(&records, 0);
+        assert_eq!(cells.len(), 1);
+        assert!(!cells[0].is_header, "row 1 cell must not be is_header");
+    }
+
+    #[test]
+    fn parse_table_ctrl_vertical_align_center_parsed() {
+        // vertical_align == 1 (center) at byte 26.
+        let records = vec![
+            make_ctrl_header_table(0),
+            make_table_record(1, 1, 1),
+            make_list_header_with_valign(1, 0, 0, 1, 1, 1), // center
+        ];
+        let (_rows, _cols, cells) = parse_table_ctrl(&records, 0);
+        assert_eq!(cells.len(), 1);
+        assert_eq!(cells[0].vertical_align, 1);
+    }
+
+    #[test]
+    fn parse_table_ctrl_vertical_align_bottom_parsed() {
+        // vertical_align == 2 (bottom) at byte 26.
+        let records = vec![
+            make_ctrl_header_table(0),
+            make_table_record(1, 1, 1),
+            make_list_header_with_valign(1, 0, 0, 1, 1, 2), // bottom
+        ];
+        let (_rows, _cols, cells) = parse_table_ctrl(&records, 0);
+        assert_eq!(cells.len(), 1);
+        assert_eq!(cells[0].vertical_align, 2);
+    }
+
+    #[test]
+    fn parse_table_ctrl_vertical_align_defaults_to_top_when_short_data() {
+        // LIST_HEADER with only 10 bytes (no byte 26) → vertical_align defaults to 0 (top).
+        let records = vec![
+            make_ctrl_header_table(0),
+            make_table_record(1, 1, 1),
+            make_list_header_record(1, 0, 0, 1, 1), // 10 bytes only
+        ];
+        let (_rows, _cols, cells) = parse_table_ctrl(&records, 0);
+        assert_eq!(cells.len(), 1);
+        assert_eq!(cells[0].vertical_align, 0);
     }
 }

@@ -36,6 +36,9 @@ cfb = "0.14"
 # Compression
 flate2 = "1.0"
 
+# AES-128 ECB for HWP distribution document decryption
+aes = "0.8"
+
 # ZIP container (HWPX)
 zip = { version = "2.0", default-features = false, features = ["deflate"] }
 

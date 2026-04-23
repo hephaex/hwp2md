@@ -957,3 +957,73 @@ fn paragraph_first_line_normal_not_double_escaped() {
         "plain multiline must not be escaped; got: {md:?}"
     );
 }
+
+// -----------------------------------------------------------------------
+// render_inlines — color field
+// -----------------------------------------------------------------------
+
+#[test]
+fn render_inlines_color_wraps_in_span() {
+    let inlines = vec![ir::Inline {
+        text: "red".into(),
+        color: Some("#FF0000".into()),
+        ..Default::default()
+    }];
+    assert_eq!(
+        render_inlines(&inlines),
+        "<span style=\"color:#FF0000\">red</span>"
+    );
+}
+
+#[test]
+fn render_inlines_no_color_no_span() {
+    let inlines = vec![ir::Inline {
+        text: "plain".into(),
+        color: None,
+        ..Default::default()
+    }];
+    assert_eq!(render_inlines(&inlines), "plain");
+}
+
+#[test]
+fn render_inlines_color_with_bold_span_wraps_bold() {
+    // Bold decoration is applied first; the span wraps the fully-decorated text.
+    let inlines = vec![ir::Inline {
+        text: "bold red".into(),
+        bold: true,
+        color: Some("#FF0000".into()),
+        ..Default::default()
+    }];
+    assert_eq!(
+        render_inlines(&inlines),
+        "<span style=\"color:#FF0000\">**bold red**</span>"
+    );
+}
+
+#[test]
+fn render_inlines_empty_color_string_no_span() {
+    // An empty string in color must not produce a <span>.
+    let inlines = vec![ir::Inline {
+        text: "text".into(),
+        color: Some(String::new()),
+        ..Default::default()
+    }];
+    assert_eq!(render_inlines(&inlines), "text");
+}
+
+#[test]
+fn render_inlines_color_applied_before_link() {
+    // Color span wraps the label; the outer [label](url) form is applied after.
+    let inlines = vec![ir::Inline {
+        text: "click".into(),
+        color: Some("#0000FF".into()),
+        link: Some("https://example.com".into()),
+        ..Default::default()
+    }];
+    let out = render_inlines(&inlines);
+    // The span must be inside the link label, not wrapping the `[label](url)`.
+    assert_eq!(
+        out,
+        "[<span style=\"color:#0000FF\">click</span>](https://example.com)"
+    );
+}

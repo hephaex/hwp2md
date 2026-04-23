@@ -84,6 +84,15 @@ pub(crate) fn parse_para_shape(data: &[u8]) -> ParaShape {
         shape.line_spacing = i32::from_le_bytes([data[20], data[21], data[22], data[23]]);
     }
 
+    // Numbering ID is at bytes 26-27 (u16 LE) when the record is long enough.
+    // tab_def_id occupies bytes 24-25, numbering_id follows at 26-27.
+    if data.len() >= 28 {
+        let nid = u16::from_le_bytes([data[26], data[27]]);
+        if nid > 0 {
+            shape.numbering_id = Some(nid);
+        }
+    }
+
     shape
 }
 
@@ -137,4 +146,70 @@ pub(crate) fn parse_bin_data_entry(data: &[u8]) -> Option<BinDataEntry> {
     }
 
     Some(entry)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -----------------------------------------------------------------------
+    // parse_para_shape — numbering_id field
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_para_shape_numbering_id_none_when_short_data() {
+        // Data shorter than 28 bytes must leave numbering_id as None.
+        let data = vec![0u8; 24];
+        let shape = parse_para_shape(&data);
+        assert!(shape.numbering_id.is_none());
+    }
+
+    #[test]
+    fn parse_para_shape_numbering_id_none_when_zero() {
+        // A zero value at bytes 26-27 must not set numbering_id (treated as absent).
+        let mut data = vec![0u8; 28];
+        data[26] = 0;
+        data[27] = 0;
+        let shape = parse_para_shape(&data);
+        assert!(shape.numbering_id.is_none());
+    }
+
+    #[test]
+    fn parse_para_shape_numbering_id_some_when_nonzero() {
+        // A non-zero value at bytes 26-27 must set numbering_id = Some(value).
+        let mut data = vec![0u8; 28];
+        let nid: u16 = 3;
+        data[26..28].copy_from_slice(&nid.to_le_bytes());
+        let shape = parse_para_shape(&data);
+        assert_eq!(shape.numbering_id, Some(3));
+    }
+
+    #[test]
+    fn parse_para_shape_numbering_id_large_value() {
+        // Values up to u16::MAX must be preserved faithfully.
+        let mut data = vec![0u8; 28];
+        let nid: u16 = 0xFFFF;
+        data[26..28].copy_from_slice(&nid.to_le_bytes());
+        let shape = parse_para_shape(&data);
+        assert_eq!(shape.numbering_id, Some(0xFFFF));
+    }
+
+    #[test]
+    fn parse_para_shape_numbering_id_does_not_affect_alignment() {
+        // Ensure numbering_id parsing does not corrupt the alignment field at bytes 0-3.
+        let mut data = vec![0u8; 28];
+        // alignment bits 0-2 = 3 → Center
+        data[0] = 3;
+        let nid: u16 = 5;
+        data[26..28].copy_from_slice(&nid.to_le_bytes());
+        let shape = parse_para_shape(&data);
+        assert_eq!(shape.alignment, Alignment::Center);
+        assert_eq!(shape.numbering_id, Some(5));
+    }
+
+    #[test]
+    fn para_shape_default_numbering_id_is_none() {
+        let shape = ParaShape::default();
+        assert!(shape.numbering_id.is_none());
+    }
 }

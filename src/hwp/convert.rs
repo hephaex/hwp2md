@@ -64,6 +64,18 @@ pub(crate) fn paragraph_to_blocks(para: &HwpParagraph, doc_info: &DocInfo) -> Ve
         let heading_level = detect_heading_level(para, doc_info);
         let inlines = build_inlines(para, doc_info);
         if !inlines.is_empty() {
+            // Log list-item hint when the paragraph has a numbering_id.
+            // Full list-item conversion is left for a future implementation pass.
+            let ps_id = para.para_shape_id as usize;
+            if ps_id < doc_info.para_shapes.len() {
+                if let Some(nid) = doc_info.para_shapes[ps_id].numbering_id {
+                    tracing::debug!(
+                        numbering_id = nid,
+                        "paragraph may be a list item; full list conversion not yet implemented"
+                    );
+                }
+            }
+
             if let Some(level) = heading_level {
                 blocks.push(ir::Block::Heading { level, inlines });
             } else {
@@ -108,6 +120,12 @@ pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<
                 .into_iter()
                 .enumerate()
                 .map(|(row_idx, row_cells)| {
+                    // Capture is_header from the first cell before sorting consumes the vec.
+                    // Fall back to row_idx == 0 for empty rows (no cells parsed).
+                    let row_is_header = row_cells
+                        .first()
+                        .map(|c| c.is_header)
+                        .unwrap_or(row_idx == 0);
                     let mut sorted = row_cells;
                     sorted.sort_by_key(|c| c.col);
                     let ir_cells: Vec<ir::TableCell> = sorted
@@ -124,7 +142,7 @@ pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<
                         .collect();
                     ir::TableRow {
                         cells: ir_cells,
-                        is_header: row_idx == 0,
+                        is_header: row_is_header,
                     }
                 })
                 .collect();
@@ -248,6 +266,23 @@ pub(crate) fn build_inlines(para: &HwpParagraph, doc_info: &DocInfo) -> Vec<ir::
         let cs_idx = cs_id as usize;
         let inline = if cs_idx < doc_info.char_shapes.len() {
             let cs = &doc_info.char_shapes[cs_idx];
+
+            // HWP color is stored as u32 in BGR byte order:
+            //   bits[ 7: 0] = blue, bits[15: 8] = green, bits[23:16] = red.
+            // Only emit a color when the value is not black (0x000000) to avoid
+            // wrapping every default run in a redundant <span>.
+            let color = if cs.color & 0x00FF_FFFF != 0 {
+                let b = (cs.color & 0xFF) as u8;
+                let g = ((cs.color >> 8) & 0xFF) as u8;
+                let r = ((cs.color >> 16) & 0xFF) as u8;
+                Some(format!("#{r:02X}{g:02X}{b:02X}"))
+            } else {
+                None
+            };
+
+            // Resolve font name via face_id lookup in the DocInfo face_names table.
+            let font_name = doc_info.face_names.get(cs.face_id as usize).cloned();
+
             ir::Inline {
                 text: segment,
                 bold: cs.bold,
@@ -256,6 +291,8 @@ pub(crate) fn build_inlines(para: &HwpParagraph, doc_info: &DocInfo) -> Vec<ir::
                 strikethrough: cs.strikethrough,
                 superscript: cs.superscript,
                 subscript: cs.subscript,
+                color,
+                font_name,
                 ..ir::Inline::default()
             }
         } else {

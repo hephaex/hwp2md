@@ -85,6 +85,9 @@ pub struct DocInfo {
     pub face_names: Vec<String>,
     pub bin_data_entries: Vec<BinDataEntry>,
     pub doc_properties: DocProperties,
+    /// Raw 256-byte seed payload from `DISTRIBUTE_DOC_DATA` (tag 0x0026).
+    /// Present only in distribution (배포용) documents.
+    pub distribute_seed: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Default)]
@@ -114,6 +117,9 @@ pub struct ParaShape {
     pub margin_right: i32,
     pub line_spacing: i32,
     pub line_spacing_type: u8,
+    /// Numbering definition ID (>0 indicates this paragraph belongs to a list).
+    /// Parsed from ParaShape record bytes 26-27 when the record is long enough.
+    pub numbering_id: Option<u16>,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -180,5 +186,9 @@ pub struct HwpTableCell {
     pub col: u16,
     pub row_span: u16,
     pub col_span: u16,
+    /// Vertical alignment of cell content (0 = top, 1 = center, 2 = bottom).
+    pub vertical_align: u8,
+    /// Whether this cell belongs to a header row as determined during parsing.
+    pub is_header: bool,
     pub paragraphs: Vec<HwpParagraph>,
 }

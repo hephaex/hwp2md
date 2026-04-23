@@ -231,12 +231,7 @@ fn fixture_table_cell_text_preserved() {
                         .flat_map(|c| &c.blocks)
                         .filter_map(|b| {
                             if let ir::Block::Paragraph { inlines } = b {
-                                Some(
-                                    inlines
-                                        .iter()
-                                        .map(|i| i.text.as_str())
-                                        .collect::<String>(),
-                                )
+                                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
                             } else {
                                 None
                             }
@@ -249,10 +244,22 @@ fn fixture_table_cell_text_preserved() {
         })
         .collect();
 
-    assert!(all_text.contains("Header1"), "Header1 missing; got: {all_text:?}");
-    assert!(all_text.contains("Header2"), "Header2 missing; got: {all_text:?}");
-    assert!(all_text.contains("Data1"), "Data1 missing; got: {all_text:?}");
-    assert!(all_text.contains("Data2"), "Data2 missing; got: {all_text:?}");
+    assert!(
+        all_text.contains("Header1"),
+        "Header1 missing; got: {all_text:?}"
+    );
+    assert!(
+        all_text.contains("Header2"),
+        "Header2 missing; got: {all_text:?}"
+    );
+    assert!(
+        all_text.contains("Data1"),
+        "Data1 missing; got: {all_text:?}"
+    );
+    assert!(
+        all_text.contains("Data2"),
+        "Data2 missing; got: {all_text:?}"
+    );
 }
 
 #[test]
@@ -329,11 +336,7 @@ fn fixture_mixed_content_all_blocks_present() {
         para_xml("An introductory paragraph."),
         table_2x2_xml("A", "B", "1", "2"),
     );
-    let (_dir, doc) = read_fixture(
-        HwpxFixture::new()
-            .title("Mixed Doc")
-            .section(&body),
-    );
+    let (_dir, doc) = read_fixture(HwpxFixture::new().title("Mixed Doc").section(&body));
 
     let blocks: Vec<&ir::Block> = doc.sections.iter().flat_map(|s| &s.blocks).collect();
 
@@ -450,7 +453,10 @@ fn fixture_can_be_opened_as_zip_archive() {
         .filter_map(|i| archive.by_index_raw(i).ok().map(|f| f.name().to_owned()))
         .collect();
 
-    assert!(names.contains(&"mimetype".to_owned()), "mimetype entry missing");
+    assert!(
+        names.contains(&"mimetype".to_owned()),
+        "mimetype entry missing"
+    );
     assert!(
         names.contains(&"META-INF/container.xml".to_owned()),
         "container.xml missing"

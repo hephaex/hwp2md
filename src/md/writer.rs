@@ -214,6 +214,15 @@ fn render_inlines(inlines: &[ir::Inline]) -> String {
             }
         }
 
+        // Wrap in a <span> for non-black text color.  The span is applied after
+        // all Markdown decoration so that bold/italic markers remain inside it
+        // and GFM renderers process them correctly.
+        if let Some(ref color) = inline.color {
+            if !color.is_empty() && color.bytes().all(|b| b.is_ascii_hexdigit() || b == b'#') {
+                text = format!("<span style=\"color:{color}\">{text}</span>");
+            }
+        }
+
         if let Some(ref url) = inline.link {
             text = format!("[{text}]({url})");
         }

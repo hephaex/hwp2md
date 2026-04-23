@@ -57,6 +57,8 @@ fn control_to_block_table_groups_cells_into_rows() {
         col,
         row_span: 1,
         col_span: 1,
+        vertical_align: 0,
+        is_header: row == 0,
         paragraphs: vec![HwpParagraph {
             text: text.to_string(),
             char_shape_ids: Vec::new(),
@@ -99,6 +101,8 @@ fn control_to_block_caps_malformed_row_index() {
             col: 0,
             row_span: 1,
             col_span: 1,
+            vertical_align: 0,
+            is_header: false,
             paragraphs: vec![],
         }],
     };
@@ -638,6 +642,8 @@ fn control_to_block_table_with_zero_col_count_infers_from_cells() {
                 col: 0,
                 row_span: 1,
                 col_span: 1,
+                vertical_align: 0,
+                is_header: true,
                 paragraphs: vec![],
             },
             HwpTableCell {
@@ -645,6 +651,8 @@ fn control_to_block_table_with_zero_col_count_infers_from_cells() {
                 col: 1,
                 row_span: 1,
                 col_span: 1,
+                vertical_align: 0,
+                is_header: true,
                 paragraphs: vec![],
             },
         ],
@@ -657,4 +665,108 @@ fn control_to_block_table_with_zero_col_count_infers_from_cells() {
     } else {
         panic!("Expected Table block");
     }
+}
+
+// -----------------------------------------------------------------------
+// build_inlines — color propagation
+// -----------------------------------------------------------------------
+
+#[test]
+fn build_inlines_non_black_color_sets_css_hex() {
+    let mut doc_info = DocInfo::default();
+    let mut cs = CharShape::default();
+    // Store red (0x0000FF_00_00 in BGR order: bytes[0]=0x00 blue, [1]=0x00 green, [2]=0xFF red).
+    // As a u32 little-endian: r=0xFF, g=0x00, b=0x00 → color = 0x0000_00FF (red in BGR).
+    // HWP BGR: byte[0]=blue=0x00, byte[1]=green=0x00, byte[2]=red=0xFF.
+    // u32 = (0xFF << 16) | (0x00 << 8) | 0x00 = 0x00FF0000
+    cs.color = 0x00FF_0000; // red stored in BGR: bit[23:16]=red=0xFF
+    doc_info.char_shapes.push(cs);
+
+    let para = HwpParagraph {
+        text: "Red text".to_string(),
+        char_shape_ids: vec![(0, 0)],
+        para_shape_id: 0,
+        controls: Vec::new(),
+    };
+    let inlines = build_inlines(&para, &doc_info);
+    assert_eq!(inlines.len(), 1);
+    assert_eq!(inlines[0].color.as_deref(), Some("#FF0000"));
+}
+
+#[test]
+fn build_inlines_black_color_is_none() {
+    let mut doc_info = DocInfo::default();
+    let mut cs = CharShape::default();
+    cs.color = 0x0000_0000; // black
+    doc_info.char_shapes.push(cs);
+
+    let para = HwpParagraph {
+        text: "Black text".to_string(),
+        char_shape_ids: vec![(0, 0)],
+        para_shape_id: 0,
+        controls: Vec::new(),
+    };
+    let inlines = build_inlines(&para, &doc_info);
+    assert_eq!(inlines.len(), 1);
+    assert!(inlines[0].color.is_none(), "black must not set color");
+}
+
+#[test]
+fn build_inlines_bgr_green_color_maps_correctly() {
+    let mut doc_info = DocInfo::default();
+    let mut cs = CharShape::default();
+    // Pure green in BGR: byte[0]=0x00 blue, byte[1]=0xFF green, byte[2]=0x00 red.
+    // u32 = (0x00 << 16) | (0xFF << 8) | 0x00 = 0x0000_FF00
+    cs.color = 0x0000_FF00;
+    doc_info.char_shapes.push(cs);
+
+    let para = HwpParagraph {
+        text: "Green".to_string(),
+        char_shape_ids: vec![(0, 0)],
+        para_shape_id: 0,
+        controls: Vec::new(),
+    };
+    let inlines = build_inlines(&para, &doc_info);
+    assert_eq!(inlines[0].color.as_deref(), Some("#00FF00"));
+}
+
+// -----------------------------------------------------------------------
+// build_inlines — face_id → font_name resolution
+// -----------------------------------------------------------------------
+
+#[test]
+fn build_inlines_face_id_resolves_font_name() {
+    let mut doc_info = DocInfo::default();
+    doc_info.face_names = vec!["Arial".to_string(), "Batang".to_string()];
+    let mut cs = CharShape::default();
+    cs.face_id = 1; // index into face_names → "Batang"
+    doc_info.char_shapes.push(cs);
+
+    let para = HwpParagraph {
+        text: "Korean".to_string(),
+        char_shape_ids: vec![(0, 0)],
+        para_shape_id: 0,
+        controls: Vec::new(),
+    };
+    let inlines = build_inlines(&para, &doc_info);
+    assert_eq!(inlines.len(), 1);
+    assert_eq!(inlines[0].font_name.as_deref(), Some("Batang"));
+}
+
+#[test]
+fn build_inlines_face_id_out_of_bounds_font_name_is_none() {
+    let mut doc_info = DocInfo::default();
+    // face_names is empty, so any face_id is out of bounds.
+    let mut cs = CharShape::default();
+    cs.face_id = 5;
+    doc_info.char_shapes.push(cs);
+
+    let para = HwpParagraph {
+        text: "Text".to_string(),
+        char_shape_ids: vec![(0, 0)],
+        para_shape_id: 0,
+        controls: Vec::new(),
+    };
+    let inlines = build_inlines(&para, &doc_info);
+    assert!(inlines[0].font_name.is_none());
 }

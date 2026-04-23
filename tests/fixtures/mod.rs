@@ -61,8 +61,7 @@ impl HwpxFixture {
         let mut zip = ZipWriter::new(buf);
 
         let stored = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
-        let deflated =
-            SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+        let deflated = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
 
         // mimetype — must be stored, not compressed
         zip.start_file("mimetype", stored).unwrap();

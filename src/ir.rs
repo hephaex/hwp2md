@@ -91,6 +91,12 @@ pub struct Inline {
     pub subscript: bool,
     pub link: Option<String>,
     pub footnote_ref: Option<String>,
+    /// CSS hex color string (e.g. `"#FF0000"`) when text color is non-black.
+    /// `None` means default/black text, which is not rendered in output.
+    pub color: Option<String>,
+    /// Font name resolved from the DocInfo face_names table.
+    /// Not rendered in Markdown output; preserved for HWPX round-trip fidelity.
+    pub font_name: Option<String>,
 }
 
 impl Inline {
@@ -163,6 +169,8 @@ mod tests {
         assert!(!i.subscript);
         assert!(i.link.is_none());
         assert!(i.footnote_ref.is_none());
+        assert!(i.color.is_none());
+        assert!(i.font_name.is_none());
     }
 
     #[test]
@@ -178,6 +186,15 @@ mod tests {
         assert!(!i.subscript);
         assert!(i.link.is_none());
         assert!(i.footnote_ref.is_none());
+        assert!(i.color.is_none());
+        assert!(i.font_name.is_none());
+    }
+
+    #[test]
+    fn inline_default_color_and_font_name_are_none() {
+        let i = Inline::default();
+        assert!(i.color.is_none());
+        assert!(i.font_name.is_none());
     }
 
     #[test]

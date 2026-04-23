@@ -19,6 +19,9 @@ pub(crate) struct ParseContext {
     pub(crate) current_strike: bool,
     pub(crate) current_superscript: bool,
     pub(crate) current_subscript: bool,
+    /// CSS hex color string parsed from the `color` / `hp:color` attribute of
+    /// `<charPr>`.  `None` means default text color (not rendered).
+    pub(crate) current_color: Option<String>,
     pub(crate) heading_level: Option<u8>,
     pub(crate) table_rows: Vec<ir::TableRow>,
     pub(crate) current_row_cells: Vec<ir::TableCell>,
@@ -61,6 +64,7 @@ impl Default for ParseContext {
             current_strike: false,
             current_superscript: false,
             current_subscript: false,
+            current_color: None,
             heading_level: None,
             table_rows: Vec::new(),
             current_row_cells: Vec::new(),
@@ -166,6 +170,19 @@ pub(crate) fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut Pa
                 ctx.current_superscript = val.as_ref() == "superscript";
                 ctx.current_subscript = val.as_ref() == "subscript";
             }
+            "color" | "hp:color" => {
+                // HWPX color attribute is a hex string, potentially with a
+                // leading "#" (e.g. "#FF0000") or without (e.g. "FF0000").
+                // Black text (#000000 or "000000") is treated as default and
+                // not propagated to avoid wrapping every run in a <span>.
+                let raw = val.as_ref().trim_start_matches('#');
+                if raw.is_empty() || raw.eq_ignore_ascii_case("000000") {
+                    ctx.current_color = None;
+                } else {
+                    // Normalise to upper-case hex with a leading '#'.
+                    ctx.current_color = Some(format!("#{}", raw.to_ascii_uppercase()));
+                }
+            }
             _ => {}
         }
     }
@@ -182,6 +199,7 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
             strikethrough: ctx.current_strike,
             superscript: ctx.current_superscript,
             subscript: ctx.current_subscript,
+            color: ctx.current_color.clone(),
             ..ir::Inline::default()
         });
     }
@@ -210,6 +228,7 @@ pub(crate) fn flush_cell_paragraph(ctx: &mut ParseContext) {
             strikethrough: ctx.current_strike,
             superscript: ctx.current_superscript,
             subscript: ctx.current_subscript,
+            color: ctx.current_color.clone(),
             ..ir::Inline::default()
         });
     }
@@ -231,6 +250,7 @@ pub(crate) fn flush_list_item_paragraph(ctx: &mut ParseContext) {
             strikethrough: ctx.current_strike,
             superscript: ctx.current_superscript,
             subscript: ctx.current_subscript,
+            color: ctx.current_color.clone(),
             ..ir::Inline::default()
         });
     }
@@ -254,6 +274,7 @@ pub(crate) fn flush_footnote_paragraph(ctx: &mut ParseContext) {
             strikethrough: ctx.current_strike,
             superscript: ctx.current_superscript,
             subscript: ctx.current_subscript,
+            color: ctx.current_color.clone(),
             ..ir::Inline::default()
         });
     }
