@@ -98,7 +98,7 @@ pub(crate) fn parse_ctrl_header_at(records: &[Record], ctrl_idx: usize) -> Optio
     match ctrl_id {
         CTRL_TABLE => {
             let (row_count, col_count, cells) = parse_table_ctrl(records, ctrl_idx);
-            tracing::debug!(
+            tracing::trace!(
                 "Parsed table: {row_count}×{col_count}, {} cells",
                 cells.len()
             );
@@ -154,7 +154,7 @@ pub(crate) fn parse_ctrl_header_at(records: &[Record], ctrl_idx: usize) -> Optio
         CTRL_PAGE_BREAK => Some(HwpControl::PageBreak),
         CTRL_COL_BREAK => Some(HwpControl::ColumnBreak),
         _ => {
-            tracing::debug!("CTRL_HEADER at index {ctrl_idx}: unhandled ctrl_id=0x{ctrl_id:08X}");
+            tracing::trace!("CTRL_HEADER at index {ctrl_idx}: unhandled ctrl_id=0x{ctrl_id:08X}");
             None
         }
     }

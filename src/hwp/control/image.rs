@@ -31,7 +31,7 @@ pub(crate) fn parse_gshape_ctrl(records: &[Record], ctrl_idx: usize) -> (u16, u3
     let ctrl_end = find_children_end(records, ctrl_idx);
     let bin_data_id = find_gsotype_bin_id(records, ctrl_idx + 1, ctrl_end);
 
-    tracing::debug!("GSHAPE: bin_id={bin_data_id} width={width} height={height}");
+    tracing::trace!("GSHAPE: bin_id={bin_data_id} width={width} height={height}");
     (bin_data_id, width, height)
 }
 

@@ -1,7 +1,6 @@
 use std::io::Read;
 
-/// Maximum size for a raw CFB stream read from untrusted HWP input (256 MB).
-const MAX_CFB_STREAM: u64 = 256 * 1024 * 1024;
+use super::reader::MAX_CFB_STREAM;
 
 const PROP_TITLE: u32 = 0x02;
 const PROP_SUBJECT: u32 = 0x03;
@@ -125,7 +124,7 @@ pub(crate) fn parse_summary_bytes(
         }
     }
 
-    tracing::debug!(
+    tracing::trace!(
         "SummaryInformation parsed: title={:?} author={:?} subject={:?} keywords={:?}",
         title,
         author,

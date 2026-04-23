@@ -30,7 +30,7 @@ pub(crate) fn parse_table_ctrl(
                 if rec.data.len() >= 8 {
                     col_count = u16::from_le_bytes([rec.data[6], rec.data[7]]);
                 }
-                tracing::debug!("TABLE dims: {row_count}×{col_count}");
+                tracing::trace!("TABLE dims: {row_count}×{col_count}");
                 idx += 1;
             }
             HWPTAG_LIST_HEADER => {

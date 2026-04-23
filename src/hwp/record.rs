@@ -23,13 +23,7 @@ pub const HWPTAG_EQEDIT: u16 = HWPTAG_BEGIN + 71;
 pub const HWPTAG_GSOTYPE: u16 = HWPTAG_BEGIN + 67;
 
 pub const CTRL_TABLE: u32 = ctrl_id(b"tbl ");
-#[allow(dead_code)]
-pub const CTRL_EQUATION: u32 = ctrl_id(b"eqed");
 pub const CTRL_GSHAPE: u32 = ctrl_id(b"gso ");
-#[allow(dead_code)]
-pub const CTRL_HEADER: u32 = ctrl_id(b"daeh");
-#[allow(dead_code)]
-pub const CTRL_FOOTER: u32 = ctrl_id(b"toof");
 pub const CTRL_FOOTNOTE: u32 = ctrl_id(b"fn  ");
 pub const CTRL_ENDNOTE: u32 = ctrl_id(b"en  ");
 pub const CTRL_PAGE_BREAK: u32 = ctrl_id(b"pgbk");

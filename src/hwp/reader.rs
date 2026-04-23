@@ -165,7 +165,7 @@ fn read_file_header(cfb: &mut cfb::CompoundFile<std::fs::File>) -> Result<FileHe
 const MAX_DECOMPRESSED: u64 = 256 * 1024 * 1024;
 
 /// Maximum size for a raw CFB stream read from untrusted HWP input (256 MB).
-const MAX_CFB_STREAM: u64 = 256 * 1024 * 1024;
+pub(crate) const MAX_CFB_STREAM: u64 = 256 * 1024 * 1024;
 
 pub(crate) fn decompress_stream(data: &[u8]) -> Result<Vec<u8>, Hwp2MdError> {
     decompress_stream_limited(data, MAX_DECOMPRESSED)
@@ -188,7 +188,7 @@ fn decompress_stream_limited(data: &[u8], limit: u64) -> Result<Vec<u8>, Hwp2MdE
             return Ok(out);
         }
         Err(e) => {
-            tracing::debug!("Deflate failed, trying zlib: {e}");
+            tracing::trace!("Deflate failed, trying zlib: {e}");
             e
         }
     };

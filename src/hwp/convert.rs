@@ -75,7 +75,7 @@ fn paragraph_to_blocks_counted(
             let ps_id = para.para_shape_id as usize;
             if ps_id < doc_info.para_shapes.len() {
                 if let Some(nid) = doc_info.para_shapes[ps_id].numbering_id {
-                    tracing::debug!(
+                    tracing::trace!(
                         numbering_id = nid,
                         "paragraph may be a list item; full list conversion not yet implemented"
                     );
@@ -146,7 +146,7 @@ pub(crate) fn paragraph_to_blocks(para: &HwpParagraph, doc_info: &DocInfo) -> Ve
             let ps_id = para.para_shape_id as usize;
             if ps_id < doc_info.para_shapes.len() {
                 if let Some(nid) = doc_info.para_shapes[ps_id].numbering_id {
-                    tracing::debug!(
+                    tracing::trace!(
                         numbering_id = nid,
                         "paragraph may be a list item; full list conversion not yet implemented"
                     );
