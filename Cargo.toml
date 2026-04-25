@@ -1,6 +1,6 @@
 [package]
 name = "hwp2md"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Mario Cho <hephaex@gmail.com>"]
 description = "HWP/HWPX ↔ Markdown bidirectional converter"
@@ -67,8 +67,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 [dev-dependencies]
 tempfile = "3"
 pretty_assertions = "1"
-polaris-dvc-core = { git = "https://github.com/PolarisOffice/polaris_dvc.git", rev = "d635741946253b08c08556dfeb7637eecb3e571c", version = "0.1.0" }
-polaris-dvc-hwpx = { git = "https://github.com/PolarisOffice/polaris_dvc.git", rev = "d635741946253b08c08556dfeb7637eecb3e571c", version = "0.1.0" }
+polaris-dvc-core = { git = "https://github.com/PolarisOffice/polaris_dvc.git", rev = "d635741946253b08c08556dfeb7637eecb3e571c" }
+polaris-dvc-hwpx = { git = "https://github.com/PolarisOffice/polaris_dvc.git", rev = "d635741946253b08c08556dfeb7637eecb3e571c" }
 
 [profile.release]
 lto = true

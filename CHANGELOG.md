@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-04-26
+
+### Added
+- **Phase 3**: charPr / paraPr / fontface reference tables in `header.xml` with
+  IDRef linking between section paragraph runs and the header table entries.
+- **Phase 4**: Style table (`hh:styles`) with Normal + Heading1-6, numeric
+  `styleIDRef` and `charPrIDRef` values replacing string-form references for
+  OWPML schema compliance.
+- **Phase 5**: Sequential paragraph IDs (`id` attribute on `<hp:p>`), table
+  block wrapping in `<hp:p>/<hp:run>/<hp:tbl>` hierarchy, heading-specific
+  charPr entries with level-differentiated font heights.
+- **Phase 6**: OWPML schema validation pass (`enable_schema=true`) with polaris
+  DVC; fixed `breakSetting` attribute set, `align` horizontal/vertical attrs,
+  `margin` child elements, `heading` / `border` / `autoSpacing` / `lineSpacing`
+  required children in `paraPr`.
+- **Phase 7**: `hh:borderFills` table with default entry (id=1), `slash` /
+  `backSlash` / border / diagonal children; `borderFillIDRef` on every `charPr`
+  entry; polaris_dvc rev pinning; schema validation expansion covering all
+  writer-emitted elements.
+- **Phase 8**: Inline code (`code: true`) mapped to distinct charPr entry with
+  Courier New monospace font; metadata preservation (`hp:docInfo` with title and
+  author in `content.hpf`); HWPX structural roundtrip tests; dead code audit;
+  version bump to 0.3.0.
+
+### Changed
+- `CharPrKey` struct gains a `code` field; `from_inline()` now forces
+  `Courier New` font for inline code spans, producing a distinct charPr ID.
+- `generate_content_hpf()` emits `<hp:docInfo>` when the document carries
+  title or author metadata.
+- README library usage example updated to `hwp2md = "0.3"`.
+
+### Fixed
+- Font registration for inline code spans: the monospace font is now registered
+  from the resolved `CharPrKey` (which overrides to `Courier New` for code)
+  rather than from the raw IR inline's `font_name` field, ensuring the font
+  table entry always exists when referenced by a charPr.
+
 ## [0.2.0] - 2026-04-23
 
 ### Added

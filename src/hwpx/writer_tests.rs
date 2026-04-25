@@ -1205,3 +1205,299 @@ fn section_xml_table_rowcnt_colcnt_attributes() {
         "colCnt must be 3: {xml}"
     );
 }
+
+// ── Phase 8 tests: inline code charPr ───────────────────────────────────
+
+#[test]
+fn charpr_key_from_inline_code_sets_code_true_and_monospace_font() {
+    let inline = Inline {
+        text: "x".into(),
+        code: true,
+        ..Inline::default()
+    };
+    let key = CharPrKey::from_inline(&inline);
+    assert!(key.code, "code flag must be true");
+    assert_eq!(
+        key.font_name.as_deref(),
+        Some("Courier New"),
+        "code inline must use monospace font"
+    );
+}
+
+#[test]
+fn charpr_key_from_inline_code_overrides_custom_font() {
+    // Even if the inline has a font_name, code=true forces Courier New.
+    let inline = Inline {
+        text: "x".into(),
+        code: true,
+        font_name: Some("Arial".into()),
+        ..Inline::default()
+    };
+    let key = CharPrKey::from_inline(&inline);
+    assert_eq!(
+        key.font_name.as_deref(),
+        Some("Courier New"),
+        "code flag must override custom font"
+    );
+}
+
+#[test]
+fn charpr_key_plain_has_code_false() {
+    let key = CharPrKey::plain();
+    assert!(!key.code, "plain key must not be code");
+}
+
+#[test]
+fn charpr_key_code_block_has_code_true() {
+    let key = CharPrKey::code_block();
+    assert!(key.code, "code_block key must have code=true");
+    assert_eq!(key.font_name.as_deref(), Some("Courier New"));
+}
+
+#[test]
+fn inline_code_gets_distinct_charpr_id_from_plain() {
+    let doc = doc_with_section(vec![Block::Paragraph {
+        inlines: vec![
+            inline("normal"),
+            Inline {
+                text: "code".into(),
+                code: true,
+                ..Inline::default()
+            },
+        ],
+    }]);
+    let tables = RefTables::build(&doc);
+
+    let plain_id = tables.char_pr_id(&CharPrKey::plain());
+    let code_key = CharPrKey::from_inline(&Inline {
+        text: "code".into(),
+        code: true,
+        ..Inline::default()
+    });
+    let code_id = tables.char_pr_id(&code_key);
+
+    assert_ne!(
+        plain_id, code_id,
+        "inline code must have a different charPr ID than plain text"
+    );
+}
+
+#[test]
+fn section_xml_inline_code_has_monospace_charpr_id_ref() {
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![
+            inline("text "),
+            Inline {
+                text: "code_val".into(),
+                code: true,
+                ..Inline::default()
+            },
+        ],
+    }]);
+
+    // There must be at least two <hp:run> elements with different charPrIDRef values.
+    let run_count = xml.matches("<hp:run ").count();
+    assert!(
+        run_count >= 2,
+        "must have at least 2 runs (plain + code): {xml}"
+    );
+
+    // The code text must be present.
+    assert!(xml.contains("code_val"), "code text missing: {xml}");
+
+    // Extract all charPrIDRef values and verify they are not all the same.
+    let marker = "charPrIDRef=\"";
+    let ids: Vec<&str> = xml
+        .match_indices(marker)
+        .map(|(pos, _)| {
+            let rest = &xml[pos + marker.len()..];
+            let end = rest.find('"').unwrap();
+            &rest[..end]
+        })
+        .collect();
+    assert!(
+        ids.len() >= 2,
+        "must have at least 2 charPrIDRef values: {ids:?}"
+    );
+    // At least one ID must differ from the plain ID (which is "0").
+    let has_nonzero = ids.iter().any(|&id| id != "0");
+    assert!(
+        has_nonzero,
+        "inline code must produce a non-zero charPrIDRef: {ids:?}"
+    );
+}
+
+#[test]
+fn header_xml_inline_code_registers_courier_new_font() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = doc_with_section(vec![Block::Paragraph {
+        inlines: vec![Inline {
+            text: "code".into(),
+            code: true,
+            ..Inline::default()
+        }],
+    }]);
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    entry.read_to_string(&mut content).expect("read");
+
+    assert!(
+        content.contains("Courier New"),
+        "Courier New font must be in header for inline code: {content}"
+    );
+}
+
+// ── Phase 8 tests: metadata in content.hpf ──────────────────────────────
+
+#[test]
+fn content_hpf_with_title_and_author() {
+    let doc = Document {
+        metadata: Metadata {
+            title: Some("Test Title".into()),
+            author: Some("Test Author".into()),
+            ..Metadata::default()
+        },
+        sections: vec![Section {
+            blocks: vec![Block::Paragraph {
+                inlines: vec![inline("hello")],
+            }],
+        }],
+        assets: Vec::new(),
+    };
+    let hpf = generate_content_hpf(&doc);
+
+    assert!(
+        hpf.contains("<hp:docInfo>"),
+        "docInfo section must be present: {hpf}"
+    );
+    assert!(
+        hpf.contains("<hp:title>Test Title</hp:title>"),
+        "title must be present: {hpf}"
+    );
+    assert!(
+        hpf.contains("<hp:author>Test Author</hp:author>"),
+        "author must be present: {hpf}"
+    );
+    assert!(
+        hpf.contains("</hp:docInfo>"),
+        "docInfo closing tag: {hpf}"
+    );
+}
+
+#[test]
+fn content_hpf_without_metadata_has_no_docinfo() {
+    let doc = Document::new();
+    let hpf = generate_content_hpf(&doc);
+
+    assert!(
+        !hpf.contains("<hp:docInfo>"),
+        "docInfo must NOT appear when metadata is empty: {hpf}"
+    );
+}
+
+#[test]
+fn content_hpf_title_only() {
+    let doc = Document {
+        metadata: Metadata {
+            title: Some("Only Title".into()),
+            ..Metadata::default()
+        },
+        sections: Vec::new(),
+        assets: Vec::new(),
+    };
+    let hpf = generate_content_hpf(&doc);
+
+    assert!(
+        hpf.contains("<hp:title>Only Title</hp:title>"),
+        "title: {hpf}"
+    );
+    assert!(
+        !hpf.contains("<hp:author>"),
+        "author must NOT appear when absent: {hpf}"
+    );
+}
+
+#[test]
+fn content_hpf_author_only() {
+    let doc = Document {
+        metadata: Metadata {
+            author: Some("Only Author".into()),
+            ..Metadata::default()
+        },
+        sections: Vec::new(),
+        assets: Vec::new(),
+    };
+    let hpf = generate_content_hpf(&doc);
+
+    assert!(
+        !hpf.contains("<hp:title>"),
+        "title must NOT appear: {hpf}"
+    );
+    assert!(
+        hpf.contains("<hp:author>Only Author</hp:author>"),
+        "author: {hpf}"
+    );
+}
+
+#[test]
+fn content_hpf_metadata_xml_escaping() {
+    let doc = Document {
+        metadata: Metadata {
+            title: Some("A & B <C>".into()),
+            author: Some("D & E".into()),
+            ..Metadata::default()
+        },
+        sections: Vec::new(),
+        assets: Vec::new(),
+    };
+    let hpf = generate_content_hpf(&doc);
+
+    assert!(
+        hpf.contains("A &amp; B &lt;C&gt;"),
+        "title must be XML-escaped: {hpf}"
+    );
+    assert!(
+        hpf.contains("D &amp; E"),
+        "author must be XML-escaped: {hpf}"
+    );
+}
+
+#[test]
+fn write_hwpx_metadata_in_content_hpf() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = Document {
+        metadata: Metadata {
+            title: Some("HWPX Title".into()),
+            author: Some("HWPX Author".into()),
+            ..Metadata::default()
+        },
+        sections: vec![Section {
+            blocks: vec![Block::Paragraph {
+                inlines: vec![inline("body")],
+            }],
+        }],
+        assets: Vec::new(),
+    };
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive
+        .by_name("Contents/content.hpf")
+        .expect("content.hpf");
+    let mut content = String::new();
+    entry.read_to_string(&mut content).expect("read");
+
+    assert!(
+        content.contains("<hp:title>HWPX Title</hp:title>"),
+        "title in content.hpf: {content}"
+    );
+    assert!(
+        content.contains("<hp:author>HWPX Author</hp:author>"),
+        "author in content.hpf: {content}"
+    );
+}

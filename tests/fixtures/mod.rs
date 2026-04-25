@@ -97,6 +97,7 @@ impl HwpxFixture {
 
     /// Write the fixture to a temporary file and return the path together with
     /// the `TempDir` guard (drop the guard to delete the file).
+    #[allow(dead_code)]
     pub fn write_to_tempfile(self) -> (tempfile::TempDir, std::path::PathBuf) {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("fixture.hwpx");
@@ -214,6 +215,7 @@ pub fn table_2x2_xml(r0c0: &str, r0c1: &str, r1c0: &str, r1c1: &str) -> String {
 }
 
 /// A bold + italic inline run (includes inline charPr for reader compatibility).
+#[allow(dead_code)]
 pub fn styled_run_xml(text: &str) -> String {
     let id = next_para_id();
     format!(

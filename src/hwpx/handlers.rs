@@ -136,6 +136,9 @@ pub(super) fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &
                 italic: ctx.current_italic,
                 underline: ctx.current_underline,
                 strikethrough: ctx.current_strike,
+                superscript: ctx.current_superscript,
+                subscript: ctx.current_subscript,
+                color: ctx.current_color.clone(),
                 ..ir::Inline::default()
             };
             ctx.push_inline(inline);

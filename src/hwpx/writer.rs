@@ -28,6 +28,7 @@ struct CharPrKey {
     italic: bool,
     underline: bool,
     strikethrough: bool,
+    code: bool,
     color: Option<String>,
     font_name: Option<String>,
     height: u32,
@@ -42,6 +43,7 @@ impl CharPrKey {
             italic: false,
             underline: false,
             strikethrough: false,
+            code: false,
             color: None,
             font_name: None,
             height: 1000,
@@ -49,13 +51,22 @@ impl CharPrKey {
     }
 
     fn from_inline(inline: &ir::Inline) -> Self {
+        // When the inline is marked as code, force monospace font regardless
+        // of any other font_name the inline may carry.
+        let font_name = if inline.code {
+            Some(CODE_FONT.to_owned())
+        } else {
+            inline.font_name.clone()
+        };
+
         Self {
             bold: inline.bold,
             italic: inline.italic,
             underline: inline.underline,
             strikethrough: inline.strikethrough,
+            code: inline.code,
             color: inline.color.clone(),
-            font_name: inline.font_name.clone(),
+            font_name,
             height: 1000,
         }
     }
@@ -66,6 +77,7 @@ impl CharPrKey {
             italic: false,
             underline: false,
             strikethrough: false,
+            code: true,
             color: None,
             font_name: Some(CODE_FONT.to_owned()),
             height: 1000,
@@ -79,6 +91,7 @@ impl CharPrKey {
             italic: false,
             underline: false,
             strikethrough: false,
+            code: false,
             color: None,
             font_name: None,
             height: HEADING_HEIGHTS[idx],
@@ -215,7 +228,10 @@ fn collect_from_inlines(
     for inline in inlines {
         let key = CharPrKey::from_inline(inline);
 
-        if let Some(font) = &inline.font_name {
+        // Register the font from the resolved key (which overrides
+        // font_name to CODE_FONT for inline code), not from the raw
+        // IR inline.
+        if let Some(font) = &key.font_name {
             if font_set.insert(font.clone()) {
                 font_names.push(font.clone());
             }
@@ -648,14 +664,48 @@ fn generate_content_hpf(doc: &ir::Document) -> String {
         ));
     }
 
+    // Build optional <hp:docInfo> with title/author metadata.
+    let has_title = doc.metadata.title.as_ref().is_some_and(|t| !t.is_empty());
+    let has_author = doc.metadata.author.as_ref().is_some_and(|a| !a.is_empty());
+    let doc_info = if has_title || has_author {
+        let mut info = String::from("  <hp:docInfo>\n");
+        if let Some(title) = doc.metadata.title.as_deref() {
+            if !title.is_empty() {
+                info.push_str(&format!(
+                    "    <hp:title>{}</hp:title>\n",
+                    xml_escape_content(title)
+                ));
+            }
+        }
+        if let Some(author) = doc.metadata.author.as_deref() {
+            if !author.is_empty() {
+                info.push_str(&format!(
+                    "    <hp:author>{}</hp:author>\n",
+                    xml_escape_content(author)
+                ));
+            }
+        }
+        info.push_str("  </hp:docInfo>\n");
+        info
+    } else {
+        String::new()
+    };
+
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <hp:HWPMLPackage xmlns:hp="http://www.hancom.co.kr/hwpml/2011/packageInfo">
   <hp:compatibledocument version="1.1"/>
-  <hp:contents>
+{doc_info}  <hp:contents>
 {items}  </hp:contents>
 </hp:HWPMLPackage>"#
     )
+}
+
+/// Minimal XML content escaping for text nodes.
+fn xml_escape_content(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 // ---------------------------------------------------------------------------
