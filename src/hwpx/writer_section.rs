@@ -239,11 +239,18 @@ fn write_inlines<W: Write>(
 /// When the inline carries a ruby annotation, the run body uses the OWPML
 /// `<hp:ruby>` structure instead of a plain `<hp:t>`.  When a `footnote_ref`
 /// is set and the text is empty, a `<hp:noteRef>` element is emitted instead.
+///
+/// Returns immediately without emitting anything when the inline has no
+/// meaningful content (empty text, no ruby, no footnote_ref).
 fn write_inline_run<W: Write>(
     writer: &mut Writer<W>,
     inline: &ir::Inline,
     tables: &RefTables,
 ) -> Result<(), quick_xml::Error> {
+    if inline.text.is_empty() && inline.ruby.is_none() && inline.footnote_ref.is_none() {
+        return Ok(());
+    }
+
     let key = CharPrKey::from_inline(inline);
     let char_pr_id = tables.char_pr_id(&key);
 

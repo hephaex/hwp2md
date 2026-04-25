@@ -263,11 +263,7 @@ pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<
                 None
             } else {
                 Some(ir::Block::Paragraph {
-                    inlines: vec![ir::Inline {
-                        text: url.clone(),
-                        link: Some(url.clone()),
-                        ..Default::default()
-                    }],
+                    inlines: vec![ir::Inline::plain(url.clone()).with_link(Some(url.clone()))],
                 })
             }
         }
@@ -278,16 +274,13 @@ pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<
             if base_text.is_empty() && ruby_text.is_empty() {
                 return None;
             }
+            let ruby = if ruby_text.is_empty() {
+                None
+            } else {
+                Some(ruby_text.clone())
+            };
             Some(ir::Block::Paragraph {
-                inlines: vec![ir::Inline {
-                    text: base_text.clone(),
-                    ruby: if ruby_text.is_empty() {
-                        None
-                    } else {
-                        Some(ruby_text.clone())
-                    },
-                    ..ir::Inline::default()
-                }],
+                inlines: vec![ir::Inline::plain(base_text.clone()).with_ruby(ruby)],
             })
         }
         HwpControl::PageBreak | HwpControl::ColumnBreak => None,
@@ -379,18 +372,18 @@ pub(crate) fn build_inlines(para: &HwpParagraph, doc_info: &DocInfo) -> Vec<ir::
             // Resolve font name via face_id lookup in the DocInfo face_names table.
             let font_name = doc_info.face_names.get(cs.face_id as usize).cloned();
 
-            ir::Inline {
-                text: segment,
-                bold: cs.bold,
-                italic: cs.italic,
-                underline: cs.underline,
-                strikethrough: cs.strikethrough,
-                superscript: cs.superscript,
-                subscript: cs.subscript,
+            let mut inline = ir::Inline::with_formatting(
+                segment,
+                cs.bold,
+                cs.italic,
+                cs.underline,
+                cs.strikethrough,
+                cs.superscript,
+                cs.subscript,
                 color,
-                font_name,
-                ..ir::Inline::default()
-            }
+            );
+            inline.font_name = font_name;
+            inline
         } else {
             ir::Inline::plain(segment)
         };

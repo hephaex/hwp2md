@@ -395,12 +395,13 @@ fn generate_content_hpf(doc: &ir::Document) -> String {
     )
 }
 
-/// Minimal XML content escaping for text nodes and attribute values.
+/// Minimal XML escaping for text nodes.
 fn xml_escape_content(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]

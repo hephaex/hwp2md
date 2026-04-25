@@ -205,7 +205,6 @@ struct InlineStyle {
     italic: bool,
     underline: bool,
     strikethrough: bool,
-    code: bool,
     superscript: bool,
     subscript: bool,
     link: Option<String>,
@@ -221,18 +220,19 @@ fn collect_inlines_recursive<'a>(
         let data = child.data.borrow();
         match &data.value {
             NodeValue::Text(text) => {
-                inlines.push(ir::Inline {
-                    text: text.clone(),
-                    bold: current_style.bold,
-                    italic: current_style.italic,
-                    underline: current_style.underline,
-                    strikethrough: current_style.strikethrough,
-                    code: current_style.code,
-                    superscript: current_style.superscript,
-                    subscript: current_style.subscript,
-                    link: current_style.link.clone(),
-                    ..ir::Inline::default()
-                });
+                inlines.push(
+                    ir::Inline::with_formatting(
+                        text.clone(),
+                        current_style.bold,
+                        current_style.italic,
+                        current_style.underline,
+                        current_style.strikethrough,
+                        current_style.superscript,
+                        current_style.subscript,
+                        None,
+                    )
+                    .with_link(current_style.link.clone()),
+                );
             }
             NodeValue::SoftBreak | NodeValue::LineBreak => {
                 inlines.push(ir::Inline::plain("\n"));
@@ -240,8 +240,18 @@ fn collect_inlines_recursive<'a>(
             NodeValue::Code(code) => {
                 inlines.push(ir::Inline {
                     text: code.literal.clone(),
+                    bold: false,
+                    italic: false,
+                    underline: false,
+                    strikethrough: false,
                     code: true,
-                    ..ir::Inline::default()
+                    superscript: false,
+                    subscript: false,
+                    link: None,
+                    footnote_ref: None,
+                    color: None,
+                    font_name: None,
+                    ruby: None,
                 });
             }
             NodeValue::HtmlInline(html) => {
@@ -289,17 +299,10 @@ fn collect_inlines_recursive<'a>(
             }
             NodeValue::Image(link) => {
                 let alt = collect_alt_text(child);
-                inlines.push(ir::Inline {
-                    text: format!("![{}]({})", alt, link.url),
-                    ..ir::Inline::default()
-                });
+                inlines.push(ir::Inline::plain(format!("![{}]({})", alt, link.url)));
             }
             NodeValue::FootnoteReference(fref) => {
-                inlines.push(ir::Inline {
-                    text: String::new(),
-                    footnote_ref: Some(fref.name.clone()),
-                    ..ir::Inline::default()
-                });
+                inlines.push(ir::Inline::footnote_ref(fref.name.clone()));
             }
             NodeValue::Math(math) => {
                 let delim = if math.display_math { "$$" } else { "$" };
