@@ -65,7 +65,7 @@ impl HwpxFixture {
 
         // mimetype — must be stored, not compressed
         zip.start_file("mimetype", stored).unwrap();
-        zip.write_all(b"application/hwpx+zip").unwrap();
+        zip.write_all(b"application/hwp+zip").unwrap();
 
         // META-INF/container.xml
         zip.start_file("META-INF/container.xml", deflated).unwrap();

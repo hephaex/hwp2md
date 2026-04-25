@@ -424,7 +424,7 @@ fn write_hwpx_mimetype_content() {
     let mut entry = archive.by_name("mimetype").expect("mimetype entry");
     let mut content = String::new();
     entry.read_to_string(&mut content).expect("read");
-    assert_eq!(content, "application/hwpx+zip");
+    assert_eq!(content, "application/hwp+zip");
 }
 
 #[test]

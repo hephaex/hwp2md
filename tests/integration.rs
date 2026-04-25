@@ -437,7 +437,7 @@ fn fixture_bytes_are_valid_zip() {
     // The mimetype entry must appear near the start (it is STORED, so uncompressed).
     let content = String::from_utf8_lossy(&bytes);
     assert!(
-        content.contains("application/hwpx+zip"),
+        content.contains("application/hwp+zip"),
         "mimetype entry not found in fixture bytes"
     );
 }

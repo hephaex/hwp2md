@@ -20,7 +20,7 @@ pub fn write_hwpx(
         "mimetype",
         SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored),
     )?;
-    zip.write_all(b"application/hwpx+zip")?;
+    zip.write_all(b"application/hwp+zip")?;
 
     zip.start_file("META-INF/container.xml", options)?;
     zip.write_all(generate_container_xml().as_bytes())?;
@@ -64,7 +64,7 @@ fn generate_container_xml() -> String {
     r#"<?xml version="1.0" encoding="UTF-8"?>
 <container version="1.0">
   <rootfiles>
-    <rootfile full-path="Contents/content.hpf" media-type="application/hwpx+xml"/>
+    <rootfile full-path="Contents/content.hpf" media-type="application/hwp+xml"/>
   </rootfiles>
 </container>"#
         .to_string()
