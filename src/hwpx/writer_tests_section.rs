@@ -58,9 +58,16 @@ fn section_xml_bold_inline_has_charpr_id_ref() {
     let xml = section_xml(vec![Block::Paragraph {
         inlines: vec![bold_inline("strong")],
     }]);
+    // Bold formatting is emitted as an inline <hp:charPr bold="true"/> inside
+    // the <hp:run> (section-level charPr), in addition to the header charPr
+    // table entry referenced by charPrIDRef.
     assert!(
-        !xml.contains("<hp:charPr"),
-        "inline charPr removed (OWPML schema): {xml}"
+        xml.contains("<hp:charPr "),
+        "inline charPr must be emitted for bold: {xml}"
+    );
+    assert!(
+        xml.contains(r#"bold="true""#),
+        "bold attribute must appear on inline charPr: {xml}"
     );
     assert!(xml.contains("charPrIDRef="), "charPrIDRef: {xml}");
     assert!(xml.contains("strong"));

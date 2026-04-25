@@ -2,6 +2,267 @@ use super::*;
 
 // ── Roundtrip / integration tests ────────────────────────────────────────
 
+// ── helpers ─────────────────────────────────────────────────────────────
+
+/// Build a simple document with one paragraph containing the given inlines.
+fn roundtrip_doc(inlines: Vec<Inline>) -> Document {
+    Document {
+        metadata: Metadata::default(),
+        sections: vec![Section {
+            blocks: vec![Block::Paragraph { inlines }],
+        }],
+        assets: Vec::new(),
+    }
+}
+
+/// Write a document to HWPX, read it back, and return the first paragraph's inlines.
+fn roundtrip_inlines(inlines: Vec<Inline>) -> Vec<Inline> {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = roundtrip_doc(inlines);
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+    let read_back = read_hwpx(tmp.path()).expect("read_hwpx");
+    read_back
+        .sections
+        .into_iter()
+        .flat_map(|s| s.blocks)
+        .filter_map(|b| match b {
+            Block::Paragraph { inlines } => Some(inlines),
+            _ => None,
+        })
+        .next()
+        .unwrap_or_default()
+}
+
+// ── bold/italic/underline/strike roundtrip ──────────────────────────────
+
+#[test]
+fn roundtrip_bold_text_preserved() {
+    let result = roundtrip_inlines(vec![bold_inline("bold text")]);
+    assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
+    assert_eq!(result[0].text, "bold text");
+    assert!(result[0].bold, "bold flag must survive roundtrip: {result:?}");
+}
+
+#[test]
+fn roundtrip_italic_text_preserved() {
+    let result = roundtrip_inlines(vec![italic_inline("italic text")]);
+    assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
+    assert_eq!(result[0].text, "italic text");
+    assert!(
+        result[0].italic,
+        "italic flag must survive roundtrip: {result:?}"
+    );
+}
+
+#[test]
+fn roundtrip_bold_italic_combined_preserved() {
+    let input = Inline {
+        text: "bold italic".into(),
+        bold: true,
+        italic: true,
+        ..Inline::default()
+    };
+    let result = roundtrip_inlines(vec![input]);
+    assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
+    assert_eq!(result[0].text, "bold italic");
+    assert!(result[0].bold, "bold must survive roundtrip: {result:?}");
+    assert!(result[0].italic, "italic must survive roundtrip: {result:?}");
+}
+
+#[test]
+fn roundtrip_underline_text_preserved() {
+    let result = roundtrip_inlines(vec![underline_inline("underlined")]);
+    assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
+    assert_eq!(result[0].text, "underlined");
+    assert!(
+        result[0].underline,
+        "underline flag must survive roundtrip: {result:?}"
+    );
+}
+
+#[test]
+fn roundtrip_strikethrough_text_preserved() {
+    let input = Inline {
+        text: "struck".into(),
+        strikethrough: true,
+        ..Inline::default()
+    };
+    let result = roundtrip_inlines(vec![input]);
+    assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
+    assert_eq!(result[0].text, "struck");
+    assert!(
+        result[0].strikethrough,
+        "strikethrough flag must survive roundtrip: {result:?}"
+    );
+}
+
+#[test]
+fn roundtrip_superscript_text_preserved() {
+    let input = Inline {
+        text: "sup".into(),
+        superscript: true,
+        ..Inline::default()
+    };
+    let result = roundtrip_inlines(vec![input]);
+    assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
+    assert_eq!(result[0].text, "sup");
+    assert!(
+        result[0].superscript,
+        "superscript flag must survive roundtrip: {result:?}"
+    );
+}
+
+#[test]
+fn roundtrip_subscript_text_preserved() {
+    let input = Inline {
+        text: "sub".into(),
+        subscript: true,
+        ..Inline::default()
+    };
+    let result = roundtrip_inlines(vec![input]);
+    assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
+    assert_eq!(result[0].text, "sub");
+    assert!(
+        result[0].subscript,
+        "subscript flag must survive roundtrip: {result:?}"
+    );
+}
+
+#[test]
+fn roundtrip_color_text_preserved() {
+    let input = Inline {
+        text: "red".into(),
+        color: Some("#FF0000".into()),
+        ..Inline::default()
+    };
+    let result = roundtrip_inlines(vec![input]);
+    assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
+    assert_eq!(result[0].text, "red");
+    assert_eq!(
+        result[0].color.as_deref(),
+        Some("#FF0000"),
+        "color must survive roundtrip: {result:?}"
+    );
+}
+
+#[test]
+fn roundtrip_mixed_plain_and_bold_preserved() {
+    let result = roundtrip_inlines(vec![inline("normal "), bold_inline("bold")]);
+    assert_eq!(result.len(), 2, "expected 2 inlines: {result:?}");
+    assert_eq!(result[0].text, "normal ");
+    assert!(!result[0].bold, "first inline must not be bold: {result:?}");
+    assert_eq!(result[1].text, "bold");
+    assert!(result[1].bold, "second inline must be bold: {result:?}");
+}
+
+#[test]
+fn roundtrip_all_formatting_combined() {
+    let input = Inline {
+        text: "all".into(),
+        bold: true,
+        italic: true,
+        underline: true,
+        strikethrough: true,
+        color: Some("#00FF00".into()),
+        ..Inline::default()
+    };
+    let result = roundtrip_inlines(vec![input]);
+    assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
+    let r = &result[0];
+    assert!(r.bold, "bold: {result:?}");
+    assert!(r.italic, "italic: {result:?}");
+    assert!(r.underline, "underline: {result:?}");
+    assert!(r.strikethrough, "strikethrough: {result:?}");
+    assert_eq!(r.color.as_deref(), Some("#00FF00"), "color: {result:?}");
+}
+
+// ── section XML inline charPr emission ──────────────────────────────────
+
+#[test]
+fn section_xml_bold_inline_emits_inline_charpr() {
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![bold_inline("hello")],
+    }]);
+    assert!(
+        xml.contains(r#"bold="true""#),
+        "section XML must contain inline charPr with bold=\"true\": {xml}"
+    );
+}
+
+#[test]
+fn section_xml_italic_inline_emits_inline_charpr() {
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![italic_inline("hello")],
+    }]);
+    assert!(
+        xml.contains(r#"italic="true""#),
+        "section XML must contain inline charPr with italic=\"true\": {xml}"
+    );
+}
+
+#[test]
+fn section_xml_underline_inline_emits_inline_charpr() {
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![underline_inline("hello")],
+    }]);
+    assert!(
+        xml.contains(r#"underline="true""#),
+        "section XML must contain inline charPr with underline=\"true\": {xml}"
+    );
+}
+
+#[test]
+fn section_xml_strikethrough_inline_emits_strikeout() {
+    let input = Inline {
+        text: "hello".into(),
+        strikethrough: true,
+        ..Inline::default()
+    };
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![input],
+    }]);
+    assert!(
+        xml.contains(r#"strikeout="true""#),
+        "section XML must contain inline charPr with strikeout=\"true\": {xml}"
+    );
+}
+
+#[test]
+fn section_xml_color_inline_emits_color_without_hash() {
+    let input = Inline {
+        text: "hello".into(),
+        color: Some("#FF0000".into()),
+        ..Inline::default()
+    };
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![input],
+    }]);
+    assert!(
+        xml.contains(r#"color="FF0000""#),
+        "section XML must contain inline charPr with color=\"FF0000\" (no hash): {xml}"
+    );
+    assert!(
+        !xml.contains(r##"color="#FF0000""##),
+        "color must not have leading # in OWPML: {xml}"
+    );
+}
+
+#[test]
+fn section_xml_plain_inline_no_charpr_element() {
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![inline("plain")],
+    }]);
+    // Inside the <hp:run> there should be NO <hp:charPr> for plain text.
+    // However the section XML itself may contain "hp:charPr" in other contexts
+    // (e.g. attribute references), so we check specifically for the element pattern.
+    assert!(
+        !xml.contains("<hp:charPr "),
+        "plain inline must NOT emit inline <hp:charPr> element: {xml}"
+    );
+}
+
+// ── image roundtrip ─────────────────────────────────────────────────────
+
 #[test]
 fn write_hwpx_image_roundtrip_preserves_asset() {
     let png_bytes = vec![0x89u8, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];

@@ -265,6 +265,34 @@ fn write_hwpx_image_block_xml_references_asset_name() {
     );
 }
 
+// ── xml_escape_content unit tests ────────────────────────────────────────
+
+#[test]
+fn xml_escape_content_apostrophe() {
+    let result = xml_escape_content("it's a test");
+    assert!(
+        result.contains("&apos;"),
+        "apostrophe must be escaped to &apos;: {result}"
+    );
+    assert_eq!(result, "it&apos;s a test");
+}
+
+#[test]
+fn xml_escape_content_all_special_chars() {
+    let result = xml_escape_content(r#"a & b < c > d " e ' f"#);
+    assert_eq!(
+        result,
+        "a &amp; b &lt; c &gt; d &quot; e &apos; f",
+        "all XML special characters must be escaped"
+    );
+}
+
+#[test]
+fn xml_escape_content_no_special_chars_unchanged() {
+    let result = xml_escape_content("hello world 123");
+    assert_eq!(result, "hello world 123");
+}
+
 // ── Phase 8 tests: metadata in content.hpf ──────────────────────────────
 
 #[test]

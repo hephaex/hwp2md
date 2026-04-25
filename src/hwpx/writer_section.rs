@@ -218,14 +218,14 @@ fn write_inlines<W: Write>(
     // wraps all inlines sharing the same link target.
     let mut i = 0;
     while i < inlines.len() {
-        if inlines[i].link.is_some() {
+        if let Some(ref url) = inlines[i].link {
             // Find the end of the consecutive group sharing the same URL.
-            let url = inlines[i].link.as_deref().unwrap();
+            let url = url.clone();
             let group_start = i;
-            while i < inlines.len() && inlines[i].link.as_deref() == Some(url) {
+            while i < inlines.len() && inlines[i].link.as_deref() == Some(&url) {
                 i += 1;
             }
-            write_hyperlink_group(writer, &inlines[group_start..i], url, tables)?;
+            write_hyperlink_group(writer, &inlines[group_start..i], &url, tables)?;
         } else {
             write_inline_run(writer, &inlines[i], tables)?;
             i += 1;
@@ -257,6 +257,11 @@ fn write_inline_run<W: Write>(
     let mut run = BytesStart::new("hp:run");
     run.push_attribute(("charPrIDRef", char_pr_id.to_string().as_str()));
     writer.write_event(Event::Start(run))?;
+
+    // Emit section-level inline charPr when any formatting is set.
+    // Header charPr only carries font/height/textColor/supscript; bold,
+    // italic, underline, and strikeout live on the section-level charPr.
+    write_inline_charpr(writer, inline)?;
 
     if let Some(ref annotation) = inline.ruby {
         // Ruby annotation: wrap base text and annotation in <hp:ruby>.
@@ -290,6 +295,58 @@ fn write_inline_run<W: Write>(
     }
 
     writer.write_event(Event::End(BytesEnd::new("hp:run")))?;
+    Ok(())
+}
+
+/// Emit an inline `<hp:charPr>` element inside `<hp:run>` when the inline
+/// carries any formatting flags (bold, italic, underline, strikethrough,
+/// superscript, subscript, or a non-default color).
+///
+/// This is the *section-level* charPr (as opposed to the header-level charPr
+/// which only stores font/height/textColor/supscript).  Bold and italic in
+/// particular MUST be emitted here for OWPML conformance.
+fn write_inline_charpr<W: Write>(
+    writer: &mut Writer<W>,
+    inline: &ir::Inline,
+) -> Result<(), quick_xml::Error> {
+    let has_formatting = inline.bold
+        || inline.italic
+        || inline.underline
+        || inline.strikethrough
+        || inline.superscript
+        || inline.subscript
+        || inline.color.is_some();
+
+    if !has_formatting {
+        return Ok(());
+    }
+
+    let mut charpr = BytesStart::new("hp:charPr");
+
+    if inline.bold {
+        charpr.push_attribute(("bold", "true"));
+    }
+    if inline.italic {
+        charpr.push_attribute(("italic", "true"));
+    }
+    if inline.underline {
+        charpr.push_attribute(("underline", "true"));
+    }
+    if inline.strikethrough {
+        charpr.push_attribute(("strikeout", "true"));
+    }
+    if inline.superscript {
+        charpr.push_attribute(("supscript", "superscript"));
+    } else if inline.subscript {
+        charpr.push_attribute(("supscript", "subscript"));
+    }
+    if let Some(ref color) = inline.color {
+        // IR stores color as "#RRGGBB"; OWPML expects "RRGGBB" (no leading #).
+        let raw = color.trim_start_matches('#');
+        charpr.push_attribute(("color", raw));
+    }
+
+    writer.write_event(Event::Empty(charpr))?;
     Ok(())
 }
 

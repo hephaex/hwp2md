@@ -271,19 +271,23 @@ fn flush_inlines_to_blocks(
     superscript: bool,
     subscript: bool,
     color: &Option<String>,
+    font_name: &Option<String>,
 ) {
     if !text.is_empty() {
         let t = std::mem::take(text);
-        inlines.push(ir::Inline::with_formatting(
-            t,
-            bold,
-            italic,
-            underline,
-            strike,
-            superscript,
-            subscript,
-            color.clone(),
-        ));
+        inlines.push(
+            ir::Inline::with_formatting(
+                t,
+                bold,
+                italic,
+                underline,
+                strike,
+                superscript,
+                subscript,
+                color.clone(),
+            )
+            .with_font_name(font_name.clone()),
+        );
     }
     if !inlines.is_empty() {
         let i = std::mem::take(inlines);
@@ -295,16 +299,19 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
     // Flush any trailing text run into the inline buffer first.
     if !ctx.current_text.is_empty() {
         let t = std::mem::take(&mut ctx.current_text);
-        ctx.current_inlines.push(ir::Inline::with_formatting(
-            t,
-            ctx.current_bold,
-            ctx.current_italic,
-            ctx.current_underline,
-            ctx.current_strike,
-            ctx.current_superscript,
-            ctx.current_subscript,
-            ctx.current_color.clone(),
-        ));
+        ctx.current_inlines.push(
+            ir::Inline::with_formatting(
+                t,
+                ctx.current_bold,
+                ctx.current_italic,
+                ctx.current_underline,
+                ctx.current_strike,
+                ctx.current_superscript,
+                ctx.current_subscript,
+                ctx.current_color.clone(),
+            )
+            .with_font_name(ctx.current_font_name.clone()),
+        );
     }
     if ctx.current_inlines.is_empty() {
         return;
@@ -330,6 +337,7 @@ pub(crate) fn flush_cell_paragraph(ctx: &mut ParseContext) {
         ctx.current_superscript,
         ctx.current_subscript,
         &ctx.current_color,
+        &ctx.current_font_name,
     );
 }
 
@@ -345,6 +353,7 @@ pub(crate) fn flush_list_item_paragraph(ctx: &mut ParseContext) {
         ctx.current_superscript,
         ctx.current_subscript,
         &ctx.current_color,
+        &ctx.current_font_name,
     );
 }
 
@@ -362,5 +371,6 @@ pub(crate) fn flush_footnote_paragraph(ctx: &mut ParseContext) {
         ctx.current_superscript,
         ctx.current_subscript,
         &ctx.current_color,
+        &ctx.current_font_name,
     );
 }
