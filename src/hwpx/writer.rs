@@ -30,7 +30,10 @@ struct CharPrKey {
     strikethrough: bool,
     color: Option<String>,
     font_name: Option<String>,
+    height: u32,
 }
+
+const HEADING_HEIGHTS: [u32; 7] = [1000, 2400, 2000, 1600, 1400, 1200, 1000];
 
 impl CharPrKey {
     fn plain() -> Self {
@@ -41,6 +44,7 @@ impl CharPrKey {
             strikethrough: false,
             color: None,
             font_name: None,
+            height: 1000,
         }
     }
 
@@ -52,6 +56,7 @@ impl CharPrKey {
             strikethrough: inline.strikethrough,
             color: inline.color.clone(),
             font_name: inline.font_name.clone(),
+            height: 1000,
         }
     }
 
@@ -63,6 +68,20 @@ impl CharPrKey {
             strikethrough: false,
             color: None,
             font_name: Some(CODE_FONT.to_owned()),
+            height: 1000,
+        }
+    }
+
+    fn heading(level: u8) -> Self {
+        let idx = (level as usize).clamp(1, 6);
+        Self {
+            bold: true,
+            italic: false,
+            underline: false,
+            strikethrough: false,
+            color: None,
+            font_name: None,
+            height: HEADING_HEIGHTS[idx],
         }
     }
 }
@@ -100,19 +119,25 @@ impl RefTables {
             );
         }
 
-        // Always register the code-block monospace entry so CodeBlock blocks
-        // always have a valid numeric charPrIDRef regardless of whether the
-        // document contains any inline code spans.
+        // Register heading charPr entries (one per level 1-6).
+        for level in 1..=6u8 {
+            let key = CharPrKey::heading(level);
+            if let std::collections::hash_map::Entry::Vacant(e) = char_pr_ids.entry(key) {
+                e.insert(next_id);
+                next_id += 1;
+            }
+        }
+
+        // Always register the code-block monospace entry.
         let code_key = CharPrKey::code_block();
         if let std::collections::hash_map::Entry::Vacant(e) = char_pr_ids.entry(code_key) {
             e.insert(next_id);
             next_id += 1;
         }
-        // Ensure CODE_FONT is present in the font table.
         if font_set.insert(CODE_FONT.to_owned()) {
             font_names.push(CODE_FONT.to_owned());
         }
-        let _ = next_id; // consumed above; suppress unused warning
+        let _ = next_id;
 
         Self {
             char_pr_ids,
@@ -122,6 +147,10 @@ impl RefTables {
 
     fn code_block_char_pr_id(&self) -> u32 {
         self.char_pr_id(&CharPrKey::code_block())
+    }
+
+    fn heading_char_pr_id(&self, level: u8) -> u32 {
+        self.char_pr_id(&CharPrKey::heading(level))
     }
 
     fn char_pr_id(&self, key: &CharPrKey) -> u32 {
@@ -329,7 +358,7 @@ fn generate_header_xml(doc: &ir::Document, tables: &RefTables) -> Result<String,
 
     w.write_event(Event::End(BytesEnd::new("hh:refList")))?;
 
-    write_styles(&mut w)?;
+    write_styles(&mut w, tables)?;
 
     w.write_event(Event::End(BytesEnd::new("hh:head")))?;
 
@@ -387,9 +416,10 @@ fn write_char_properties<W: Write>(
 
         let color = key.color.as_deref().unwrap_or("#000000");
 
+        let height_str = key.height.to_string();
         let mut char_pr = BytesStart::new("hh:charPr");
         char_pr.push_attribute(("id", id.to_string().as_str()));
-        char_pr.push_attribute(("height", "1000"));
+        char_pr.push_attribute(("height", height_str.as_str()));
         char_pr.push_attribute(("textColor", color));
         if key.bold {
             char_pr.push_attribute(("bold", "true"));
@@ -445,31 +475,33 @@ fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::E
     Ok(())
 }
 
-/// Emits the `<hh:styles>` block referenced by heading paragraphs.
-///
-/// Style IDs match the `hp:styleIDRef` numeric values used in section XML:
-/// - 0 = Normal
-/// - 1..=6 = Heading1..Heading6
-fn write_styles<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::Error> {
+fn write_styles<W: Write>(
+    w: &mut Writer<W>,
+    tables: &RefTables,
+) -> Result<(), quick_xml::Error> {
     w.write_event(Event::Start(BytesStart::new("hh:styles")))?;
 
-    let style_defs: &[(&str, &str)] = &[
-        ("0", "Normal"),
-        ("1", "Heading1"),
-        ("2", "Heading2"),
-        ("3", "Heading3"),
-        ("4", "Heading4"),
-        ("5", "Heading5"),
-        ("6", "Heading6"),
-    ];
+    // Normal style uses the default charPr (id=0).
+    let mut normal = BytesStart::new("hh:style");
+    normal.push_attribute(("id", "0"));
+    normal.push_attribute(("type", "PARAGRAPH"));
+    normal.push_attribute(("name", "Normal"));
+    normal.push_attribute(("paraPrIDRef", "0"));
+    normal.push_attribute(("charPrIDRef", "0"));
+    w.write_event(Event::Empty(normal))?;
 
-    for (id, name) in style_defs {
+    // Heading styles reference level-specific charPr entries.
+    for level in 1..=6u8 {
+        let char_pr_id = tables.heading_char_pr_id(level);
+        let id_str = level.to_string();
+        let char_pr_id_str = char_pr_id.to_string();
+        let name = format!("Heading{level}");
         let mut style = BytesStart::new("hh:style");
-        style.push_attribute(("id", *id));
+        style.push_attribute(("id", id_str.as_str()));
         style.push_attribute(("type", "PARAGRAPH"));
-        style.push_attribute(("name", *name));
+        style.push_attribute(("name", name.as_str()));
         style.push_attribute(("paraPrIDRef", "0"));
-        style.push_attribute(("charPrIDRef", "0"));
+        style.push_attribute(("charPrIDRef", char_pr_id_str.as_str()));
         w.write_event(Event::Empty(style))?;
     }
 
@@ -519,8 +551,9 @@ fn generate_section_xml(
     sec.push_attribute(("xmlns:hp", "http://www.hancom.co.kr/hwpml/2011/paragraph"));
     writer.write_event(Event::Start(sec))?;
 
+    let mut para_id: u32 = 0;
     for block in &section.blocks {
-        write_block(&mut writer, block, tables)?;
+        write_block(&mut writer, block, tables, &mut para_id)?;
     }
 
     writer.write_event(Event::End(BytesEnd::new("hs:sec")))?;
@@ -528,10 +561,18 @@ fn generate_section_xml(
     Ok(String::from_utf8(buf.into_inner()).unwrap_or_default())
 }
 
+/// Emit a single IR block as OWPML XML.
+///
+/// `para_id` is a section-scoped sequential counter.  Every `<hp:p>` element
+/// that is directly emitted by this function (including those wrapping tables)
+/// consumes one ID and increments the counter.  Paragraph IDs inside table
+/// cells share the same counter so that all IDs remain globally unique within
+/// the section.
 fn write_block<W: Write>(
     writer: &mut Writer<W>,
     block: &ir::Block,
     tables: &RefTables,
+    para_id: &mut u32,
 ) -> Result<(), quick_xml::Error> {
     match block {
         ir::Block::Heading { level, inlines } => {
@@ -539,7 +580,10 @@ fn write_block<W: Write>(
             // Levels outside 1-6 are clamped to the nearest valid ID.
             let style_id = (*level).clamp(1, 6);
             let style_id_str = style_id.to_string();
+            let id_str = para_id.to_string();
+            *para_id += 1;
             let mut p = BytesStart::new("hp:p");
+            p.push_attribute(("id", id_str.as_str()));
             p.push_attribute(("hp:styleIDRef", style_id_str.as_str()));
             p.push_attribute(("paraPrIDRef", "0"));
             writer.write_event(Event::Start(p))?;
@@ -547,14 +591,36 @@ fn write_block<W: Write>(
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
         ir::Block::Paragraph { inlines } => {
+            let id_str = para_id.to_string();
+            *para_id += 1;
             let mut p = BytesStart::new("hp:p");
+            p.push_attribute(("id", id_str.as_str()));
             p.push_attribute(("paraPrIDRef", "0"));
             writer.write_event(Event::Start(p))?;
             write_inlines(writer, inlines, tables)?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
         ir::Block::Table { rows, .. } => {
-            writer.write_event(Event::Start(BytesStart::new("hp:tbl")))?;
+            // OWPML requires <hp:tbl> to be a child of <hp:run> inside <hp:p>.
+            let row_cnt = rows.len();
+            let col_cnt = rows.first().map_or(0, |r| r.cells.len());
+
+            let id_str = para_id.to_string();
+            *para_id += 1;
+            let mut p = BytesStart::new("hp:p");
+            p.push_attribute(("id", id_str.as_str()));
+            p.push_attribute(("paraPrIDRef", "0"));
+            writer.write_event(Event::Start(p))?;
+
+            let mut run = BytesStart::new("hp:run");
+            run.push_attribute(("charPrIDRef", "0"));
+            writer.write_event(Event::Start(run))?;
+
+            let mut tbl = BytesStart::new("hp:tbl");
+            tbl.push_attribute(("rowCnt", row_cnt.to_string().as_str()));
+            tbl.push_attribute(("colCnt", col_cnt.to_string().as_str()));
+            writer.write_event(Event::Start(tbl))?;
+
             for row in rows {
                 writer.write_event(Event::Start(BytesStart::new("hp:tr")))?;
                 for cell in &row.cells {
@@ -566,17 +632,23 @@ fn write_block<W: Write>(
                         writer.write_event(Event::Empty(addr))?;
                     }
                     for b in &cell.blocks {
-                        write_block(writer, b, tables)?;
+                        write_block(writer, b, tables, para_id)?;
                     }
                     writer.write_event(Event::End(BytesEnd::new("hp:tc")))?;
                 }
                 writer.write_event(Event::End(BytesEnd::new("hp:tr")))?;
             }
+
             writer.write_event(Event::End(BytesEnd::new("hp:tbl")))?;
+            writer.write_event(Event::End(BytesEnd::new("hp:run")))?;
+            writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
         ir::Block::CodeBlock { code, .. } => {
             let code_id = tables.code_block_char_pr_id().to_string();
+            let id_str = para_id.to_string();
+            *para_id += 1;
             let mut p = BytesStart::new("hp:p");
+            p.push_attribute(("id", id_str.as_str()));
             p.push_attribute(("paraPrIDRef", "0"));
             writer.write_event(Event::Start(p))?;
             let mut run = BytesStart::new("hp:run");
@@ -590,18 +662,21 @@ fn write_block<W: Write>(
         }
         ir::Block::BlockQuote { blocks } => {
             for b in blocks {
-                write_block(writer, b, tables)?;
+                write_block(writer, b, tables, para_id)?;
             }
         }
         ir::Block::List { items, .. } => {
             for item in items {
                 for b in &item.blocks {
-                    write_block(writer, b, tables)?;
+                    write_block(writer, b, tables, para_id)?;
                 }
             }
         }
         ir::Block::Image { src, alt } => {
+            let id_str = para_id.to_string();
+            *para_id += 1;
             let mut p = BytesStart::new("hp:p");
+            p.push_attribute(("id", id_str.as_str()));
             p.push_attribute(("paraPrIDRef", "0"));
             writer.write_event(Event::Start(p))?;
             let mut img = BytesStart::new("hp:img");
@@ -611,7 +686,10 @@ fn write_block<W: Write>(
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
         ir::Block::HorizontalRule => {
+            let id_str = para_id.to_string();
+            *para_id += 1;
             let mut p = BytesStart::new("hp:p");
+            p.push_attribute(("id", id_str.as_str()));
             p.push_attribute(("paraPrIDRef", "0"));
             writer.write_event(Event::Start(p))?;
             let mut run = BytesStart::new("hp:run");
@@ -624,7 +702,10 @@ fn write_block<W: Write>(
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
         ir::Block::Math { tex, .. } => {
+            let id_str = para_id.to_string();
+            *para_id += 1;
             let mut p = BytesStart::new("hp:p");
+            p.push_attribute(("id", id_str.as_str()));
             p.push_attribute(("paraPrIDRef", "0"));
             writer.write_event(Event::Start(p))?;
             writer.write_event(Event::Start(BytesStart::new("hp:equation")))?;
@@ -634,7 +715,7 @@ fn write_block<W: Write>(
         }
         ir::Block::Footnote { content, .. } => {
             for b in content {
-                write_block(writer, b, tables)?;
+                write_block(writer, b, tables, para_id)?;
             }
         }
     }

@@ -162,10 +162,18 @@ fn xml_escape(s: &str) -> String {
 // Pre-built XML snippets for common document patterns
 // ---------------------------------------------------------------------------
 
+/// Paragraph ID counter for fixture snippets.
+static FIXTURE_PARA_ID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+fn next_para_id() -> u32 {
+    FIXTURE_PARA_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
 /// A single paragraph with plain text.
 pub fn para_xml(text: &str) -> String {
+    let id = next_para_id();
     format!(
-        "<hp:p><hp:run><hp:t>{}</hp:t></hp:run></hp:p>",
+        r#"<hp:p id="{id}" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>{}</hp:t></hp:run></hp:p>"#,
         xml_escape(text)
     )
 }
@@ -173,25 +181,31 @@ pub fn para_xml(text: &str) -> String {
 /// A heading paragraph at the given level (1–6).
 pub fn heading_xml(level: u8, text: &str) -> String {
     debug_assert!((1..=6).contains(&level), "heading level must be 1–6");
+    let id = next_para_id();
     format!(
-        r#"<hp:p hp:styleIDRef="Heading{level}"><hp:run><hp:t>{}</hp:t></hp:run></hp:p>"#,
+        r#"<hp:p id="{id}" hp:styleIDRef="{level}" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>{}</hp:t></hp:run></hp:p>"#,
         xml_escape(text)
     )
 }
 
-/// A 2×2 table with four plain-text cells.
+/// A 2×2 table with four plain-text cells, wrapped in a paragraph container.
 pub fn table_2x2_xml(r0c0: &str, r0c1: &str, r1c0: &str, r1c1: &str) -> String {
+    let wrapper_id = next_para_id();
+    let c0 = next_para_id();
+    let c1 = next_para_id();
+    let c2 = next_para_id();
+    let c3 = next_para_id();
     format!(
-        r#"<hp:tbl>
+        r#"<hp:p id="{wrapper_id}" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:tbl rowCnt="2" colCnt="2">
   <hp:tr>
-    <hp:tc><hp:p><hp:run><hp:t>{}</hp:t></hp:run></hp:p></hp:tc>
-    <hp:tc><hp:p><hp:run><hp:t>{}</hp:t></hp:run></hp:p></hp:tc>
+    <hp:tc><hp:p id="{c0}" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>{}</hp:t></hp:run></hp:p></hp:tc>
+    <hp:tc><hp:p id="{c1}" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>{}</hp:t></hp:run></hp:p></hp:tc>
   </hp:tr>
   <hp:tr>
-    <hp:tc><hp:p><hp:run><hp:t>{}</hp:t></hp:run></hp:p></hp:tc>
-    <hp:tc><hp:p><hp:run><hp:t>{}</hp:t></hp:run></hp:p></hp:tc>
+    <hp:tc><hp:p id="{c2}" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>{}</hp:t></hp:run></hp:p></hp:tc>
+    <hp:tc><hp:p id="{c3}" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>{}</hp:t></hp:run></hp:p></hp:tc>
   </hp:tr>
-</hp:tbl>"#,
+</hp:tbl></hp:run></hp:p>"#,
         xml_escape(r0c0),
         xml_escape(r0c1),
         xml_escape(r1c0),
@@ -199,10 +213,11 @@ pub fn table_2x2_xml(r0c0: &str, r0c1: &str, r1c0: &str, r1c1: &str) -> String {
     )
 }
 
-/// A bold + italic inline run.
+/// A bold + italic inline run (includes inline charPr for reader compatibility).
 pub fn styled_run_xml(text: &str) -> String {
+    let id = next_para_id();
     format!(
-        r#"<hp:p><hp:run><hp:charPr bold="true" italic="true"/><hp:t>{}</hp:t></hp:run></hp:p>"#,
+        r#"<hp:p id="{id}" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:charPr bold="true" italic="true"/><hp:t>{}</hp:t></hp:run></hp:p>"#,
         xml_escape(text)
     )
 }

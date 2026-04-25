@@ -250,7 +250,14 @@ fn section_xml_table_2x2() {
             },
         ],
     }]);
-    assert!(xml.contains("<hp:tbl>"), "tbl open: {xml}");
+    // 5-B: table must be wrapped in a paragraph container
+    assert!(xml.contains("<hp:p "), "p wrapper: {xml}");
+    assert!(xml.contains(r#"<hp:run charPrIDRef="0">"#), "run wrapper: {xml}");
+    // 5-C: tbl must carry rowCnt and colCnt
+    assert!(
+        xml.contains(r#"<hp:tbl rowCnt="2" colCnt="2">"#),
+        "tbl with rowCnt/colCnt: {xml}"
+    );
     assert!(xml.contains("</hp:tbl>"), "tbl close: {xml}");
     assert_eq!(xml.matches("<hp:tr>").count(), 2, "two rows: {xml}");
     assert_eq!(xml.matches("<hp:tc>").count(), 4, "four cells: {xml}");
@@ -915,5 +922,124 @@ fn section_xml_code_block_has_numeric_char_pr_id_ref() {
     assert!(
         xml.contains("let x = 1;"),
         "code content must appear: {xml}"
+    );
+}
+
+// ── Phase 5 tests: paragraph IDs + table wrapping ────────────────────────
+
+#[test]
+fn section_xml_paragraphs_have_sequential_ids() {
+    // Multiple blocks must receive sequential id="0", id="1", … on their <hp:p>.
+    let xml = section_xml(vec![
+        Block::Heading {
+            level: 1,
+            inlines: vec![inline("First")],
+        },
+        Block::Paragraph {
+            inlines: vec![inline("Second")],
+        },
+        Block::CodeBlock {
+            language: None,
+            code: "third".into(),
+        },
+    ]);
+    assert!(xml.contains(r#"id="0""#), "first block id=0: {xml}");
+    assert!(xml.contains(r#"id="1""#), "second block id=1: {xml}");
+    assert!(xml.contains(r#"id="2""#), "third block id=2: {xml}");
+    // Verify the first paragraph element is the heading (id=0 + styleIDRef).
+    let id0_pos = xml.find(r#"id="0""#).expect("id=0 position");
+    let style_pos = xml
+        .find(r#"hp:styleIDRef="1""#)
+        .expect("styleIDRef=1 position");
+    // id="0" must appear on the same opening tag as hp:styleIDRef="1".
+    // Since the heading opens before the content, id0_pos < style_pos for a
+    // forward-ordered attribute list (writer emits id first).
+    assert!(
+        id0_pos < style_pos,
+        "id=0 must precede styleIDRef on the heading element: {xml}"
+    );
+}
+
+#[test]
+fn section_xml_table_wrapped_in_paragraph() {
+    // A table block must be emitted as:
+    //   <hp:p id="N" paraPrIDRef="0">
+    //     <hp:run charPrIDRef="0">
+    //       <hp:tbl rowCnt="…" colCnt="…"> … </hp:tbl>
+    //     </hp:run>
+    //   </hp:p>
+    let cell = |text: &str| TableCell {
+        blocks: vec![Block::Paragraph {
+            inlines: vec![inline(text)],
+        }],
+        colspan: 1,
+        rowspan: 1,
+    };
+    let xml = section_xml(vec![Block::Table {
+        col_count: 2,
+        rows: vec![TableRow {
+            cells: vec![cell("X"), cell("Y")],
+            is_header: false,
+        }],
+    }]);
+    // The outer paragraph wrapper must carry an id.
+    assert!(xml.contains(r#"id="0""#), "table wrapper p must have id=0: {xml}");
+    // The run wrapper must be present with charPrIDRef="0".
+    assert!(
+        xml.contains(r#"<hp:run charPrIDRef="0">"#),
+        "run wrapper: {xml}"
+    );
+    // The table element must be present with rowCnt and colCnt.
+    assert!(
+        xml.contains(r#"<hp:tbl rowCnt="1" colCnt="2">"#),
+        "tbl attrs: {xml}"
+    );
+    // Structural nesting: p opens before run, run opens before tbl.
+    let p_pos = xml.find(r#"id="0""#).expect("p wrapper position");
+    let run_pos = xml
+        .find(r#"<hp:run charPrIDRef="0">"#)
+        .expect("run position");
+    let tbl_pos = xml
+        .find(r#"<hp:tbl rowCnt="1" colCnt="2">"#)
+        .expect("tbl position");
+    assert!(p_pos < run_pos, "p must come before run: {xml}");
+    assert!(run_pos < tbl_pos, "run must come before tbl: {xml}");
+    // Cell paragraph IDs (inside the table) continue from the outer counter.
+    // The outer table p is id=0, so the first cell paragraph is id=1.
+    assert!(xml.contains(r#"id="1""#), "cell paragraph id=1: {xml}");
+}
+
+#[test]
+fn section_xml_table_rowcnt_colcnt_attributes() {
+    // Verify rowCnt and colCnt reflect actual row/column counts.
+    let cell = || TableCell {
+        blocks: vec![],
+        colspan: 1,
+        rowspan: 1,
+    };
+    let xml = section_xml(vec![Block::Table {
+        col_count: 3,
+        rows: vec![
+            TableRow {
+                cells: vec![cell(), cell(), cell()],
+                is_header: false,
+            },
+            TableRow {
+                cells: vec![cell(), cell(), cell()],
+                is_header: false,
+            },
+            TableRow {
+                cells: vec![cell(), cell(), cell()],
+                is_header: false,
+            },
+        ],
+    }]);
+    assert!(
+        xml.contains(r#"rowCnt="3""#),
+        "rowCnt must be 3: {xml}"
+    );
+    assert!(
+        xml.contains(r#"colCnt="3""#),
+        "colCnt must be 3: {xml}"
     );
 }

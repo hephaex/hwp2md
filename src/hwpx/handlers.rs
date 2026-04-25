@@ -363,9 +363,15 @@ pub(super) fn handle_empty_element(
 /// Parse a HWP style ID reference and return the heading level (1–6) if it
 /// identifies a heading style, or `None` otherwise.
 pub(crate) fn parse_heading_style(style_ref: &str) -> Option<u8> {
+    // Numeric style IDs: "1"–"6" map directly to heading levels.
+    if let Ok(n) = style_ref.parse::<u8>() {
+        if (1..=6).contains(&n) {
+            return Some(n);
+        }
+    }
+
     let lower = style_ref.to_lowercase();
     if lower.contains("heading") || lower.contains("제목") || lower.contains("개요") {
-        // Extract the trailing number so "Heading12" -> 12, "제목 10" -> 10
         let num_str: String = style_ref
             .chars()
             .rev()
