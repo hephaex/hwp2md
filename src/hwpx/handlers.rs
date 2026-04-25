@@ -33,9 +33,14 @@ pub(super) fn handle_start_element(
             ctx.current_italic = false;
             ctx.current_underline = false;
             ctx.current_strike = false;
+            ctx.current_superscript = false;
+            ctx.current_subscript = false;
+            ctx.current_color = None;
         }
         "charPr" | "hp:charPr" => apply_charpr_attrs(e, ctx),
-        "t" | "hp:t" => {}
+        "t" | "hp:t" => {
+            ctx.in_text = true;
+        }
         "tbl" | "hp:tbl" => {
             ctx.in_table = true;
             ctx.table_rows.clear();
@@ -79,6 +84,24 @@ pub(super) fn handle_start_element(
         "equation" | "hp:equation" | "eqEdit" | "hp:eqEdit" => {
             ctx.in_equation = true;
             ctx.equation_text.clear();
+        }
+        // <hp:fieldBegin type="HYPERLINK" command="https://..."> (non-self-closing)
+        "fieldBegin" | "hp:fieldBegin" => {
+            let mut field_type = String::new();
+            let mut command = String::new();
+            for attr in e.attributes().flatten() {
+                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                let val = attr.unescape_value().unwrap_or_default().to_string();
+                match key {
+                    "type" | "hp:type" => field_type = val,
+                    "command" | "hp:command" => command = val,
+                    _ => {}
+                }
+            }
+            if field_type == "HYPERLINK" && !command.is_empty() {
+                ctx.in_hyperlink = true;
+                ctx.hyperlink_url = Some(command);
+            }
         }
         "ruby" | "hp:ruby" => {
             ctx.in_ruby = true;
@@ -128,20 +151,28 @@ pub(super) fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &
         "run" | "hp:run" => {
             ctx.in_run = false;
         }
-        "t" | "hp:t" if !ctx.current_text.is_empty() => {
-            let text = std::mem::take(&mut ctx.current_text);
-            let inline = ir::Inline {
-                text,
-                bold: ctx.current_bold,
-                italic: ctx.current_italic,
-                underline: ctx.current_underline,
-                strikethrough: ctx.current_strike,
-                superscript: ctx.current_superscript,
-                subscript: ctx.current_subscript,
-                color: ctx.current_color.clone(),
-                ..ir::Inline::default()
-            };
-            ctx.push_inline(inline);
+        "t" | "hp:t" => {
+            ctx.in_text = false;
+            if !ctx.current_text.is_empty() {
+                let text = std::mem::take(&mut ctx.current_text);
+                let inline = ir::Inline {
+                    text,
+                    bold: ctx.current_bold,
+                    italic: ctx.current_italic,
+                    underline: ctx.current_underline,
+                    strikethrough: ctx.current_strike,
+                    superscript: ctx.current_superscript,
+                    subscript: ctx.current_subscript,
+                    color: ctx.current_color.clone(),
+                    link: if ctx.in_hyperlink {
+                        ctx.hyperlink_url.clone()
+                    } else {
+                        None
+                    },
+                    ..ir::Inline::default()
+                };
+                ctx.push_inline(inline);
+            }
         }
         "tbl" | "hp:tbl" => {
             let col_count = ctx.col_count.max(
@@ -201,6 +232,13 @@ pub(super) fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &
             }
             ctx.in_equation = false;
         }
+        // Non-self-closing fieldEnd (closing tag clears hyperlink state)
+        "fieldEnd" | "hp:fieldEnd" => {
+            ctx.in_hyperlink = false;
+            ctx.hyperlink_url = None;
+        }
+        // Non-self-closing fieldBegin end tag (no-op; state set on open)
+        "fieldBegin" | "hp:fieldBegin" => {}
         "rubyText" | "hp:rubyText" | "baseText" | "hp:baseText" => {
             ctx.ruby_current_part = RubyPart::None;
         }
@@ -250,7 +288,7 @@ pub(super) fn handle_text(text: &str, ctx: &mut ParseContext) {
         }
         return;
     }
-    if ctx.in_run {
+    if ctx.in_run && ctx.in_text {
         ctx.active_text_buf().push_str(text);
     }
 }
@@ -314,6 +352,29 @@ pub(super) fn handle_empty_element(
         // <hp:charPr bold="true" italic="true" .../>  (self-closing variant)
         // Delegates to apply_charpr_attrs -- same logic as the Start element path.
         "charPr" | "hp:charPr" => apply_charpr_attrs(e, ctx),
+        // <hp:fieldBegin type="HYPERLINK" command="https://..." />
+        "fieldBegin" | "hp:fieldBegin" => {
+            let mut field_type = String::new();
+            let mut command = String::new();
+            for attr in e.attributes().flatten() {
+                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                let val = attr.unescape_value().unwrap_or_default().to_string();
+                match key {
+                    "type" | "hp:type" => field_type = val,
+                    "command" | "hp:command" => command = val,
+                    _ => {}
+                }
+            }
+            if field_type == "HYPERLINK" && !command.is_empty() {
+                ctx.in_hyperlink = true;
+                ctx.hyperlink_url = Some(command);
+            }
+        }
+        // <hp:fieldEnd type="HYPERLINK" />
+        "fieldEnd" | "hp:fieldEnd" => {
+            ctx.in_hyperlink = false;
+            ctx.hyperlink_url = None;
+        }
         // Footnote / endnote reference inline: a self-closing marker that records
         // which footnote the current text position cites.
         //

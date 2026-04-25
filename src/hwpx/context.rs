@@ -9,6 +9,10 @@ use crate::ir;
 pub(crate) struct ParseContext {
     pub(crate) in_paragraph: bool,
     pub(crate) in_run: bool,
+    /// True when the parser is inside a `<hp:t>` element.  Text is only
+    /// accumulated into the active buffer when this flag is set, preventing
+    /// XML formatting whitespace from bleeding into inline text content.
+    pub(crate) in_text: bool,
     pub(crate) in_table: bool,
     pub(crate) in_cell: bool,
     pub(crate) current_text: String,
@@ -47,6 +51,9 @@ pub(crate) struct ParseContext {
     pub(crate) footnote_blocks: Vec<ir::Block>,
     pub(crate) footnote_inlines: Vec<ir::Inline>,
     pub(crate) footnote_text: String,
+    // hyperlink (fieldBegin/fieldEnd) accumulation
+    pub(crate) in_hyperlink: bool,
+    pub(crate) hyperlink_url: Option<String>,
     // ruby annotation accumulation
     pub(crate) in_ruby: bool,
     pub(crate) ruby_base_text: String,
@@ -69,6 +76,7 @@ impl Default for ParseContext {
         Self {
             in_paragraph: false,
             in_run: false,
+            in_text: false,
             in_table: false,
             in_cell: false,
             current_text: String::new(),
@@ -104,6 +112,8 @@ impl Default for ParseContext {
             footnote_blocks: Vec::new(),
             footnote_inlines: Vec::new(),
             footnote_text: String::new(),
+            in_hyperlink: false,
+            hyperlink_url: None,
             in_ruby: false,
             ruby_base_text: String::new(),
             ruby_annotation_text: String::new(),
