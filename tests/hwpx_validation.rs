@@ -286,3 +286,109 @@ fn writer_empty_doc_no_schema_violations() {
         "schema violations on empty doc: {schema_violations:#?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Phase 7: expanded schema validation for complex documents
+// ---------------------------------------------------------------------------
+
+/// Verify that a document with H1-H6 headings produces no schema violations.
+#[test]
+fn writer_heading_doc_no_schema_violations() {
+    let md_text = "\
+# Heading 1
+
+Paragraph under H1.
+
+## Heading 2
+
+Content for H2.
+
+### Heading 3
+
+Content for H3.
+
+#### Heading 4
+
+Content for H4.
+
+##### Heading 5
+
+Content for H5.
+
+###### Heading 6
+
+Content for H6.
+";
+
+    let ir_doc = md::parse_markdown(md_text);
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    hwpx::write_hwpx(&ir_doc, tmp.path(), None).unwrap();
+
+    let bytes = std::fs::read(tmp.path()).unwrap();
+    let violations = validate_hwpx_bytes_with_schema(&bytes);
+    let schema_violations: Vec<_> = violations
+        .iter()
+        .filter(|v| v.error_code.0 >= 13000 && v.error_code.0 < 14000)
+        .collect();
+
+    assert!(
+        schema_violations.is_empty(),
+        "schema violations on heading doc: {schema_violations:#?}"
+    );
+}
+
+/// Verify that a mixed document (headings + paragraphs + bold/italic + table +
+/// image + code block) produces no schema violations.
+#[test]
+fn writer_mixed_doc_no_schema_violations() {
+    let md_text = "\
+# Document Title
+
+An introductory paragraph with **bold text** and *italic text*.
+
+## Data Section
+
+| Column A | Column B | Column C |
+|----------|----------|----------|
+| Cell 1   | Cell 2   | Cell 3   |
+| Cell 4   | Cell 5   | Cell 6   |
+
+### Code Example
+
+```rust
+fn main() {
+    println!(\"Hello, world!\");
+}
+```
+
+#### Image Placeholder
+
+Some text after the code block.
+
+##### Conclusion
+
+Final paragraph with **bold**, *italic*, and plain text mixed together.
+
+---
+
+###### Appendix
+
+End of document.
+";
+
+    let ir_doc = md::parse_markdown(md_text);
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    hwpx::write_hwpx(&ir_doc, tmp.path(), None).unwrap();
+
+    let bytes = std::fs::read(tmp.path()).unwrap();
+    let violations = validate_hwpx_bytes_with_schema(&bytes);
+    let schema_violations: Vec<_> = violations
+        .iter()
+        .filter(|v| v.error_code.0 >= 13000 && v.error_code.0 < 14000)
+        .collect();
+
+    assert!(
+        schema_violations.is_empty(),
+        "schema violations on mixed doc: {schema_violations:#?}"
+    );
+}

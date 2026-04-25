@@ -546,6 +546,137 @@ fn header_xml_default_charpr_has_id_zero() {
     assert!(content.contains(r#"id="0""#), "id=0 charPr: {content}");
 }
 
+// ── Phase 7 tests: borderFill table ─────────────────────────────────────
+
+#[test]
+fn header_xml_contains_border_fills_section() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = Document::new();
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    entry.read_to_string(&mut content).expect("read");
+
+    assert!(
+        content.contains("hh:borderFills"),
+        "borderFills section must be present: {content}"
+    );
+    assert!(
+        content.contains("hh:borderFill"),
+        "borderFill entry must be present: {content}"
+    );
+}
+
+#[test]
+fn header_xml_border_fill_has_default_entry() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = Document::new();
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    entry.read_to_string(&mut content).expect("read");
+
+    // borderFill id=1 with required attributes.
+    assert!(
+        content.contains(r#"id="1""#),
+        "borderFill id=1 must exist: {content}"
+    );
+    assert!(
+        content.contains(r#"threeD="false""#),
+        "threeD attribute: {content}"
+    );
+    assert!(
+        content.contains(r#"shadow="false""#),
+        "shadow attribute: {content}"
+    );
+    // Border elements must be present.
+    assert!(
+        content.contains("hh:leftBorder"),
+        "leftBorder: {content}"
+    );
+    assert!(
+        content.contains("hh:rightBorder"),
+        "rightBorder: {content}"
+    );
+    assert!(
+        content.contains("hh:topBorder"),
+        "topBorder: {content}"
+    );
+    assert!(
+        content.contains("hh:bottomBorder"),
+        "bottomBorder: {content}"
+    );
+    assert!(
+        content.contains("hh:diagonal"),
+        "diagonal: {content}"
+    );
+    // Slash and backSlash elements must be present.
+    assert!(
+        content.contains("hh:slash"),
+        "slash element: {content}"
+    );
+    assert!(
+        content.contains("hh:backSlash"),
+        "backSlash element: {content}"
+    );
+}
+
+#[test]
+fn header_xml_charpr_has_border_fill_id_ref() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = doc_with_section(vec![Block::Paragraph {
+        inlines: vec![inline("text")],
+    }]);
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    entry.read_to_string(&mut content).expect("read");
+
+    // Every charPr entry must have borderFillIDRef="1".
+    assert!(
+        content.contains(r#"borderFillIDRef="1""#),
+        "charPr must reference borderFill id=1: {content}"
+    );
+    // Must NOT reference borderFillIDRef="0" (nonexistent entry).
+    assert!(
+        !content.contains(r#"borderFillIDRef="0""#),
+        "borderFillIDRef=0 must not appear (no such entry): {content}"
+    );
+}
+
+#[test]
+fn header_xml_border_fills_precedes_char_properties() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = Document::new();
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    entry.read_to_string(&mut content).expect("read");
+
+    let bf_pos = content
+        .find("hh:borderFills")
+        .expect("borderFills must exist");
+    let cp_pos = content
+        .find("hh:charProperties")
+        .expect("charProperties must exist");
+    assert!(
+        bf_pos < cp_pos,
+        "borderFills must appear before charProperties in header.xml"
+    );
+}
+
 // ── write_hwpx integration: ZIP entry presence ─────────────────────────
 
 #[test]

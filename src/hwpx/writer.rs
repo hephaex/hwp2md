@@ -92,6 +92,8 @@ struct RefTables {
     char_pr_ids: HashMap<CharPrKey, u32>,
     /// Unique font names in document order (first seen wins for ordering).
     font_names: Vec<String>,
+    /// The single default borderFill entry ID (always 1).
+    border_fill_id: u32,
 }
 
 impl RefTables {
@@ -142,6 +144,7 @@ impl RefTables {
         Self {
             char_pr_ids,
             font_names,
+            border_fill_id: 1,
         }
     }
 
@@ -341,6 +344,7 @@ fn generate_header_xml(doc: &ir::Document, tables: &RefTables) -> Result<String,
     w.write_event(Event::Start(BytesStart::new("hh:refList")))?;
 
     write_font_faces(&mut w, tables)?;
+    write_border_fills(&mut w, tables)?;
     write_char_properties(&mut w, tables)?;
     write_para_properties(&mut w)?;
     write_styles(&mut w, tables)?;
@@ -352,7 +356,8 @@ fn generate_header_xml(doc: &ir::Document, tables: &RefTables) -> Result<String,
 
     w.write_event(Event::End(BytesEnd::new("hh:head")))?;
 
-    Ok(String::from_utf8(buf.into_inner()).unwrap_or_default())
+    String::from_utf8(buf.into_inner())
+        .map_err(|e| Hwp2MdError::HwpxWrite(format!("header XML is not valid UTF-8: {e}")))
 }
 
 fn write_font_faces<W: Write>(
@@ -386,6 +391,52 @@ fn write_font_faces<W: Write>(
     Ok(())
 }
 
+fn write_border_fills<W: Write>(
+    w: &mut Writer<W>,
+    tables: &RefTables,
+) -> Result<(), quick_xml::Error> {
+    let mut border_fills = BytesStart::new("hh:borderFills");
+    border_fills.push_attribute(("itemCnt", "1"));
+    w.write_event(Event::Start(border_fills))?;
+
+    let id_str = tables.border_fill_id.to_string();
+    let mut bf = BytesStart::new("hh:borderFill");
+    bf.push_attribute(("id", id_str.as_str()));
+    bf.push_attribute(("threeD", "false"));
+    bf.push_attribute(("shadow", "false"));
+    w.write_event(Event::Start(bf))?;
+
+    let mut slash = BytesStart::new("hh:slash");
+    slash.push_attribute(("type", "NONE"));
+    slash.push_attribute(("Crooked", "false"));
+    slash.push_attribute(("isCounter", "false"));
+    w.write_event(Event::Empty(slash))?;
+
+    let mut back_slash = BytesStart::new("hh:backSlash");
+    back_slash.push_attribute(("type", "NONE"));
+    back_slash.push_attribute(("Crooked", "false"));
+    back_slash.push_attribute(("isCounter", "false"));
+    w.write_event(Event::Empty(back_slash))?;
+
+    for border_name in &[
+        "hh:leftBorder",
+        "hh:rightBorder",
+        "hh:topBorder",
+        "hh:bottomBorder",
+        "hh:diagonal",
+    ] {
+        let mut border = BytesStart::new(*border_name);
+        border.push_attribute(("type", "NONE"));
+        border.push_attribute(("width", "0.12 mm"));
+        border.push_attribute(("color", "000000"));
+        w.write_event(Event::Empty(border))?;
+    }
+
+    w.write_event(Event::End(BytesEnd::new("hh:borderFill")))?;
+    w.write_event(Event::End(BytesEnd::new("hh:borderFills")))?;
+    Ok(())
+}
+
 fn write_char_properties<W: Write>(
     w: &mut Writer<W>,
     tables: &RefTables,
@@ -415,6 +466,7 @@ fn write_char_properties<W: Write>(
         let color = key.color.as_deref().unwrap_or("#000000");
 
         let height_str = key.height.to_string();
+        let border_fill_ref = tables.border_fill_id.to_string();
         // OWPML schema only allows: id, height, textColor, shadeColor,
         // useFontSpace, useKerning, symMark, borderFillIDRef.
         // bold/italic/underline/strikeout are NOT valid attributes here.
@@ -422,6 +474,7 @@ fn write_char_properties<W: Write>(
         char_pr.push_attribute(("id", id.to_string().as_str()));
         char_pr.push_attribute(("height", height_str.as_str()));
         char_pr.push_attribute(("textColor", color));
+        char_pr.push_attribute(("borderFillIDRef", border_fill_ref.as_str()));
         w.write_event(Event::Start(char_pr))?;
 
         let font_id_str = font_id.to_string();
@@ -531,7 +584,7 @@ fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::E
     w.write_event(Event::End(BytesEnd::new("hh:margin")))?;
 
     let mut border = BytesStart::new("hh:border");
-    border.push_attribute(("borderFillIDRef", "0"));
+    border.push_attribute(("borderFillIDRef", "1"));
     w.write_event(Event::Empty(border))?;
 
     let mut auto_spacing = BytesStart::new("hh:autoSpacing");
@@ -631,7 +684,8 @@ fn generate_section_xml(
 
     writer.write_event(Event::End(BytesEnd::new("hs:sec")))?;
 
-    Ok(String::from_utf8(buf.into_inner()).unwrap_or_default())
+    String::from_utf8(buf.into_inner())
+        .map_err(|e| Hwp2MdError::HwpxWrite(format!("section XML is not valid UTF-8: {e}")))
 }
 
 /// Emit a single IR block as OWPML XML.
