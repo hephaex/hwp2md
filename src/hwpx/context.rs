@@ -241,17 +241,9 @@ fn flush_inlines_to_blocks(
 ) {
     if !text.is_empty() {
         let t = std::mem::take(text);
-        inlines.push(ir::Inline {
-            text: t,
-            bold,
-            italic,
-            underline,
-            strikethrough: strike,
-            superscript,
-            subscript,
-            color: color.clone(),
-            ..ir::Inline::default()
-        });
+        inlines.push(ir::Inline::with_formatting(
+            t, bold, italic, underline, strike, superscript, subscript, color.clone(),
+        ));
     }
     if !inlines.is_empty() {
         let i = std::mem::take(inlines);
@@ -263,17 +255,16 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
     // Flush any trailing text run into the inline buffer first.
     if !ctx.current_text.is_empty() {
         let t = std::mem::take(&mut ctx.current_text);
-        ctx.current_inlines.push(ir::Inline {
-            text: t,
-            bold: ctx.current_bold,
-            italic: ctx.current_italic,
-            underline: ctx.current_underline,
-            strikethrough: ctx.current_strike,
-            superscript: ctx.current_superscript,
-            subscript: ctx.current_subscript,
-            color: ctx.current_color.clone(),
-            ..ir::Inline::default()
-        });
+        ctx.current_inlines.push(ir::Inline::with_formatting(
+            t,
+            ctx.current_bold,
+            ctx.current_italic,
+            ctx.current_underline,
+            ctx.current_strike,
+            ctx.current_superscript,
+            ctx.current_subscript,
+            ctx.current_color.clone(),
+        ));
     }
     if ctx.current_inlines.is_empty() {
         return;

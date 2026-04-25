@@ -1,3 +1,6 @@
+//! Markdown parser and writer built on top of the [`pulldown_cmark`] ecosystem.
+#![allow(missing_docs)]
+
 mod parser;
 mod writer;
 

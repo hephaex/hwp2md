@@ -1,3 +1,5 @@
+//! High-level conversion entry points for HWP/HWPX ↔ Markdown.
+
 use std::fs;
 use std::path::Path;
 
@@ -7,6 +9,17 @@ use crate::hwpx;
 use crate::ir;
 use crate::md;
 
+/// Convert an HWP or HWPX document to Markdown.
+///
+/// Reads `input` (`.hwp` or `.hwpx`), converts it to Markdown, and writes the
+/// result to `output` (or stdout when `None`).  Embedded images are extracted
+/// to `assets_dir` when provided.  Set `frontmatter` to `true` to prepend a
+/// YAML front-matter block with document metadata.
+///
+/// # Errors
+///
+/// Returns [`Hwp2MdError::UnsupportedFormat`] for unknown extensions and
+/// propagates I/O or parse errors from the underlying readers.
 pub fn to_markdown(
     input: &Path,
     output: Option<&Path>,
@@ -57,6 +70,18 @@ pub fn to_markdown(
     Ok(())
 }
 
+/// Convert a Markdown file to HWPX format.
+///
+/// Reads `input` (`.md` or `.markdown`), parses it into the intermediate
+/// representation, and writes a conformant HWPX archive to `output`.  When
+/// `output` is `None` the output path is derived by replacing the input
+/// extension with `.hwpx`.  The optional `style` argument is reserved for a
+/// future style-template feature and is currently ignored.
+///
+/// # Errors
+///
+/// Returns [`Hwp2MdError::UnsupportedFormat`] when `input` does not have a
+/// Markdown extension, and propagates I/O or write errors.
 pub fn to_hwpx(
     input: &Path,
     output: Option<&Path>,
@@ -95,6 +120,15 @@ pub fn to_hwpx(
     Ok(())
 }
 
+/// Print human-readable metadata and statistics for an HWP or HWPX file.
+///
+/// Writes a summary (format, title, author, section count, block count,
+/// estimated character count, asset count) to stdout.
+///
+/// # Errors
+///
+/// Returns [`Hwp2MdError::UnsupportedFormat`] for unknown extensions and
+/// propagates parse errors from the underlying readers.
 pub fn show_info(input: &Path) -> Result<(), Hwp2MdError> {
     let ext = input
         .extension()

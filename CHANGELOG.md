@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.0] - 2026-04-26
 
 ### Added
+- **Phase 11**: Crate-level `//!` documentation on `lib.rs`; `///` doc comments
+  on all public types in `ir.rs`, `error.rs`, and all public functions in
+  `convert.rs`; `#![warn(missing_docs)]` lint enabled; `xml_escape_content`
+  extended with `"` → `&quot;` escaping for defense-in-depth.
+- **Phase 10**: Ruby annotation writer (`hp:ruby` / `baseText` / `rubyText`);
+  `footnote_ref` writer emitting `hp:noteRef`; `Inline` builder pattern with
+  `with_formatting` / `with_link` / `with_ruby` constructors; ruby formatting
+  propagation fix ensuring annotation runs inherit the base run's charPr.
+- **Phase 9**: Superscript/subscript writer using the `supscript` charPr
+  attribute; hyperlink reader and writer using `fieldBegin` / `fieldEnd`
+  controls; writer module split into three focused submodules; reader run-start
+  reset fix preventing stale formatting from leaking across paragraphs.
 - **Phase 3**: charPr / paraPr / fontface reference tables in `header.xml` with
   IDRef linking between section paragraph runs and the header table entries.
 - **Phase 4**: Style table (`hh:styles`) with Normal + Heading1-6, numeric

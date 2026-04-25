@@ -1,3 +1,6 @@
+//! HWPX reader and writer (ZIP/XML format).
+#![allow(missing_docs)]
+
 mod reader;
 mod writer;
 

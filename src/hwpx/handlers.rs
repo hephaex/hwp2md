@@ -397,11 +397,7 @@ pub(super) fn handle_empty_element(
                 }
             }
             if !note_id.is_empty() {
-                let inline = ir::Inline {
-                    footnote_ref: Some(note_id),
-                    ..ir::Inline::default()
-                };
-                ctx.push_inline(inline);
+                ctx.push_inline(ir::Inline::footnote_ref(note_id));
             }
         }
         // <hp:ctrl id="fn" idRef="1"/> -- HWP-binary-style ctrl inline.
@@ -418,11 +414,7 @@ pub(super) fn handle_empty_element(
                 }
             }
             if (ctrl_kind == "fn" || ctrl_kind == "en") && !id_ref.is_empty() {
-                let inline = ir::Inline {
-                    footnote_ref: Some(id_ref),
-                    ..ir::Inline::default()
-                };
-                ctx.push_inline(inline);
+                ctx.push_inline(ir::Inline::footnote_ref(id_ref));
             }
         }
         _ => {}

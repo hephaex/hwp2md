@@ -221,3 +221,62 @@ fn hwpx_roundtrip_preserves_section_count() {
         "should have exactly one section after roundtrip"
     );
 }
+
+// -----------------------------------------------------------------------
+// Test: Hyperlink roundtrip
+// -----------------------------------------------------------------------
+
+#[test]
+fn hwpx_roundtrip_hyperlink_preserves_url_and_text() {
+    // Build IR directly with a linked inline so we control the exact URL
+    // and text without relying on the Markdown parser.
+    let linked_inline = ir::Inline {
+        text: "Click here".into(),
+        link: Some("https://example.com".into()),
+        ..ir::Inline::default()
+    };
+    let doc = ir::Document {
+        metadata: ir::Metadata::default(),
+        sections: vec![ir::Section {
+            blocks: vec![ir::Block::Paragraph {
+                inlines: vec![linked_inline],
+            }],
+        }],
+        assets: Vec::new(),
+    };
+
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+    let read_back = read_hwpx(tmp.path()).expect("read_hwpx");
+
+    let blocks = read_back
+        .sections
+        .first()
+        .map(|s| s.blocks.as_slice())
+        .unwrap_or(&[]);
+
+    let inlines = match blocks.first() {
+        Some(ir::Block::Paragraph { inlines }) => inlines,
+        other => panic!("expected Paragraph as first block, got: {other:?}"),
+    };
+
+    assert!(
+        !inlines.is_empty(),
+        "linked paragraph must contain at least one inline after roundtrip"
+    );
+
+    let linked = inlines
+        .iter()
+        .find(|i| i.link.is_some())
+        .expect("at least one inline must carry a link after roundtrip");
+
+    assert_eq!(
+        linked.text, "Click here",
+        "link text must survive HWPX roundtrip"
+    );
+    assert_eq!(
+        linked.link.as_deref(),
+        Some("https://example.com"),
+        "link URL must survive HWPX roundtrip"
+    );
+}

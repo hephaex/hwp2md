@@ -1,13 +1,20 @@
+//! Intermediate representation (IR) types shared by all readers and writers.
+
 use serde::{Deserialize, Serialize};
 
+/// Top-level document produced by any reader and consumed by any writer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Document {
+    /// Document-level metadata (title, author, dates, …).
     pub metadata: Metadata,
+    /// Ordered list of content sections.
     pub sections: Vec<Section>,
+    /// Embedded binary assets (images, fonts, …).
     pub assets: Vec<Asset>,
 }
 
 impl Document {
+    /// Create an empty document with default metadata.
     pub fn new() -> Self {
         Self {
             metadata: Metadata::default(),
@@ -23,73 +30,122 @@ impl Default for Document {
     }
 }
 
+/// Document-level metadata extracted from HWP/HWPX summary streams.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Metadata {
+    /// Document title.
     pub title: Option<String>,
+    /// Primary author.
     pub author: Option<String>,
+    /// Creation timestamp (ISO 8601 string when available).
     pub created: Option<String>,
+    /// Last-modified timestamp (ISO 8601 string when available).
     pub modified: Option<String>,
+    /// Short description or abstract.
     pub description: Option<String>,
+    /// Subject or category.
     pub subject: Option<String>,
+    /// Keyword tags.
     pub keywords: Vec<String>,
 }
 
+/// A logical section of a document containing an ordered sequence of blocks.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Section {
+    /// Content blocks in reading order.
     pub blocks: Vec<Block>,
 }
 
+/// A block-level content element within a section.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Block {
+    /// ATX heading with a level in `1..=6`.
     Heading {
+        /// Heading level (1 = `#`, 6 = `######`).
         level: u8,
+        /// Inline content of the heading.
         inlines: Vec<Inline>,
     },
+    /// Plain paragraph of inline content.
     Paragraph {
+        /// Inline runs in reading order.
         inlines: Vec<Inline>,
     },
+    /// Table with a fixed column count.
     Table {
+        /// Rows in top-to-bottom order.
         rows: Vec<TableRow>,
+        /// Total number of columns (used for alignment row generation).
         col_count: usize,
     },
+    /// Fenced code block.
     CodeBlock {
+        /// Optional language hint (e.g. `"rust"`).
         language: Option<String>,
+        /// Raw source code.
         code: String,
     },
+    /// Block quotation wrapping nested blocks.
     BlockQuote {
+        /// Quoted blocks.
         blocks: Vec<Block>,
     },
+    /// Ordered or unordered list.
     List {
+        /// `true` for an ordered (`1.`) list, `false` for a bullet list.
         ordered: bool,
+        /// Starting number for ordered lists.
         start: u32,
+        /// List items in order.
         items: Vec<ListItem>,
     },
+    /// Inline image.
     Image {
+        /// Image source URI or data URL.
         src: String,
+        /// Alternative text.
         alt: String,
     },
+    /// Thematic break (`---`).
     HorizontalRule,
+    /// Footnote definition collected from the source document.
     Footnote {
+        /// Unique identifier matching the `footnote_ref` on the call-out inline.
         id: String,
+        /// Block content of the footnote body.
         content: Vec<Block>,
     },
+    /// Mathematical expression in TeX syntax.
     Math {
+        /// `true` for a display (block) equation, `false` for inline.
         display: bool,
+        /// TeX source.
         tex: String,
     },
 }
 
+/// A run of inline text with optional formatting and annotations.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Inline {
+    /// The raw text of this run.
     pub text: String,
+    /// Bold weight.
     pub bold: bool,
+    /// Italic style.
     pub italic: bool,
+    /// Underline decoration.
     pub underline: bool,
+    /// Strikethrough decoration.
     pub strikethrough: bool,
+    /// Monospace / inline-code style.
     pub code: bool,
+    /// Superscript (`<sup>`).
     pub superscript: bool,
+    /// Subscript (`<sub>`).
     pub subscript: bool,
+    /// Hyperlink target URL when this run is a link.
     pub link: Option<String>,
+    /// ID of the footnote definition this run references.
     pub footnote_ref: Option<String>,
     /// CSS hex color string (e.g. `"#FF0000"`) when text color is non-black.
     /// `None` means default/black text, which is not rendered in output.
@@ -104,6 +160,7 @@ pub struct Inline {
 }
 
 impl Inline {
+    /// Create a plain, unformatted inline run from `text`.
     pub fn plain(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
@@ -111,6 +168,7 @@ impl Inline {
         }
     }
 
+    /// Create a bold inline run from `text`.
     pub fn bold(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
@@ -164,18 +222,33 @@ impl Inline {
         self.ruby = ruby;
         self
     }
+
+    /// Create a footnote-reference inline with no visible text or formatting.
+    pub fn footnote_ref(id: impl Into<String>) -> Self {
+        Self {
+            footnote_ref: Some(id.into()),
+            ..Self::default()
+        }
+    }
 }
 
+/// A single row in a [`Block::Table`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableRow {
+    /// Cells in left-to-right order.
     pub cells: Vec<TableCell>,
+    /// `true` when this row should be treated as a header row.
     pub is_header: bool,
 }
 
+/// A single cell in a [`TableRow`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableCell {
+    /// Block content inside the cell.
     pub blocks: Vec<Block>,
+    /// Number of columns this cell spans (≥ 1).
     pub colspan: u32,
+    /// Number of rows this cell spans (≥ 1).
     pub rowspan: u32,
 }
 
@@ -189,16 +262,23 @@ impl Default for TableCell {
     }
 }
 
+/// A single item in a [`Block::List`], optionally containing nested sub-lists.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListItem {
+    /// Block content of this item (typically one `Paragraph`).
     pub blocks: Vec<Block>,
+    /// Nested child list items for multi-level lists.
     pub children: Vec<ListItem>,
 }
 
+/// A binary asset (image, font, …) embedded in the document.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Asset {
+    /// Original file name as recorded in the source archive.
     pub name: String,
+    /// Raw bytes of the asset.
     pub data: Vec<u8>,
+    /// MIME type (e.g. `"image/png"`).
     pub mime_type: String,
 }
 

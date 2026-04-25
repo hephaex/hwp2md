@@ -1944,6 +1944,89 @@ fn reader_text_outside_hyperlink_has_no_link() {
     assert_eq!(inlines[2].text, "after");
 }
 
+// ── Phase 9 audit: missing tests ─────────────────────────────────────────
+
+#[test]
+fn section_xml_adjacent_link_inlines_different_urls_produce_two_field_groups() {
+    // Two consecutive inlines with DIFFERENT URLs must each produce their own
+    // fieldBegin/fieldEnd pair.  The grouping logic in write_inlines() only
+    // merges consecutive spans that share the same URL.
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![
+            Inline {
+                text: "A".into(),
+                link: Some("https://a.com".into()),
+                ..Inline::default()
+            },
+            Inline {
+                text: "B".into(),
+                link: Some("https://b.com".into()),
+                ..Inline::default()
+            },
+        ],
+    }]);
+
+    let begin_count = xml.matches("hp:fieldBegin").count();
+    let end_count = xml.matches("hp:fieldEnd").count();
+    assert_eq!(
+        begin_count, 2,
+        "two different URLs must produce two fieldBegin elements: {xml}"
+    );
+    assert_eq!(
+        end_count, 2,
+        "two different URLs must produce two fieldEnd elements: {xml}"
+    );
+    assert!(xml.contains("https://a.com"), "first URL: {xml}");
+    assert!(xml.contains("https://b.com"), "second URL: {xml}");
+    assert!(xml.contains("A"), "first link text: {xml}");
+    assert!(xml.contains("B"), "second link text: {xml}");
+}
+
+#[test]
+fn bold_superscript_combo_gets_unique_charpr_and_supscript_attribute() {
+    // An inline with both bold=true AND superscript=true must receive a
+    // charPrIDRef that is not 0 (distinct from the plain entry), and the
+    // header.xml must contain a charPr with supscript="superscript".
+    let bold_sup_inline = Inline {
+        text: "X".into(),
+        bold: true,
+        superscript: true,
+        ..Inline::default()
+    };
+
+    // Verify charPrIDRef is non-zero via section XML.
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![bold_sup_inline.clone()],
+    }]);
+    let marker = "charPrIDRef=\"";
+    let start = xml.find(marker).expect("charPrIDRef must be present");
+    let rest = &xml[start + marker.len()..];
+    let end = rest.find('"').expect("closing quote");
+    let value = &rest[..end];
+    assert_ne!(
+        value, "0",
+        "bold+superscript charPrIDRef must not be 0 (plain): {xml}"
+    );
+
+    // Verify header.xml carries the supscript attribute via write_hwpx.
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = doc_with_section(vec![Block::Paragraph {
+        inlines: vec![bold_sup_inline],
+    }]);
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    entry.read_to_string(&mut content).expect("read");
+
+    assert!(
+        content.contains(r#"supscript="superscript""#),
+        "header must contain supscript=\"superscript\" for bold+superscript inline: {content}"
+    );
+}
+
 // ── Phase 10 tests: ruby annotation writer ──────────────────────────────
 
 #[test]
