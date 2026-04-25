@@ -34,14 +34,8 @@ fn section_xml_footnote_ref_is_self_closing() {
         }],
     }]);
 
-    assert!(
-        xml.contains("hp:noteRef"),
-        "noteRef element: {xml}"
-    );
-    assert!(
-        xml.contains(r#"noteId="42""#),
-        "noteId=42: {xml}"
-    );
+    assert!(xml.contains("hp:noteRef"), "noteRef element: {xml}");
+    assert!(xml.contains(r#"noteId="42""#), "noteId=42: {xml}");
     // Must NOT contain <hp:t> for a pure footnote_ref with empty text.
     assert!(
         !xml.contains("<hp:t>"),
@@ -90,10 +84,7 @@ fn section_xml_footnote_ref_wrapped_in_run() {
     let noteref_pos = xml.find("hp:noteRef").expect("noteRef must exist");
     let run_end_pos = xml.find("</hp:run>").expect("run close must exist");
 
-    assert!(
-        run_pos < noteref_pos,
-        "run must precede noteRef: {xml}"
-    );
+    assert!(run_pos < noteref_pos, "run must precede noteRef: {xml}");
     assert!(
         noteref_pos < run_end_pos,
         "noteRef must precede run close: {xml}"

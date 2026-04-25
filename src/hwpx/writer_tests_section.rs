@@ -204,7 +204,10 @@ fn section_xml_table_2x2() {
     }]);
     // 5-B: table must be wrapped in a paragraph container
     assert!(xml.contains("<hp:p "), "p wrapper: {xml}");
-    assert!(xml.contains(r#"<hp:run charPrIDRef="0">"#), "run wrapper: {xml}");
+    assert!(
+        xml.contains(r#"<hp:run charPrIDRef="0">"#),
+        "run wrapper: {xml}"
+    );
     // 5-C: tbl must carry rowCnt and colCnt
     assert!(
         xml.contains(r#"<hp:tbl rowCnt="2" colCnt="2">"#),
@@ -505,7 +508,10 @@ fn section_xml_table_wrapped_in_paragraph() {
         }],
     }]);
     // The outer paragraph wrapper must carry an id.
-    assert!(xml.contains(r#"id="0""#), "table wrapper p must have id=0: {xml}");
+    assert!(
+        xml.contains(r#"id="0""#),
+        "table wrapper p must have id=0: {xml}"
+    );
     // The run wrapper must be present with charPrIDRef="0".
     assert!(
         xml.contains(r#"<hp:run charPrIDRef="0">"#),
@@ -556,14 +562,8 @@ fn section_xml_table_rowcnt_colcnt_attributes() {
             },
         ],
     }]);
-    assert!(
-        xml.contains(r#"rowCnt="3""#),
-        "rowCnt must be 3: {xml}"
-    );
-    assert!(
-        xml.contains(r#"colCnt="3""#),
-        "colCnt must be 3: {xml}"
-    );
+    assert!(xml.contains(r#"rowCnt="3""#), "rowCnt must be 3: {xml}");
+    assert!(xml.contains(r#"colCnt="3""#), "colCnt must be 3: {xml}");
 }
 
 // ── Phase 8 tests: inline code charPr ───────────────────────────────────

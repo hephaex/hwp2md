@@ -172,10 +172,7 @@ fn write_hwpx_header_xml_has_version_and_sec_cnt() {
         content.contains(r#"version="1.1""#),
         "version attr: {content}"
     );
-    assert!(
-        content.contains(r#"secCnt="1""#),
-        "secCnt attr: {content}"
-    );
+    assert!(content.contains(r#"secCnt="1""#), "secCnt attr: {content}");
 }
 
 #[test]
@@ -299,10 +296,7 @@ fn content_hpf_with_title_and_author() {
         hpf.contains("<hp:author>Test Author</hp:author>"),
         "author must be present: {hpf}"
     );
-    assert!(
-        hpf.contains("</hp:docInfo>"),
-        "docInfo closing tag: {hpf}"
-    );
+    assert!(hpf.contains("</hp:docInfo>"), "docInfo closing tag: {hpf}");
 }
 
 #[test]
@@ -350,10 +344,7 @@ fn content_hpf_author_only() {
     };
     let hpf = generate_content_hpf(&doc);
 
-    assert!(
-        !hpf.contains("<hp:title>"),
-        "title must NOT appear: {hpf}"
-    );
+    assert!(!hpf.contains("<hp:title>"), "title must NOT appear: {hpf}");
     assert!(
         hpf.contains("<hp:author>Only Author</hp:author>"),
         "author: {hpf}"

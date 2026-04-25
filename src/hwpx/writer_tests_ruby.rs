@@ -6,7 +6,7 @@ use super::*;
 fn section_xml_ruby_inline_produces_ruby_structure() {
     let xml = section_xml(vec![Block::Paragraph {
         inlines: vec![Inline {
-            text: "\u{6F22}\u{5B57}".into(), // 漢字
+            text: "\u{6F22}\u{5B57}".into(),       // 漢字
             ruby: Some("\u{D55C}\u{C790}".into()), // 한자
             ..Inline::default()
         }],
@@ -152,11 +152,7 @@ fn reader_ruby_with_bold_preserves_formatting() {
     assert!(!inlines.is_empty(), "inlines should not be empty");
     let ruby_inline = &inlines[0];
     assert_eq!(ruby_inline.text, "base", "base text");
-    assert_eq!(
-        ruby_inline.ruby.as_deref(),
-        Some("anno"),
-        "annotation text"
-    );
+    assert_eq!(ruby_inline.ruby.as_deref(), Some("anno"), "annotation text");
     assert!(
         ruby_inline.bold,
         "bold formatting must be preserved on ruby inline"
@@ -244,17 +240,8 @@ fn inline_with_formatting_chained_with_link() {
 
 #[test]
 fn inline_with_formatting_chained_with_ruby() {
-    let i = Inline::with_formatting(
-        "base".into(),
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        None,
-    )
-    .with_ruby(Some("annotation".into()));
+    let i = Inline::with_formatting("base".into(), true, false, false, false, false, false, None)
+        .with_ruby(Some("annotation".into()));
 
     assert_eq!(i.text, "base");
     assert!(i.bold);

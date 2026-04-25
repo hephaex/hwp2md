@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-04-26
+
+### Added
+- **Phase 12**: `writer_tests.rs` split into 8 topic-based test modules
+  (`writer_tests_charpr`, `writer_tests_section`, `writer_tests_metadata`,
+  `writer_tests_hyperlink`, `writer_tests_ruby`, `writer_tests_footnote`,
+  `writer_tests_roundtrip`); ruby + hyperlink combination test added.
+- `xml_escape_content` now covers the complete set of XML 1.0 predefined
+  entities (`&`, `<`, `>`, `"`, `'`).
+
+### Changed
+- `..Default::default()` struct update syntax eliminated across the entire
+  codebase (`md/parser.rs`, `hwp/convert.rs`) — all fields are now set
+  explicitly.
+
+### Fixed
+- Empty text inline run guard in `writer_section.rs`: zero-length text runs are
+  skipped, preventing emission of empty `<hp:t/>` elements.
+- Dead code removed: `InlineStyle.code` field (superseded by the `CharPrKey`
+  path introduced in Phase 8).
+- Broken intra-doc link in `md/mod.rs` corrected.
+
 ## [0.3.0] - 2026-04-26
 
 ### Added

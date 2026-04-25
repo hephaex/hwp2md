@@ -36,6 +36,7 @@ pub(super) fn handle_start_element(
             ctx.current_superscript = false;
             ctx.current_subscript = false;
             ctx.current_color = None;
+            ctx.current_font_name = None;
         }
         "charPr" | "hp:charPr" => apply_charpr_attrs(e, ctx),
         "t" | "hp:t" => {
@@ -165,6 +166,7 @@ pub(super) fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &
                     ctx.current_subscript,
                     ctx.current_color.clone(),
                 )
+                .with_font_name(ctx.current_font_name.clone())
                 .with_link(if ctx.in_hyperlink {
                     ctx.hyperlink_url.clone()
                 } else {

@@ -303,10 +303,7 @@ fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::E
     Ok(())
 }
 
-fn write_styles<W: Write>(
-    w: &mut Writer<W>,
-    tables: &RefTables,
-) -> Result<(), quick_xml::Error> {
+fn write_styles<W: Write>(w: &mut Writer<W>, tables: &RefTables) -> Result<(), quick_xml::Error> {
     // 7 styles: Normal (id=0) + Heading1-6 (id=1..6).
     let mut styles = BytesStart::new("hh:styles");
     styles.push_attribute(("itemCnt", "7"));

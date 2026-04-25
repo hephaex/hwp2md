@@ -137,31 +137,16 @@ fn header_xml_border_fill_has_default_entry() {
         "shadow attribute: {content}"
     );
     // Border elements must be present.
-    assert!(
-        content.contains("hh:leftBorder"),
-        "leftBorder: {content}"
-    );
-    assert!(
-        content.contains("hh:rightBorder"),
-        "rightBorder: {content}"
-    );
-    assert!(
-        content.contains("hh:topBorder"),
-        "topBorder: {content}"
-    );
+    assert!(content.contains("hh:leftBorder"), "leftBorder: {content}");
+    assert!(content.contains("hh:rightBorder"), "rightBorder: {content}");
+    assert!(content.contains("hh:topBorder"), "topBorder: {content}");
     assert!(
         content.contains("hh:bottomBorder"),
         "bottomBorder: {content}"
     );
-    assert!(
-        content.contains("hh:diagonal"),
-        "diagonal: {content}"
-    );
+    assert!(content.contains("hh:diagonal"), "diagonal: {content}");
     // Slash and backSlash elements must be present.
-    assert!(
-        content.contains("hh:slash"),
-        "slash element: {content}"
-    );
+    assert!(content.contains("hh:slash"), "slash element: {content}");
     assert!(
         content.contains("hh:backSlash"),
         "backSlash element: {content}"

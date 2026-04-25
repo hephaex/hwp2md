@@ -13,6 +13,11 @@
 - Markdown to HWPX (write path; binary HWP output is not yet supported)
 - Headings levels 1-6, paragraphs, bold, italic, underline, strikethrough, inline code
 - Superscript and subscript inline styles
+- Hyperlinks (reader + writer; `fieldBegin`/`fieldEnd` control pattern)
+- Ruby annotations (reader + writer; rendered as `<ruby>base<rt>annotation</rt></ruby>`)
+- Footnote references (writer; `hp:noteRef` emission)
+- Inline code mapped to monospace font (Courier New) in HWPX output
+- Metadata preservation (title, author) round-trips through HWPX `hp:docInfo`
 - Ordered and unordered lists with nested items
 - Tables (GFM pipe syntax; colspan/rowspan fall back to HTML)
 - Fenced code blocks with language annotation
@@ -183,6 +188,7 @@ println!("{} sections", doc.sections.len());
 | Inline code | yes | yes | yes |
 | Superscript / Subscript | yes | yes | yes |
 | Hyperlinks | yes | yes | yes |
+| Ruby annotations | yes | yes | yes |
 | Ordered lists | yes | yes | yes |
 | Unordered lists | yes | yes | yes |
 | Nested lists | yes | yes | yes |
@@ -218,7 +224,7 @@ The conversion pipeline is decoupled through a format-neutral intermediate repre
 | `Metadata` | Title, author, creation/modification date, subject, keywords |
 | `Section` | Ordered sequence of `Block` values |
 | `Block` | `Heading`, `Paragraph`, `Table`, `CodeBlock`, `BlockQuote`, `List`, `Image`, `HorizontalRule`, `Footnote`, `Math` |
-| `Inline` | Leaf text with style flags (bold, italic, underline, strikethrough, code, superscript, subscript, link, footnote reference) |
+| `Inline` | Leaf text with style flags (bold, italic, underline, strikethrough, code, superscript, subscript, link, footnote reference, ruby annotation) |
 | `Asset` | Embedded binary (image or other media) with MIME type |
 
 ### Crate layout

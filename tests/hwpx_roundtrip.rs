@@ -1,3 +1,4 @@
+use hwp2md::hwpx::{read_hwpx, write_hwpx};
 /// HWPX structural roundtrip tests.
 ///
 /// Each test follows the pipeline:
@@ -6,7 +7,6 @@
 /// These tests verify that the IR blocks and inlines survive a full
 /// HWPX write-then-read cycle.
 use hwp2md::ir;
-use hwp2md::hwpx::{read_hwpx, write_hwpx};
 use hwp2md::md::parse_markdown;
 
 // -----------------------------------------------------------------------
@@ -46,7 +46,10 @@ fn collect_all_text(blocks: &[ir::Block]) -> String {
                     }
                 }
             }
-            ir::Block::BlockQuote { blocks } | ir::Block::Footnote { content: blocks, .. } => {
+            ir::Block::BlockQuote { blocks }
+            | ir::Block::Footnote {
+                content: blocks, ..
+            } => {
                 out.push_str(&collect_all_text(blocks));
             }
             ir::Block::List { items, .. } => {
@@ -147,10 +150,7 @@ fn hwpx_roundtrip_bold_italic_formatting() {
     let doc = md_to_hwpx_to_ir(md);
 
     let text = collect_all_text(first_blocks(&doc));
-    assert!(
-        text.contains("bold"),
-        "bold text must survive: {text:?}"
-    );
+    assert!(text.contains("bold"), "bold text must survive: {text:?}");
     assert!(
         text.contains("italic"),
         "italic text must survive: {text:?}"
@@ -191,22 +191,10 @@ Another paragraph here.
     let doc = md_to_hwpx_to_ir(md);
 
     let text = collect_all_text(first_blocks(&doc));
-    assert!(
-        text.contains("Document Title"),
-        "h1: {text:?}"
-    );
-    assert!(
-        text.contains("bold"),
-        "bold inline: {text:?}"
-    );
-    assert!(
-        text.contains("Section Two"),
-        "h2: {text:?}"
-    );
-    assert!(
-        text.contains("Another paragraph"),
-        "body: {text:?}"
-    );
+    assert!(text.contains("Document Title"), "h1: {text:?}");
+    assert!(text.contains("bold"), "bold inline: {text:?}");
+    assert!(text.contains("Section Two"), "h2: {text:?}");
+    assert!(text.contains("Another paragraph"), "body: {text:?}");
 }
 
 #[test]

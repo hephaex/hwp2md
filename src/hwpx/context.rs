@@ -26,6 +26,14 @@ pub(crate) struct ParseContext {
     /// CSS hex color string parsed from the `color` / `hp:color` attribute of
     /// `<charPr>`.  `None` means default text color (not rendered).
     pub(crate) current_color: Option<String>,
+    /// Font name resolved from the DocInfo `<hh:fontface>` table via a
+    /// `faceNameIDRef` index carried on a `<charPr>` element.  `None` means
+    /// the run uses the document default font.
+    pub(crate) current_font_name: Option<String>,
+    /// Ordered list of face names parsed from `<hh:fontface>` entries in
+    /// header.xml.  The position in the vec is the index used by
+    /// `faceNameIDRef` in `<charPr>` elements inside section XML.
+    pub(crate) face_names: Vec<String>,
     pub(crate) heading_level: Option<u8>,
     pub(crate) table_rows: Vec<ir::TableRow>,
     pub(crate) current_row_cells: Vec<ir::TableCell>,
@@ -88,6 +96,8 @@ impl Default for ParseContext {
             current_superscript: false,
             current_subscript: false,
             current_color: None,
+            current_font_name: None,
+            face_names: Vec::new(),
             heading_level: None,
             table_rows: Vec::new(),
             current_row_cells: Vec::new(),
@@ -172,13 +182,24 @@ impl ParseContext {
     }
 }
 
-/// Parse `bold`, `italic`, `underline`, and `strikeout` attributes from a
-/// `<charPr>` or `<hp:charPr>` element and write them onto `ctx`.
+/// Parse `bold`, `italic`, `underline`, `strikeout`, and font-face attributes
+/// from a `<charPr>` or `<hp:charPr>` element and write them onto `ctx`.
 ///
 /// Called from both `handle_start_element` (non-self-closing variant) and
 /// `handle_empty_element` (self-closing variant) so the two paths are
 /// guaranteed to behave identically.
+///
+/// Font resolution: HWPX section XML carries a `faceNameIDRef` (or
+/// `hangulIDRef` in some encodings) attribute on `<charPr>` that is a
+/// zero-based index into the `<hh:fontface>` list built from header.xml.
+/// When `ctx.face_names` is populated, the index is resolved to a font name
+/// and stored in `ctx.current_font_name`.  An out-of-range index is silently
+/// ignored.
 pub(crate) fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut ParseContext) {
+    // Collect faceNameIDRef / hangulIDRef separately so we can resolve after
+    // scanning all attributes (avoids a second pass).
+    let mut face_id: Option<usize> = None;
+
     for attr in e.attributes().flatten() {
         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
         let val = attr.unescape_value().unwrap_or_default();
@@ -212,8 +233,20 @@ pub(crate) fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut Pa
                     ctx.current_color = Some(format!("#{}", raw.to_ascii_uppercase()));
                 }
             }
+            // HWPX section XML uses `faceNameIDRef` (HANGUL slot index into the
+            // document-level fontface list) or the alias `hangulIDRef`.
+            "faceNameIDRef" | "hp:faceNameIDRef" | "hangulIDRef" | "hp:hangulIDRef" => {
+                if let Ok(idx) = val.as_ref().parse::<usize>() {
+                    face_id = Some(idx);
+                }
+            }
             _ => {}
         }
+    }
+
+    // Resolve font index to a name using the pre-populated face_names table.
+    if let Some(idx) = face_id {
+        ctx.current_font_name = ctx.face_names.get(idx).cloned();
     }
 }
 
@@ -242,7 +275,14 @@ fn flush_inlines_to_blocks(
     if !text.is_empty() {
         let t = std::mem::take(text);
         inlines.push(ir::Inline::with_formatting(
-            t, bold, italic, underline, strike, superscript, subscript, color.clone(),
+            t,
+            bold,
+            italic,
+            underline,
+            strike,
+            superscript,
+            subscript,
+            color.clone(),
         ));
     }
     if !inlines.is_empty() {

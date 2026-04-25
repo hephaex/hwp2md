@@ -23,9 +23,17 @@ pub fn read_hwpx(path: &Path) -> Result<ir::Document, Hwp2MdError> {
 
     let mut doc = ir::Document::new();
 
-    if let Ok(metadata) = read_metadata(&mut archive) {
+    // Read header.xml once: extract both document metadata and the font face
+    // name table.  The face names are passed into each section parser so that
+    // charPr faceNameIDRef attributes can be resolved to human-readable names.
+    let header_xml = read_zip_entry(&mut archive, "Contents/header.xml")
+        .or_else(|_| read_zip_entry(&mut archive, "header.xml"))
+        .unwrap_or_default();
+
+    if let Ok(metadata) = parse_metadata(&header_xml) {
         doc.metadata = metadata;
     }
+    let face_names = parse_face_names(&header_xml);
 
     // Build the BinData ID -> full ZIP path map before parsing sections so that
     // binaryItemIDRef references can be resolved immediately.
@@ -35,7 +43,7 @@ pub fn read_hwpx(path: &Path) -> Result<ir::Document, Hwp2MdError> {
     let section_files = find_section_files(&mut archive);
 
     for section_path in &section_files {
-        match read_section_xml(&mut archive, section_path) {
+        match read_section_xml(&mut archive, section_path, &face_names) {
             Ok(mut section) => {
                 resolve_bin_refs(&mut section, &bin_map);
                 doc.sections.push(section);
@@ -125,15 +133,13 @@ fn resolve_block_bin_refs(block: &mut ir::Block, bin_map: &HashMap<String, Strin
     }
 }
 
-fn read_metadata(
-    archive: &mut zip::ZipArchive<std::fs::File>,
-) -> Result<ir::Metadata, Hwp2MdError> {
+/// Parse document metadata (title, author, subject, description) from the
+/// text of a header.xml entry.  Returns a default `Metadata` if parsing fails
+/// or the XML contains none of the recognised elements.
+fn parse_metadata(xml: &str) -> Result<ir::Metadata, Hwp2MdError> {
     let mut meta = ir::Metadata::default();
 
-    let xml = read_zip_entry(archive, "Contents/header.xml")
-        .or_else(|_| read_zip_entry(archive, "header.xml"))?;
-
-    let mut reader = Reader::from_str(&xml);
+    let mut reader = Reader::from_str(xml);
     let mut buf = Vec::new();
     let mut in_title = false;
     let mut in_author = false;
@@ -183,6 +189,73 @@ fn read_metadata(
     }
 
     Ok(meta)
+}
+
+/// Parse the ordered list of font face names from the text of a header.xml
+/// entry.
+///
+/// HWPX header.xml contains one or more `<hh:fontface>` elements (one per
+/// language slot: HANGUL, LATIN, …).  Each contains `<hh:font id="N"
+/// face="FontName"/>` children.  We collect names from the **first**
+/// `<hh:fontface>` element encountered (typically the HANGUL slot), because
+/// that slot matches the `faceNameIDRef` index used on `<charPr>` elements in
+/// section XML.
+///
+/// Returns an empty `Vec` when header.xml is absent or contains no font
+/// declarations.
+pub(crate) fn parse_face_names(xml: &str) -> Vec<String> {
+    let mut names: Vec<String> = Vec::new();
+    let mut in_first_fontface = false;
+    let mut fontface_depth: u32 = 0;
+    let mut reader = Reader::from_str(xml);
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
+                let local_name = e.local_name();
+                let local = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
+                match local {
+                    "fontface" => {
+                        fontface_depth += 1;
+                        if fontface_depth == 1 {
+                            in_first_fontface = true;
+                        }
+                    }
+                    "font" if in_first_fontface => {
+                        // Collect the `face` attribute value.
+                        for attr in e.attributes().flatten() {
+                            let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                            if key == "face" || key == "hh:face" {
+                                let val = attr.unescape_value().unwrap_or_default().to_string();
+                                if !val.is_empty() {
+                                    names.push(val);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                let local_name = e.local_name();
+                let local = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
+                if local == "fontface" && fontface_depth > 0 {
+                    fontface_depth -= 1;
+                    // Once the first fontface block closes, stop collecting.
+                    if fontface_depth == 0 {
+                        break;
+                    }
+                }
+            }
+            Ok(Event::Eof) | Err(_) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    names
 }
 
 fn find_section_files(archive: &mut zip::ZipArchive<std::fs::File>) -> Vec<String> {
@@ -259,17 +332,31 @@ fn find_bin_files(archive: &mut zip::ZipArchive<std::fs::File>) -> Vec<String> {
 fn read_section_xml(
     archive: &mut zip::ZipArchive<std::fs::File>,
     path: &str,
+    face_names: &[String],
 ) -> Result<ir::Section, Hwp2MdError> {
     let xml = read_zip_entry(archive, path)?;
-    parse_section_xml(&xml)
+    parse_section_xml_with_face_names(&xml, face_names)
 }
 
-pub(crate) fn parse_section_xml(xml: &str) -> Result<ir::Section, Hwp2MdError> {
+/// Parse a section XML string into an `ir::Section` using a pre-built font
+/// face name table.
+///
+/// `face_names` is populated from header.xml and allows `faceNameIDRef`
+/// indices on `<charPr>` elements to be resolved to human-readable font names
+/// stored on `ir::Inline::font_name`.  Pass an empty slice when no header is
+/// available (e.g. in unit tests that work with raw section XML snippets).
+pub(crate) fn parse_section_xml_with_face_names(
+    xml: &str,
+    face_names: &[String],
+) -> Result<ir::Section, Hwp2MdError> {
     let mut section = ir::Section { blocks: Vec::new() };
     let mut reader = Reader::from_str(xml);
     let mut buf = Vec::new();
 
-    let mut context = ParseContext::default();
+    let mut context = ParseContext {
+        face_names: face_names.to_vec(),
+        ..ParseContext::default()
+    };
 
     loop {
         match reader.read_event_into(&mut buf) {
@@ -305,6 +392,16 @@ pub(crate) fn parse_section_xml(xml: &str) -> Result<ir::Section, Hwp2MdError> {
     flush_paragraph(&mut context, &mut section);
 
     Ok(section)
+}
+
+/// Parse a section XML string into an `ir::Section` with no font face context.
+///
+/// This is a convenience wrapper around [`parse_section_xml_with_face_names`]
+/// that passes an empty face name table.  It is used by unit tests that
+/// construct minimal section XML snippets without a corresponding header.xml.
+#[cfg(test)]
+pub(crate) fn parse_section_xml(xml: &str) -> Result<ir::Section, Hwp2MdError> {
+    parse_section_xml_with_face_names(xml, &[])
 }
 
 /// Maximum size for a single ZIP entry read from untrusted HWPX input (256 MB).

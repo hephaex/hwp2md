@@ -223,6 +223,12 @@ impl Inline {
         self
     }
 
+    /// Set the `font_name` field, returning the modified inline.
+    pub fn with_font_name(mut self, font_name: Option<String>) -> Self {
+        self.font_name = font_name;
+        self
+    }
+
     /// Create a footnote-reference inline with no visible text or formatting.
     pub fn footnote_ref(id: impl Into<String>) -> Self {
         Self {

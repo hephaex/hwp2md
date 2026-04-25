@@ -46,7 +46,9 @@ fn section_xml_field_begin_has_correct_attributes() {
 
     // fieldBegin must have both type and command attributes.
     let fb_pos = xml.find("hp:fieldBegin").expect("fieldBegin must exist");
-    let fb_end = xml[fb_pos..].find("/>").expect("fieldBegin must be self-closing");
+    let fb_end = xml[fb_pos..]
+        .find("/>")
+        .expect("fieldBegin must be self-closing");
     let fb_tag = &xml[fb_pos..fb_pos + fb_end];
     assert!(
         fb_tag.contains(r#"type="HYPERLINK""#),
@@ -76,10 +78,7 @@ fn section_xml_link_text_appears_between_field_markers() {
         begin_pos < text_pos,
         "fieldBegin must precede link text: {xml}"
     );
-    assert!(
-        text_pos < end_pos,
-        "link text must precede fieldEnd: {xml}"
-    );
+    assert!(text_pos < end_pos, "link text must precede fieldEnd: {xml}");
 }
 
 #[test]
