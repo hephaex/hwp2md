@@ -226,6 +226,21 @@ fn section_xml_image_block() {
     );
     assert!(xml.contains(r#"alt="a cat""#), "{xml}");
     assert!(xml.contains("<hp:img"), "{xml}");
+    // 6-A: image must be wrapped in <hp:run><hp:pic>...</hp:pic></hp:run>
+    assert!(
+        xml.contains(r#"<hp:run charPrIDRef="0">"#),
+        "image run wrapper missing: {xml}"
+    );
+    assert!(xml.contains("<hp:pic>"), "hp:pic wrapper missing: {xml}");
+    assert!(xml.contains("</hp:pic>"), "hp:pic close missing: {xml}");
+    // Verify nesting order: run → pic → img
+    let run_pos = xml
+        .find(r#"<hp:run charPrIDRef="0">"#)
+        .expect("run position");
+    let pic_pos = xml.find("<hp:pic>").expect("pic position");
+    let img_pos = xml.find("<hp:img").expect("img position");
+    assert!(run_pos < pic_pos, "run must precede pic: {xml}");
+    assert!(pic_pos < img_pos, "pic must precede img: {xml}");
 }
 
 #[test]
@@ -326,6 +341,17 @@ fn section_xml_math_block() {
     assert!(xml.contains("<hp:equation>"), "equation open: {xml}");
     assert!(xml.contains("</hp:equation>"), "equation close: {xml}");
     assert!(xml.contains(r"E = mc^2"), "{xml}");
+    // 6-B: equation must be wrapped in <hp:run charPrIDRef="0">
+    assert!(
+        xml.contains(r#"<hp:run charPrIDRef="0">"#),
+        "equation run wrapper missing: {xml}"
+    );
+    // Verify nesting order: run → equation
+    let run_pos = xml
+        .find(r#"<hp:run charPrIDRef="0">"#)
+        .expect("run position");
+    let eq_pos = xml.find("<hp:equation>").expect("equation position");
+    assert!(run_pos < eq_pos, "run must precede equation: {xml}");
 }
 
 #[test]
@@ -454,9 +480,16 @@ fn header_xml_contains_char_properties() {
         "charProperties section: {content}"
     );
     assert!(content.contains("hh:charPr"), "charPr entry: {content}");
+    // OWPML schema does not allow bold/italic/underline/strikeout as charPr
+    // attributes; bold formatting is expressed through distinct charPr IDs.
     assert!(
-        content.contains(r#"bold="true""#),
-        "bold charPr in header: {content}"
+        !content.contains(r#"bold="true""#),
+        "bold must NOT appear as a charPr attribute (schema violation): {content}"
+    );
+    // The bold inline must produce a non-default (id != 0) charPr entry.
+    assert!(
+        content.contains(r#"id="1""#),
+        "bold inline must produce a charPr with id=1: {content}"
     );
 }
 
@@ -671,17 +704,9 @@ fn write_hwpx_asset_with_path_prefix_uses_basename_only() {
 }
 
 #[test]
-fn write_hwpx_header_xml_contains_title_and_author() {
+fn write_hwpx_header_xml_has_version_and_sec_cnt() {
     let tmp = tempfile::NamedTempFile::new().expect("tmp file");
-    let doc = Document {
-        metadata: Metadata {
-            title: Some("My Title".into()),
-            author: Some("Alice".into()),
-            ..Metadata::default()
-        },
-        sections: Vec::new(),
-        assets: Vec::new(),
-    };
+    let doc = doc_with_section(vec![]);
     write_hwpx(&doc, tmp.path(), None).expect("write");
 
     let file = std::fs::File::open(tmp.path()).expect("open");
@@ -689,8 +714,14 @@ fn write_hwpx_header_xml_contains_title_and_author() {
     let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
     let mut content = String::new();
     entry.read_to_string(&mut content).expect("read");
-    assert!(content.contains("My Title"), "{content}");
-    assert!(content.contains("Alice"), "{content}");
+    assert!(
+        content.contains(r#"version="1.1""#),
+        "version attr: {content}"
+    );
+    assert!(
+        content.contains(r#"secCnt="1""#),
+        "secCnt attr: {content}"
+    );
 }
 
 #[test]

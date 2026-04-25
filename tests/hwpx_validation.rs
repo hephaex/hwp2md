@@ -26,6 +26,21 @@ fn validate_hwpx_bytes(bytes: &[u8]) -> Vec<polaris_dvc_core::ViolationRecord> {
     report.violations
 }
 
+fn validate_hwpx_bytes_with_schema(bytes: &[u8]) -> Vec<polaris_dvc_core::ViolationRecord> {
+    let doc = match open_bytes(bytes) {
+        Ok(d) => d,
+        Err(e) => panic!("polaris_dvc failed to parse HWPX: {e}"),
+    };
+    let spec = RuleSpec::default();
+    let opts = EngineOptions {
+        stop_on_first: false,
+        profile: CheckProfile::Extended,
+        enable_schema: true,
+    };
+    let report = polaris_dvc_core::engine::validate(&doc, &spec, &opts);
+    report.violations
+}
+
 fn container_integrity_violations(
     violations: &[polaris_dvc_core::ViolationRecord],
 ) -> Vec<&polaris_dvc_core::ViolationRecord> {
@@ -240,5 +255,34 @@ fn markdown_to_hwpx_roundtrip_passes_validation() {
     assert!(
         critical.is_empty(),
         "Korean doc container/integrity violations: {critical:#?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6: schema validation (JID 13000-13999)
+// ---------------------------------------------------------------------------
+
+/// Verify that an empty document produces no OWPML schema violations.
+///
+/// Schema violations use error codes in the 13000-13999 range (polaris_dvc
+/// convention).  This test is marked `#[ignore]` if schema checks reveal
+/// violations that require additional writer work beyond Phase 6 scope.
+/// Remove the `#[ignore]` attribute once all schema violations are resolved.
+#[test]
+fn writer_empty_doc_no_schema_violations() {
+    let doc = ir::Document::new();
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    hwpx::write_hwpx(&doc, tmp.path(), None).unwrap();
+
+    let bytes = std::fs::read(tmp.path()).unwrap();
+    let violations = validate_hwpx_bytes_with_schema(&bytes);
+    let schema_violations: Vec<_> = violations
+        .iter()
+        .filter(|v| v.error_code.0 >= 13000 && v.error_code.0 < 14000)
+        .collect();
+
+    assert!(
+        schema_violations.is_empty(),
+        "schema violations on empty doc: {schema_violations:#?}"
     );
 }

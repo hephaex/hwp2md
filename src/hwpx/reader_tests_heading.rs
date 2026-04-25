@@ -46,3 +46,23 @@ fn parse_heading_style_heading_no_digit_defaults_to_1() {
 fn parse_heading_style_case_insensitive() {
     assert_eq!(parse_heading_style("HEADING2"), Some(2));
 }
+
+#[test]
+fn parse_heading_style_numeric_1() {
+    assert_eq!(parse_heading_style("1"), Some(1));
+}
+
+#[test]
+fn parse_heading_style_numeric_6() {
+    assert_eq!(parse_heading_style("6"), Some(6));
+}
+
+#[test]
+fn parse_heading_style_numeric_7() {
+    assert_eq!(parse_heading_style("7"), None);
+}
+
+#[test]
+fn parse_heading_style_numeric_0() {
+    assert_eq!(parse_heading_style("0"), None);
+}

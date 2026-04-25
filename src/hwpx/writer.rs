@@ -313,31 +313,19 @@ fn generate_version_xml() -> String {
 // ---------------------------------------------------------------------------
 
 fn generate_header_xml(doc: &ir::Document, tables: &RefTables) -> Result<String, Hwp2MdError> {
-    let title = doc.metadata.title.as_deref().unwrap_or("");
-    let author = doc.metadata.author.as_deref().unwrap_or("");
-
     let mut buf = Cursor::new(Vec::new());
     let mut w = Writer::new_with_indent(&mut buf, b' ', 2);
 
     w.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
 
-    // <hh:head>
+    let sec_cnt = doc.sections.len().max(1);
+
+    // <hh:head version="1.1" secCnt="N">
     let mut head = BytesStart::new("hh:head");
     head.push_attribute(("xmlns:hh", "http://www.hancom.co.kr/hwpml/2011/head"));
+    head.push_attribute(("version", "1.1"));
+    head.push_attribute(("secCnt", sec_cnt.to_string().as_str()));
     w.write_event(Event::Start(head))?;
-
-    // <hh:docInfo>
-    w.write_event(Event::Start(BytesStart::new("hh:docInfo")))?;
-
-    w.write_event(Event::Start(BytesStart::new("hh:title")))?;
-    w.write_event(Event::Text(BytesText::new(title)))?;
-    w.write_event(Event::End(BytesEnd::new("hh:title")))?;
-
-    w.write_event(Event::Start(BytesStart::new("hh:creator")))?;
-    w.write_event(Event::Text(BytesText::new(author)))?;
-    w.write_event(Event::End(BytesEnd::new("hh:creator")))?;
-
-    w.write_event(Event::End(BytesEnd::new("hh:docInfo")))?;
 
     // <hh:beginNum> — required structural marker
     let mut begin_num = BytesStart::new("hh:beginNum");
@@ -349,16 +337,18 @@ fn generate_header_xml(doc: &ir::Document, tables: &RefTables) -> Result<String,
     begin_num.push_attribute(("equation", "1"));
     w.write_event(Event::Empty(begin_num))?;
 
-    // <hh:refList>
+    // <hh:refList> — contains fontfaces, charProperties, paraProperties, styles
     w.write_event(Event::Start(BytesStart::new("hh:refList")))?;
 
     write_font_faces(&mut w, tables)?;
     write_char_properties(&mut w, tables)?;
     write_para_properties(&mut w)?;
+    write_styles(&mut w, tables)?;
 
     w.write_event(Event::End(BytesEnd::new("hh:refList")))?;
 
-    write_styles(&mut w, tables)?;
+    // <hh:trackchangeConfig> — required by schema (minOccurs=1)
+    w.write_event(Event::Empty(BytesStart::new("hh:trackchangeConfig")))?;
 
     w.write_event(Event::End(BytesEnd::new("hh:head")))?;
 
@@ -369,17 +359,23 @@ fn write_font_faces<W: Write>(
     w: &mut Writer<W>,
     tables: &RefTables,
 ) -> Result<(), quick_xml::Error> {
-    w.write_event(Event::Start(BytesStart::new("hh:fontfaces")))?;
+    let font_cnt = tables.font_names.len().to_string();
+
+    let mut fontfaces = BytesStart::new("hh:fontfaces");
+    fontfaces.push_attribute(("itemCnt", LANG_SLOTS.len().to_string().as_str()));
+    w.write_event(Event::Start(fontfaces))?;
 
     for lang in LANG_SLOTS {
         let mut face = BytesStart::new("hh:fontface");
         face.push_attribute(("lang", lang));
+        face.push_attribute(("fontCnt", font_cnt.as_str()));
         w.write_event(Event::Start(face))?;
 
         for (id, name) in tables.font_names.iter().enumerate() {
             let mut font = BytesStart::new("hh:font");
             font.push_attribute(("id", id.to_string().as_str()));
             font.push_attribute(("face", name.as_str()));
+            font.push_attribute(("type", "REP"));
             w.write_event(Event::Empty(font))?;
         }
 
@@ -394,12 +390,14 @@ fn write_char_properties<W: Write>(
     w: &mut Writer<W>,
     tables: &RefTables,
 ) -> Result<(), quick_xml::Error> {
-    w.write_event(Event::Start(BytesStart::new("hh:charProperties")))?;
-
     // Collect and sort by ID for deterministic output.
     let mut entries: Vec<(&CharPrKey, u32)> =
         tables.char_pr_ids.iter().map(|(k, &id)| (k, id)).collect();
     entries.sort_by_key(|(_, id)| *id);
+
+    let mut char_properties = BytesStart::new("hh:charProperties");
+    char_properties.push_attribute(("itemCnt", entries.len().to_string().as_str()));
+    w.write_event(Event::Start(char_properties))?;
 
     for (key, id) in entries {
         let font_id: u32 = key
@@ -417,22 +415,13 @@ fn write_char_properties<W: Write>(
         let color = key.color.as_deref().unwrap_or("#000000");
 
         let height_str = key.height.to_string();
+        // OWPML schema only allows: id, height, textColor, shadeColor,
+        // useFontSpace, useKerning, symMark, borderFillIDRef.
+        // bold/italic/underline/strikeout are NOT valid attributes here.
         let mut char_pr = BytesStart::new("hh:charPr");
         char_pr.push_attribute(("id", id.to_string().as_str()));
         char_pr.push_attribute(("height", height_str.as_str()));
         char_pr.push_attribute(("textColor", color));
-        if key.bold {
-            char_pr.push_attribute(("bold", "true"));
-        }
-        if key.italic {
-            char_pr.push_attribute(("italic", "true"));
-        }
-        if key.underline {
-            char_pr.push_attribute(("underline", "bottom"));
-        }
-        if key.strikethrough {
-            char_pr.push_attribute(("strikeout", "line"));
-        }
         w.write_event(Event::Start(char_pr))?;
 
         let font_id_str = font_id.to_string();
@@ -446,6 +435,47 @@ fn write_char_properties<W: Write>(
         font_ref.push_attribute(("user", font_id_str.as_str()));
         w.write_event(Event::Empty(font_ref))?;
 
+        // Required children (minOccurs=1) with default values.
+        let mut ratio = BytesStart::new("hh:ratio");
+        ratio.push_attribute(("hangul", "100"));
+        ratio.push_attribute(("latin", "100"));
+        ratio.push_attribute(("hanja", "100"));
+        ratio.push_attribute(("japanese", "100"));
+        ratio.push_attribute(("other", "100"));
+        ratio.push_attribute(("symbol", "100"));
+        ratio.push_attribute(("user", "100"));
+        w.write_event(Event::Empty(ratio))?;
+
+        let mut spacing = BytesStart::new("hh:spacing");
+        spacing.push_attribute(("hangul", "0"));
+        spacing.push_attribute(("latin", "0"));
+        spacing.push_attribute(("hanja", "0"));
+        spacing.push_attribute(("japanese", "0"));
+        spacing.push_attribute(("other", "0"));
+        spacing.push_attribute(("symbol", "0"));
+        spacing.push_attribute(("user", "0"));
+        w.write_event(Event::Empty(spacing))?;
+
+        let mut rel_sz = BytesStart::new("hh:relSz");
+        rel_sz.push_attribute(("hangul", "100"));
+        rel_sz.push_attribute(("latin", "100"));
+        rel_sz.push_attribute(("hanja", "100"));
+        rel_sz.push_attribute(("japanese", "100"));
+        rel_sz.push_attribute(("other", "100"));
+        rel_sz.push_attribute(("symbol", "100"));
+        rel_sz.push_attribute(("user", "100"));
+        w.write_event(Event::Empty(rel_sz))?;
+
+        let mut offset = BytesStart::new("hh:offset");
+        offset.push_attribute(("hangul", "0"));
+        offset.push_attribute(("latin", "0"));
+        offset.push_attribute(("hanja", "0"));
+        offset.push_attribute(("japanese", "0"));
+        offset.push_attribute(("other", "0"));
+        offset.push_attribute(("symbol", "0"));
+        offset.push_attribute(("user", "0"));
+        w.write_event(Event::Empty(offset))?;
+
         w.write_event(Event::End(BytesEnd::new("hh:charPr")))?;
     }
 
@@ -454,20 +484,60 @@ fn write_char_properties<W: Write>(
 }
 
 fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::Error> {
-    w.write_event(Event::Start(BytesStart::new("hh:paraProperties")))?;
+    let mut para_properties = BytesStart::new("hh:paraProperties");
+    para_properties.push_attribute(("itemCnt", "1"));
+    w.write_event(Event::Start(para_properties))?;
 
     let mut para_pr = BytesStart::new("hh:paraPr");
     para_pr.push_attribute(("id", "0"));
     w.write_event(Event::Start(para_pr))?;
 
+    // <align> requires both horizontal and vertical attributes.
     let mut align = BytesStart::new("hh:align");
     align.push_attribute(("horizontal", "JUSTIFY"));
+    align.push_attribute(("vertical", "BASELINE"));
     w.write_event(Event::Empty(align))?;
+
+    // Required children (minOccurs=1) with default values.
+    let mut heading = BytesStart::new("hh:heading");
+    heading.push_attribute(("type", "NONE"));
+    heading.push_attribute(("idRef", "0"));
+    heading.push_attribute(("level", "0"));
+    w.write_event(Event::Empty(heading))?;
+
+    // breakSetting requires all seven attributes (schema: all required).
+    let mut break_setting = BytesStart::new("hh:breakSetting");
+    break_setting.push_attribute(("breakLatinWord", "KEEP_WORD"));
+    break_setting.push_attribute(("breakNonLatinWord", "KEEP_WORD"));
+    break_setting.push_attribute(("widowOrphan", "false"));
+    break_setting.push_attribute(("keepWithNext", "false"));
+    break_setting.push_attribute(("keepLines", "false"));
+    break_setting.push_attribute(("pageBreakBefore", "false"));
+    break_setting.push_attribute(("lineWrap", "BREAK"));
+    w.write_event(Event::Empty(break_setting))?;
 
     let mut line_spacing = BytesStart::new("hh:lineSpacing");
     line_spacing.push_attribute(("type", "PERCENT"));
     line_spacing.push_attribute(("value", "160"));
     w.write_event(Event::Empty(line_spacing))?;
+
+    // margin children are HWPValue elements (value attribute, no attrs on margin itself).
+    w.write_event(Event::Start(BytesStart::new("hh:margin")))?;
+    for child_name in &["hh:intent", "hh:left", "hh:right", "hh:prev", "hh:next"] {
+        let mut child = BytesStart::new(*child_name);
+        child.push_attribute(("value", "0"));
+        w.write_event(Event::Empty(child))?;
+    }
+    w.write_event(Event::End(BytesEnd::new("hh:margin")))?;
+
+    let mut border = BytesStart::new("hh:border");
+    border.push_attribute(("borderFillIDRef", "0"));
+    w.write_event(Event::Empty(border))?;
+
+    let mut auto_spacing = BytesStart::new("hh:autoSpacing");
+    auto_spacing.push_attribute(("eAsianEng", "false"));
+    auto_spacing.push_attribute(("eAsianNum", "false"));
+    w.write_event(Event::Empty(auto_spacing))?;
 
     w.write_event(Event::End(BytesEnd::new("hh:paraPr")))?;
 
@@ -479,12 +549,15 @@ fn write_styles<W: Write>(
     w: &mut Writer<W>,
     tables: &RefTables,
 ) -> Result<(), quick_xml::Error> {
-    w.write_event(Event::Start(BytesStart::new("hh:styles")))?;
+    // 7 styles: Normal (id=0) + Heading1-6 (id=1..6).
+    let mut styles = BytesStart::new("hh:styles");
+    styles.push_attribute(("itemCnt", "7"));
+    w.write_event(Event::Start(styles))?;
 
     // Normal style uses the default charPr (id=0).
     let mut normal = BytesStart::new("hh:style");
     normal.push_attribute(("id", "0"));
-    normal.push_attribute(("type", "PARAGRAPH"));
+    normal.push_attribute(("type", "PARA"));
     normal.push_attribute(("name", "Normal"));
     normal.push_attribute(("paraPrIDRef", "0"));
     normal.push_attribute(("charPrIDRef", "0"));
@@ -498,7 +571,7 @@ fn write_styles<W: Write>(
         let name = format!("Heading{level}");
         let mut style = BytesStart::new("hh:style");
         style.push_attribute(("id", id_str.as_str()));
-        style.push_attribute(("type", "PARAGRAPH"));
+        style.push_attribute(("type", "PARA"));
         style.push_attribute(("name", name.as_str()));
         style.push_attribute(("paraPrIDRef", "0"));
         style.push_attribute(("charPrIDRef", char_pr_id_str.as_str()));
@@ -679,10 +752,16 @@ fn write_block<W: Write>(
             p.push_attribute(("id", id_str.as_str()));
             p.push_attribute(("paraPrIDRef", "0"));
             writer.write_event(Event::Start(p))?;
+            let mut run = BytesStart::new("hp:run");
+            run.push_attribute(("charPrIDRef", "0"));
+            writer.write_event(Event::Start(run))?;
+            writer.write_event(Event::Start(BytesStart::new("hp:pic")))?;
             let mut img = BytesStart::new("hp:img");
             img.push_attribute(("hp:binaryItemIDRef", src.as_str()));
             img.push_attribute(("alt", alt.as_str()));
             writer.write_event(Event::Empty(img))?;
+            writer.write_event(Event::End(BytesEnd::new("hp:pic")))?;
+            writer.write_event(Event::End(BytesEnd::new("hp:run")))?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
         ir::Block::HorizontalRule => {
@@ -708,9 +787,13 @@ fn write_block<W: Write>(
             p.push_attribute(("id", id_str.as_str()));
             p.push_attribute(("paraPrIDRef", "0"));
             writer.write_event(Event::Start(p))?;
+            let mut run = BytesStart::new("hp:run");
+            run.push_attribute(("charPrIDRef", "0"));
+            writer.write_event(Event::Start(run))?;
             writer.write_event(Event::Start(BytesStart::new("hp:equation")))?;
             writer.write_event(Event::Text(BytesText::new(tex)))?;
             writer.write_event(Event::End(BytesEnd::new("hp:equation")))?;
+            writer.write_event(Event::End(BytesEnd::new("hp:run")))?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
         ir::Block::Footnote { content, .. } => {
