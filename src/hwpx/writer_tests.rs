@@ -35,8 +35,16 @@ fn underline_inline(text: &str) -> Inline {
 }
 
 fn section_xml(blocks: Vec<Block>) -> String {
+    let doc = Document {
+        metadata: Metadata::default(),
+        sections: vec![Section {
+            blocks: blocks.clone(),
+        }],
+        assets: Vec::new(),
+    };
+    let tables = RefTables::build(&doc);
     let sec = Section { blocks };
-    generate_section_xml(&sec, 0).expect("generate_section_xml failed")
+    generate_section_xml(&sec, 0, &tables).expect("generate_section_xml failed")
 }
 
 fn zip_entry_names(path: &std::path::Path) -> Vec<String> {
@@ -70,7 +78,7 @@ fn section_xml_paragraph_plain_text() {
     let xml = section_xml(vec![Block::Paragraph {
         inlines: vec![inline("hello world")],
     }]);
-    assert!(xml.contains("<hp:p>"), "paragraph open: {xml}");
+    assert!(xml.contains("<hp:p "), "paragraph open: {xml}");
     assert!(xml.contains("</hp:p>"), "paragraph close: {xml}");
     assert!(xml.contains("<hp:t>"), "text run open: {xml}");
     assert!(xml.contains("hello world"), "text content: {xml}");
@@ -79,7 +87,7 @@ fn section_xml_paragraph_plain_text() {
 #[test]
 fn section_xml_empty_paragraph() {
     let xml = section_xml(vec![Block::Paragraph { inlines: vec![] }]);
-    assert!(xml.contains("<hp:p>"));
+    assert!(xml.contains("<hp:p "));
     assert!(xml.contains("</hp:p>"));
 }
 
@@ -149,8 +157,43 @@ fn section_xml_plain_inline_has_no_charpr() {
     let xml = section_xml(vec![Block::Paragraph {
         inlines: vec![inline("plain")],
     }]);
-    // No formatting → no hp:charPr element should be emitted
-    assert!(!xml.contains("<hp:charPr"), "unexpected charPr: {xml}");
+    // Plain text → no inline hp:charPr element (formatting is only in header table)
+    assert!(
+        !xml.contains("<hp:charPr"),
+        "unexpected inline charPr: {xml}"
+    );
+}
+
+#[test]
+fn section_xml_plain_inline_has_charpr_id_ref() {
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![inline("plain")],
+    }]);
+    // Plain text → charPrIDRef="0" on the run element
+    assert!(
+        xml.contains(r#"charPrIDRef="0""#),
+        "charPrIDRef missing: {xml}"
+    );
+}
+
+#[test]
+fn section_xml_bold_inline_has_nonzero_charpr_id_ref() {
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![bold_inline("bold")],
+    }]);
+    // Bold → charPrIDRef pointing to id=1 (first non-default entry)
+    assert!(xml.contains("charPrIDRef="), "charPrIDRef missing: {xml}");
+}
+
+#[test]
+fn section_xml_paragraph_has_para_pr_id_ref() {
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![inline("text")],
+    }]);
+    assert!(
+        xml.contains(r#"paraPrIDRef="0""#),
+        "paraPrIDRef missing: {xml}"
+    );
 }
 
 #[test]
@@ -170,7 +213,7 @@ fn section_xml_image_block() {
         src: "image001.png".into(),
         alt: "a cat".into(),
     }]);
-    assert!(xml.contains("<hp:p>"), "{xml}");
+    assert!(xml.contains("<hp:p "), "{xml}");
     assert!(
         xml.contains(r#"hp:binaryItemIDRef="image001.png""#),
         "{xml}"
@@ -294,7 +337,7 @@ fn section_xml_ordered_list() {
     }]);
     assert!(xml.contains("first"), "{xml}");
     assert!(xml.contains("second"), "{xml}");
-    assert_eq!(xml.matches("<hp:p>").count(), 2, "{xml}");
+    assert_eq!(xml.matches("<hp:p ").count(), 2, "{xml}");
 }
 
 #[test]
@@ -331,13 +374,13 @@ fn section_xml_blockquote() {
         }],
     }]);
     assert!(xml.contains("quoted"), "{xml}");
-    assert!(xml.contains("<hp:p>"), "{xml}");
+    assert!(xml.contains("<hp:p "), "{xml}");
 }
 
 #[test]
 fn section_xml_horizontal_rule() {
     let xml = section_xml(vec![Block::HorizontalRule]);
-    assert!(xml.contains("<hp:p>"), "{xml}");
+    assert!(xml.contains("<hp:p "), "{xml}");
     // The writer emits a line of em-dashes as a visual rule.
     assert!(xml.contains("───"), "{xml}");
 }
@@ -348,7 +391,7 @@ fn section_xml_code_block() {
         language: Some("rust".into()),
         code: "fn main() {}".into(),
     }]);
-    assert!(xml.contains("<hp:p>"), "{xml}");
+    assert!(xml.contains("<hp:p "), "{xml}");
     assert!(xml.contains(r#"hp:charPrIDRef="code""#), "{xml}");
     assert!(xml.contains("fn main() {}"), "{xml}");
 }
@@ -368,6 +411,86 @@ fn section_xml_multiple_blocks_ordering() {
     let heading_pos = xml.find("Section").expect("heading text");
     let para_pos = xml.find("Body text").expect("para text");
     assert!(heading_pos < para_pos, "heading before paragraph: {xml}");
+}
+
+// ── header.xml reference table tests ─────────────────────────────────────
+
+#[test]
+fn header_xml_contains_char_properties() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = doc_with_section(vec![Block::Paragraph {
+        inlines: vec![bold_inline("hello")],
+    }]);
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    entry.read_to_string(&mut content).expect("read");
+
+    assert!(
+        content.contains("hh:charProperties"),
+        "charProperties section: {content}"
+    );
+    assert!(content.contains("hh:charPr"), "charPr entry: {content}");
+    assert!(
+        content.contains(r#"bold="true""#),
+        "bold charPr in header: {content}"
+    );
+}
+
+#[test]
+fn header_xml_contains_para_properties() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = Document::new();
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    entry.read_to_string(&mut content).expect("read");
+
+    assert!(
+        content.contains("hh:paraProperties"),
+        "paraProperties section: {content}"
+    );
+    assert!(content.contains("hh:paraPr"), "paraPr entry: {content}");
+}
+
+#[test]
+fn header_xml_contains_font_faces() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = Document::new();
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    entry.read_to_string(&mut content).expect("read");
+
+    assert!(
+        content.contains("hh:fontfaces"),
+        "fontfaces section: {content}"
+    );
+    assert!(content.contains("바탕"), "default Batang font: {content}");
+}
+
+#[test]
+fn header_xml_default_charpr_has_id_zero() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = Document::new();
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    entry.read_to_string(&mut content).expect("read");
+
+    assert!(content.contains(r#"id="0""#), "id=0 charPr: {content}");
 }
 
 // ── write_hwpx integration: ZIP entry presence ─────────────────────────

@@ -26,7 +26,9 @@ fn validate_hwpx_bytes(bytes: &[u8]) -> Vec<polaris_dvc_core::ViolationRecord> {
     report.violations
 }
 
-fn container_integrity_violations(violations: &[polaris_dvc_core::ViolationRecord]) -> Vec<&polaris_dvc_core::ViolationRecord> {
+fn container_integrity_violations(
+    violations: &[polaris_dvc_core::ViolationRecord],
+) -> Vec<&polaris_dvc_core::ViolationRecord> {
     violations
         .iter()
         .filter(|v| v.error_code.0 >= 11000 && v.error_code.0 < 13000)
@@ -63,7 +65,10 @@ fn writer_empty_doc_passes_polaris_dvc_parse() {
 
     let bytes = std::fs::read(tmp.path()).unwrap();
     let result = open_bytes(&bytes);
-    assert!(result.is_ok(), "polaris_dvc should parse empty hwp2md output: {result:?}");
+    assert!(
+        result.is_ok(),
+        "polaris_dvc should parse empty hwp2md output: {result:?}"
+    );
 }
 
 #[test]
@@ -193,7 +198,10 @@ fn fixture_passes_polaris_dvc_parse() {
         .build();
 
     let result = open_bytes(&bytes);
-    assert!(result.is_ok(), "polaris_dvc failed to parse fixture: {result:?}");
+    assert!(
+        result.is_ok(),
+        "polaris_dvc failed to parse fixture: {result:?}"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +230,10 @@ fn markdown_to_hwpx_roundtrip_passes_validation() {
 
     let bytes = std::fs::read(tmp.path()).unwrap();
     let result = open_bytes(&bytes);
-    assert!(result.is_ok(), "polaris_dvc parse failed on Korean content: {result:?}");
+    assert!(
+        result.is_ok(),
+        "polaris_dvc parse failed on Korean content: {result:?}"
+    );
 
     let violations = validate_hwpx_bytes(&bytes);
     let critical = container_integrity_violations(&violations);

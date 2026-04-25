@@ -113,7 +113,7 @@ impl HwpxFixture {
 const CONTAINER_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <container version="1.0">
   <rootfiles>
-    <rootfile full-path="Contents/content.hpf" media-type="application/hwpx+xml"/>
+    <rootfile full-path="Contents/content.hpf" media-type="application/hwp+xml"/>
   </rootfiles>
 </container>"#;
 
