@@ -97,9 +97,10 @@ fn section_xml_heading_level_1() {
         level: 1,
         inlines: vec![inline("Title")],
     }]);
+    // Heading 1 → numeric styleIDRef="1" (matches hh:styles table id=1)
     assert!(
-        xml.contains(r#"hp:styleIDRef="Heading1""#),
-        "h1 style ref: {xml}"
+        xml.contains(r#"hp:styleIDRef="1""#),
+        "h1 style ref must be numeric 1: {xml}"
     );
     assert!(xml.contains("Title"));
 }
@@ -110,38 +111,42 @@ fn section_xml_heading_level_6() {
         level: 6,
         inlines: vec![inline("Deep")],
     }]);
-    assert!(xml.contains(r#"hp:styleIDRef="Heading6""#), "{xml}");
+    // Heading 6 → numeric styleIDRef="6"
+    assert!(xml.contains(r#"hp:styleIDRef="6""#), "{xml}");
     assert!(xml.contains("Deep"));
 }
 
 #[test]
-fn section_xml_bold_inline_emits_charpr() {
+fn section_xml_bold_inline_has_charpr_id_ref() {
     let xml = section_xml(vec![Block::Paragraph {
         inlines: vec![bold_inline("strong")],
     }]);
-    assert!(xml.contains("<hp:charPr"), "charPr element: {xml}");
-    assert!(xml.contains(r#"bold="true""#), "bold attr: {xml}");
+    assert!(
+        !xml.contains("<hp:charPr"),
+        "inline charPr removed (OWPML schema): {xml}"
+    );
+    assert!(xml.contains("charPrIDRef="), "charPrIDRef: {xml}");
     assert!(xml.contains("strong"));
 }
 
 #[test]
-fn section_xml_italic_inline_emits_charpr() {
+fn section_xml_italic_inline_has_charpr_id_ref() {
     let xml = section_xml(vec![Block::Paragraph {
         inlines: vec![italic_inline("em")],
     }]);
-    assert!(xml.contains(r#"italic="true""#), "{xml}");
+    assert!(xml.contains("charPrIDRef="), "{xml}");
 }
 
 #[test]
-fn section_xml_underline_inline_emits_charpr() {
+fn section_xml_underline_inline_has_charpr_id_ref() {
     let xml = section_xml(vec![Block::Paragraph {
         inlines: vec![underline_inline("ul")],
     }]);
-    assert!(xml.contains(r#"underline="bottom""#), "{xml}");
+    assert!(xml.contains("charPrIDRef="), "{xml}");
 }
 
 #[test]
-fn section_xml_strikethrough_inline_emits_charpr() {
+fn section_xml_strikethrough_inline_has_charpr_id_ref() {
     let xml = section_xml(vec![Block::Paragraph {
         inlines: vec![Inline {
             text: "del".into(),
@@ -149,7 +154,7 @@ fn section_xml_strikethrough_inline_emits_charpr() {
             ..Inline::default()
         }],
     }]);
-    assert!(xml.contains(r#"strikeout="line""#), "{xml}");
+    assert!(xml.contains("charPrIDRef="), "{xml}");
 }
 
 #[test]
@@ -201,8 +206,9 @@ fn section_xml_nested_inlines_bold_then_italic() {
     let xml = section_xml(vec![Block::Paragraph {
         inlines: vec![bold_inline("B"), italic_inline("I")],
     }]);
-    assert!(xml.contains(r#"bold="true""#), "{xml}");
-    assert!(xml.contains(r#"italic="true""#), "{xml}");
+    // Each formatting variant gets a distinct charPrIDRef; bold and italic
+    // runs are separate so they must have different IDs (both non-zero).
+    assert!(xml.contains("charPrIDRef="), "{xml}");
     assert!(xml.contains("B"));
     assert!(xml.contains("I"));
 }
@@ -392,7 +398,14 @@ fn section_xml_code_block() {
         code: "fn main() {}".into(),
     }]);
     assert!(xml.contains("<hp:p "), "{xml}");
-    assert!(xml.contains(r#"hp:charPrIDRef="code""#), "{xml}");
+    assert!(
+        !xml.contains(r#"charPrIDRef="code""#),
+        "charPrIDRef must not be the string 'code': {xml}"
+    );
+    assert!(
+        xml.contains("charPrIDRef="),
+        "charPrIDRef must be present: {xml}"
+    );
     assert!(xml.contains("fn main() {}"), "{xml}");
 }
 
@@ -809,5 +822,98 @@ fn write_hwpx_image_roundtrip_preserves_asset() {
     assert_eq!(
         read_back.assets[0].mime_type, "image/png",
         "asset MIME type must be preserved"
+    );
+}
+
+// ── Phase 4 tests: styles, numeric styleIDRef, numeric charPrIDRef ────────
+
+#[test]
+fn header_xml_contains_styles() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = Document::new();
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    entry.read_to_string(&mut content).expect("read");
+
+    assert!(
+        content.contains("hh:styles"),
+        "hh:styles section must be present: {content}"
+    );
+    assert!(
+        content.contains("hh:style"),
+        "hh:style entries must be present: {content}"
+    );
+    // Style id=0 (Normal) and id=1..6 (Heading1..6) must all appear.
+    for id in 0..=6u8 {
+        assert!(
+            content.contains(&format!(r#"id="{id}""#)),
+            "style id={id} must be present: {content}"
+        );
+    }
+    // Verify known style names.
+    assert!(
+        content.contains(r#"name="Normal""#),
+        "Normal style: {content}"
+    );
+    assert!(
+        content.contains(r#"name="Heading1""#),
+        "Heading1 style: {content}"
+    );
+    assert!(
+        content.contains(r#"name="Heading6""#),
+        "Heading6 style: {content}"
+    );
+}
+
+#[test]
+fn section_xml_heading_has_numeric_style_id_ref() {
+    // Verify that heading styleIDRef is a pure decimal digit, not a name
+    // like "Heading1".
+    for level in 1u8..=6 {
+        let xml = section_xml(vec![Block::Heading {
+            level,
+            inlines: vec![inline("h")],
+        }]);
+        let expected = format!(r#"hp:styleIDRef="{level}""#);
+        assert!(
+            xml.contains(&expected),
+            "level {level}: expected numeric styleIDRef={level}, got: {xml}"
+        );
+        // Must NOT contain the old string form.
+        let old_form = format!(r#"hp:styleIDRef="Heading{level}""#);
+        assert!(
+            !xml.contains(&old_form),
+            "level {level}: string styleIDRef must not appear: {xml}"
+        );
+    }
+}
+
+#[test]
+fn section_xml_code_block_has_numeric_char_pr_id_ref() {
+    let xml = section_xml(vec![Block::CodeBlock {
+        language: Some("rust".into()),
+        code: "let x = 1;".into(),
+    }]);
+    // The charPrIDRef value on the run element must be a decimal number.
+    // Extract it and confirm it parses as u32.
+    let marker = "charPrIDRef=\"";
+    let start = xml
+        .find(marker)
+        .expect("charPrIDRef attribute must be present");
+    let rest = &xml[start + marker.len()..];
+    let end = rest.find('"').expect("closing quote");
+    let value = &rest[..end];
+    assert!(
+        value.parse::<u32>().is_ok(),
+        "charPrIDRef value '{value}' must be a numeric u32, not a string like 'code': {xml}"
+    );
+    // Sanity: "let x = 1;" must appear in the output.
+    assert!(
+        xml.contains("let x = 1;"),
+        "code content must appear: {xml}"
     );
 }

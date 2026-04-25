@@ -13,6 +13,7 @@ use zip::ZipWriter;
 // ---------------------------------------------------------------------------
 
 const DEFAULT_FONT: &str = "바탕";
+const CODE_FONT: &str = "Courier New";
 const LANG_SLOTS: [&str; 7] = [
     "HANGUL", "LATIN", "HANJA", "JAPANESE", "OTHER", "SYMBOL", "USER",
 ];
@@ -54,13 +55,15 @@ impl CharPrKey {
         }
     }
 
-    fn is_plain(&self) -> bool {
-        !self.bold
-            && !self.italic
-            && !self.underline
-            && !self.strikethrough
-            && self.color.is_none()
-            && self.font_name.is_none()
+    fn code_block() -> Self {
+        Self {
+            bold: false,
+            italic: false,
+            underline: false,
+            strikethrough: false,
+            color: None,
+            font_name: Some(CODE_FONT.to_owned()),
+        }
     }
 }
 
@@ -97,10 +100,28 @@ impl RefTables {
             );
         }
 
+        // Always register the code-block monospace entry so CodeBlock blocks
+        // always have a valid numeric charPrIDRef regardless of whether the
+        // document contains any inline code spans.
+        let code_key = CharPrKey::code_block();
+        if let std::collections::hash_map::Entry::Vacant(e) = char_pr_ids.entry(code_key) {
+            e.insert(next_id);
+            next_id += 1;
+        }
+        // Ensure CODE_FONT is present in the font table.
+        if font_set.insert(CODE_FONT.to_owned()) {
+            font_names.push(CODE_FONT.to_owned());
+        }
+        let _ = next_id; // consumed above; suppress unused warning
+
         Self {
             char_pr_ids,
             font_names,
         }
+    }
+
+    fn code_block_char_pr_id(&self) -> u32 {
+        self.char_pr_id(&CharPrKey::code_block())
     }
 
     fn char_pr_id(&self, key: &CharPrKey) -> u32 {
@@ -308,6 +329,8 @@ fn generate_header_xml(doc: &ir::Document, tables: &RefTables) -> Result<String,
 
     w.write_event(Event::End(BytesEnd::new("hh:refList")))?;
 
+    write_styles(&mut w)?;
+
     w.write_event(Event::End(BytesEnd::new("hh:head")))?;
 
     Ok(String::from_utf8(buf.into_inner()).unwrap_or_default())
@@ -422,6 +445,38 @@ fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::E
     Ok(())
 }
 
+/// Emits the `<hh:styles>` block referenced by heading paragraphs.
+///
+/// Style IDs match the `hp:styleIDRef` numeric values used in section XML:
+/// - 0 = Normal
+/// - 1..=6 = Heading1..Heading6
+fn write_styles<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::Error> {
+    w.write_event(Event::Start(BytesStart::new("hh:styles")))?;
+
+    let style_defs: &[(&str, &str)] = &[
+        ("0", "Normal"),
+        ("1", "Heading1"),
+        ("2", "Heading2"),
+        ("3", "Heading3"),
+        ("4", "Heading4"),
+        ("5", "Heading5"),
+        ("6", "Heading6"),
+    ];
+
+    for (id, name) in style_defs {
+        let mut style = BytesStart::new("hh:style");
+        style.push_attribute(("id", *id));
+        style.push_attribute(("type", "PARAGRAPH"));
+        style.push_attribute(("name", *name));
+        style.push_attribute(("paraPrIDRef", "0"));
+        style.push_attribute(("charPrIDRef", "0"));
+        w.write_event(Event::Empty(style))?;
+    }
+
+    w.write_event(Event::End(BytesEnd::new("hh:styles")))?;
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // content.hpf
 // ---------------------------------------------------------------------------
@@ -480,8 +535,12 @@ fn write_block<W: Write>(
 ) -> Result<(), quick_xml::Error> {
     match block {
         ir::Block::Heading { level, inlines } => {
+            // Style IDs match the hh:styles table: 1=Heading1 … 6=Heading6.
+            // Levels outside 1-6 are clamped to the nearest valid ID.
+            let style_id = (*level).clamp(1, 6);
+            let style_id_str = style_id.to_string();
             let mut p = BytesStart::new("hp:p");
-            p.push_attribute(("hp:styleIDRef", format!("Heading{level}").as_str()));
+            p.push_attribute(("hp:styleIDRef", style_id_str.as_str()));
             p.push_attribute(("paraPrIDRef", "0"));
             writer.write_event(Event::Start(p))?;
             write_inlines(writer, inlines, tables)?;
@@ -516,11 +575,12 @@ fn write_block<W: Write>(
             writer.write_event(Event::End(BytesEnd::new("hp:tbl")))?;
         }
         ir::Block::CodeBlock { code, .. } => {
+            let code_id = tables.code_block_char_pr_id().to_string();
             let mut p = BytesStart::new("hp:p");
             p.push_attribute(("paraPrIDRef", "0"));
             writer.write_event(Event::Start(p))?;
             let mut run = BytesStart::new("hp:run");
-            run.push_attribute(("hp:charPrIDRef", "code"));
+            run.push_attribute(("charPrIDRef", code_id.as_str()));
             writer.write_event(Event::Start(run))?;
             writer.write_event(Event::Start(BytesStart::new("hp:t")))?;
             writer.write_event(Event::Text(BytesText::new(code)))?;
@@ -554,7 +614,13 @@ fn write_block<W: Write>(
             let mut p = BytesStart::new("hp:p");
             p.push_attribute(("paraPrIDRef", "0"));
             writer.write_event(Event::Start(p))?;
+            let mut run = BytesStart::new("hp:run");
+            run.push_attribute(("charPrIDRef", "0"));
+            writer.write_event(Event::Start(run))?;
+            writer.write_event(Event::Start(BytesStart::new("hp:t")))?;
             writer.write_event(Event::Text(BytesText::new("───────────────────")))?;
+            writer.write_event(Event::End(BytesEnd::new("hp:t")))?;
+            writer.write_event(Event::End(BytesEnd::new("hp:run")))?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
         ir::Block::Math { tex, .. } => {
@@ -588,24 +654,8 @@ fn write_inlines<W: Write>(
         run.push_attribute(("charPrIDRef", char_pr_id.to_string().as_str()));
         writer.write_event(Event::Start(run))?;
 
-        // Emit inline hp:charPr only for non-plain runs so that readers
-        // that do not consult the header table still get the formatting hint.
-        if !key.is_plain() {
-            let mut char_pr = BytesStart::new("hp:charPr");
-            if key.bold {
-                char_pr.push_attribute(("bold", "true"));
-            }
-            if key.italic {
-                char_pr.push_attribute(("italic", "true"));
-            }
-            if key.underline {
-                char_pr.push_attribute(("underline", "bottom"));
-            }
-            if key.strikethrough {
-                char_pr.push_attribute(("strikeout", "line"));
-            }
-            writer.write_event(Event::Empty(char_pr))?;
-        }
+        // charPr formatting is fully described in the header table; inline
+        // <hp:charPr/> is NOT a valid child of <run> per OWPML schema.
 
         writer.write_event(Event::Start(BytesStart::new("hp:t")))?;
         writer.write_event(Event::Text(BytesText::new(&inline.text)))?;
