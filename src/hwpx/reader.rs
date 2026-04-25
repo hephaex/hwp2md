@@ -365,5 +365,25 @@ fn guess_mime_from_name(name: &str) -> String {
 }
 
 #[cfg(test)]
-#[path = "reader_tests.rs"]
-mod tests;
+#[path = "reader_tests_heading.rs"]
+mod tests_heading;
+
+#[cfg(test)]
+#[path = "reader_tests_basic.rs"]
+mod tests_basic;
+
+#[cfg(test)]
+#[path = "reader_tests_structure.rs"]
+mod tests_structure;
+
+#[cfg(test)]
+#[path = "reader_tests_charpr.rs"]
+mod tests_charpr;
+
+#[cfg(test)]
+#[path = "reader_tests_footnotes.rs"]
+mod tests_footnotes;
+
+#[cfg(test)]
+#[path = "reader_tests_binrefs.rs"]
+mod tests_binrefs;

@@ -308,6 +308,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::identity_op)] // `(0u32 << 10)` is intentional bit-field layout documentation
     fn parse_records_extended_size_field() {
         // size_field == 0xFFF means the next u32 is the actual size.
         let size: u32 = 8;

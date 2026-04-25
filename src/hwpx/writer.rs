@@ -1,5 +1,5 @@
+use crate::error::Hwp2MdError;
 use crate::ir;
-use anyhow::Result;
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
 use std::io::{Cursor, Write};
@@ -7,7 +7,11 @@ use std::path::Path;
 use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
 
-pub fn write_hwpx(doc: &ir::Document, output: &Path, _style: Option<&Path>) -> Result<()> {
+pub fn write_hwpx(
+    doc: &ir::Document,
+    output: &Path,
+    _style: Option<&Path>,
+) -> Result<(), Hwp2MdError> {
     let file = std::fs::File::create(output)?;
     let mut zip = ZipWriter::new(file);
     let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
@@ -76,7 +80,7 @@ fn generate_version_xml() -> String {
         .to_string()
 }
 
-fn generate_header_xml(doc: &ir::Document) -> Result<String> {
+fn generate_header_xml(doc: &ir::Document) -> Result<String, Hwp2MdError> {
     let title = doc.metadata.title.as_deref().unwrap_or("");
     let author = doc.metadata.author.as_deref().unwrap_or("");
 
@@ -121,7 +125,7 @@ fn generate_content_hpf(doc: &ir::Document) -> String {
     )
 }
 
-fn generate_section_xml(section: &ir::Section, _index: usize) -> Result<String> {
+fn generate_section_xml(section: &ir::Section, _index: usize) -> Result<String, Hwp2MdError> {
     let mut buf = Cursor::new(Vec::new());
     let mut writer = Writer::new_with_indent(&mut buf, b' ', 2);
 

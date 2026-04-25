@@ -246,15 +246,15 @@ fn parse_para_shape_no_heading() {
 
 // --- size limit constants ---
 
-#[test]
-fn size_limit_constants_are_reasonable() {
-    // Both limits must be strictly positive and at most 1 GiB so that
-    // allocation in tests and production code stays bounded.
+// Verify the size-limit constants at compile time so they cannot be set to
+// zero or above 1 GiB.  Using const-assert avoids the `assertions_on_constants`
+// clippy lint while still catching misconfiguration at build time.
+const _: () = {
     assert!(MAX_DECOMPRESSED > 0);
     assert!(MAX_DECOMPRESSED <= 1024 * 1024 * 1024);
     assert!(MAX_CFB_STREAM > 0);
     assert!(MAX_CFB_STREAM <= 1024 * 1024 * 1024);
-}
+};
 
 // --- decompress_stream ---
 

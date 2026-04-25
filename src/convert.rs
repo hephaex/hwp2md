@@ -1,7 +1,7 @@
-use anyhow::{bail, Result};
 use std::fs;
 use std::path::Path;
 
+use crate::error::Hwp2MdError;
 use crate::hwp;
 use crate::hwpx;
 use crate::ir;
@@ -12,7 +12,7 @@ pub fn to_markdown(
     output: Option<&Path>,
     assets_dir: Option<&Path>,
     frontmatter: bool,
-) -> Result<()> {
+) -> Result<(), Hwp2MdError> {
     let ext = input
         .extension()
         .and_then(|e| e.to_str())
@@ -28,7 +28,11 @@ pub fn to_markdown(
             tracing::info!("Parsing HWPX: {:?}", input);
             hwpx::read_hwpx(input)?
         }
-        _ => bail!("Unsupported format: .{ext}. Expected .hwp or .hwpx"),
+        _ => {
+            return Err(Hwp2MdError::UnsupportedFormat(format!(
+                ".{ext}. Expected .hwp or .hwpx"
+            )))
+        }
     };
 
     if let Some(dir) = assets_dir {
@@ -53,7 +57,11 @@ pub fn to_markdown(
     Ok(())
 }
 
-pub fn to_hwpx(input: &Path, output: Option<&Path>, style: Option<&Path>) -> Result<()> {
+pub fn to_hwpx(
+    input: &Path,
+    output: Option<&Path>,
+    style: Option<&Path>,
+) -> Result<(), Hwp2MdError> {
     let ext = input
         .extension()
         .and_then(|e| e.to_str())
@@ -61,7 +69,9 @@ pub fn to_hwpx(input: &Path, output: Option<&Path>, style: Option<&Path>) -> Res
         .to_lowercase();
 
     if ext != "md" && ext != "markdown" {
-        bail!("Expected .md or .markdown file, got .{ext}");
+        return Err(Hwp2MdError::UnsupportedFormat(format!(
+            "Expected .md or .markdown file, got .{ext}"
+        )));
     }
 
     if style.is_some() {
@@ -85,7 +95,7 @@ pub fn to_hwpx(input: &Path, output: Option<&Path>, style: Option<&Path>) -> Res
     Ok(())
 }
 
-pub fn show_info(input: &Path) -> Result<()> {
+pub fn show_info(input: &Path) -> Result<(), Hwp2MdError> {
     let ext = input
         .extension()
         .and_then(|e| e.to_str())
@@ -101,7 +111,7 @@ pub fn show_info(input: &Path) -> Result<()> {
             let doc = hwpx::read_hwpx(input)?;
             print_info(&doc, input);
         }
-        _ => bail!("Unsupported format: .{ext}"),
+        _ => return Err(Hwp2MdError::UnsupportedFormat(format!(".{ext}"))),
     }
 
     Ok(())
@@ -158,6 +168,25 @@ fn count_chars(block: &ir::Block) -> usize {
         ir::Block::Footnote { content, .. } => content.iter().map(count_chars).sum(),
         ir::Block::Image { .. } | ir::Block::HorizontalRule => 0,
     }
+}
+
+fn write_assets(doc: &ir::Document, dir: &Path) -> Result<(), Hwp2MdError> {
+    if doc.assets.is_empty() {
+        return Ok(());
+    }
+
+    fs::create_dir_all(dir)?;
+
+    for asset in &doc.assets {
+        let safe_name = std::path::Path::new(&asset.name)
+            .file_name()
+            .unwrap_or(std::ffi::OsStr::new("asset"));
+        let path = dir.join(safe_name);
+        fs::write(&path, &asset.data)?;
+        tracing::info!("Extracted: {:?}", path);
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -601,23 +630,4 @@ mod tests {
             "unexpected error message: {msg}"
         );
     }
-}
-
-fn write_assets(doc: &ir::Document, dir: &Path) -> Result<()> {
-    if doc.assets.is_empty() {
-        return Ok(());
-    }
-
-    fs::create_dir_all(dir)?;
-
-    for asset in &doc.assets {
-        let safe_name = std::path::Path::new(&asset.name)
-            .file_name()
-            .unwrap_or(std::ffi::OsStr::new("asset"));
-        let path = dir.join(safe_name);
-        fs::write(&path, &asset.data)?;
-        tracing::info!("Extracted: {:?}", path);
-    }
-
-    Ok(())
 }

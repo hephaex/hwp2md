@@ -376,5 +376,29 @@ fn write_list(out: &mut String, items: &[ir::ListItem], ordered: bool, start: u3
 }
 
 #[cfg(test)]
-#[path = "writer_tests.rs"]
-mod tests;
+#[path = "writer_tests_yaml.rs"]
+mod tests_yaml;
+
+#[cfg(test)]
+#[path = "writer_tests_inline.rs"]
+mod tests_inline;
+
+#[cfg(test)]
+#[path = "writer_tests_inline_adv.rs"]
+mod tests_inline_adv;
+
+#[cfg(test)]
+#[path = "writer_tests_block.rs"]
+mod tests_block;
+
+#[cfg(test)]
+#[path = "writer_tests_edge.rs"]
+mod tests_edge;
+
+#[cfg(test)]
+#[path = "writer_tests_frontmatter.rs"]
+mod tests_frontmatter;
+
+#[cfg(test)]
+#[path = "writer_tests_table_adv.rs"]
+mod tests_table_adv;

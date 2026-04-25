@@ -7,7 +7,6 @@
 /// Binary HWP 5.0 is deliberately excluded: its compound-file-binary format
 /// requires a real HWP runtime to produce valid files.  HWPX (ZIP + XML) is
 /// fully constructable from pure Rust.
-
 // Make the fixture helpers available as `fixtures::HwpxFixture` etc.
 #[path = "fixtures/mod.rs"]
 mod fixtures;

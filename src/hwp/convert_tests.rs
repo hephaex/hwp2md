@@ -64,6 +64,7 @@ fn control_to_block_table_groups_cells_into_rows() {
             char_shape_ids: Vec::new(),
             para_shape_id: 0,
             controls: Vec::new(),
+            raw_para_text: None,
         }],
     };
     let ctrl = HwpControl::Table {
@@ -225,6 +226,7 @@ fn make_para(text: &str, para_shape_id: u16) -> HwpParagraph {
         char_shape_ids: Vec::new(),
         para_shape_id,
         controls: Vec::new(),
+        raw_para_text: None,
     }
 }
 
@@ -234,6 +236,7 @@ fn make_para_with_cs(text: &str, cs_id: u16) -> HwpParagraph {
         char_shape_ids: vec![(0, cs_id)],
         para_shape_id: 0,
         controls: Vec::new(),
+        raw_para_text: None,
     }
 }
 
@@ -384,6 +387,7 @@ fn build_inlines_with_bold_char_shape() {
         char_shape_ids: vec![(0, 0)], // position 0, shape 0
         para_shape_id: 0,
         controls: Vec::new(),
+        raw_para_text: None,
     };
     let inlines = build_inlines(&para, &doc_info);
     assert!(!inlines.is_empty());
@@ -403,6 +407,7 @@ fn build_inlines_with_italic_char_shape() {
         char_shape_ids: vec![(0, 0)],
         para_shape_id: 0,
         controls: Vec::new(),
+        raw_para_text: None,
     };
     let inlines = build_inlines(&para, &doc_info);
     assert!(!inlines.is_empty());
@@ -418,6 +423,7 @@ fn build_inlines_unknown_cs_id_falls_back_to_plain() {
         char_shape_ids: vec![(0, 99)], // cs_id 99 doesn't exist
         para_shape_id: 0,
         controls: Vec::new(),
+        raw_para_text: None,
     };
     let inlines = build_inlines(&para, &doc_info);
     assert!(!inlines.is_empty());
@@ -432,6 +438,7 @@ fn build_inlines_position_past_end_stops() {
         char_shape_ids: vec![(100, 0)], // position 100 > text length 2
         para_shape_id: 0,
         controls: Vec::new(),
+        raw_para_text: None,
     };
     let inlines = build_inlines(&para, &doc_info);
     // No inline emitted because start >= chars.len()
@@ -452,6 +459,7 @@ fn build_inlines_multiple_segments() {
         char_shape_ids: vec![(0, 0), (4, 1)],
         para_shape_id: 0,
         controls: Vec::new(),
+        raw_para_text: None,
     };
     let inlines = build_inlines(&para, &doc_info);
     assert_eq!(inlines.len(), 2);
@@ -509,6 +517,7 @@ fn hwp_to_ir_paragraph_text_becomes_ir_paragraph() {
             char_shape_ids: Vec::new(),
             para_shape_id: 0,
             controls: Vec::new(),
+            raw_para_text: None,
         }],
     });
     let doc = hwp_to_ir(&hwp);
@@ -543,6 +552,7 @@ fn hwp_to_ir_empty_paragraph_text_not_emitted() {
             char_shape_ids: Vec::new(),
             para_shape_id: 0,
             controls: Vec::new(),
+            raw_para_text: None,
         }],
     });
     let doc = hwp_to_ir(&hwp);
@@ -591,12 +601,14 @@ fn hwp_to_ir_two_footnotes_get_sequential_ids() {
                 char_shape_ids: Vec::new(),
                 para_shape_id: 0,
                 controls: vec![make_fn_ctrl()],
+                raw_para_text: None,
             },
             HwpParagraph {
                 text: String::new(),
                 char_shape_ids: Vec::new(),
                 para_shape_id: 0,
                 controls: vec![make_fn_ctrl()],
+                raw_para_text: None,
             },
         ],
     });
@@ -629,12 +641,14 @@ fn hwp_to_ir_two_endnotes_get_sequential_ids() {
                 char_shape_ids: Vec::new(),
                 para_shape_id: 0,
                 controls: vec![make_en_ctrl()],
+                raw_para_text: None,
             },
             HwpParagraph {
                 text: String::new(),
                 char_shape_ids: Vec::new(),
                 para_shape_id: 0,
                 controls: vec![make_en_ctrl()],
+                raw_para_text: None,
             },
         ],
     });
@@ -666,6 +680,7 @@ fn hwp_to_ir_footnote_and_endnote_counters_are_independent() {
                     is_endnote: false,
                     paragraphs: Vec::new(),
                 }],
+                raw_para_text: None,
             },
             HwpParagraph {
                 text: String::new(),
@@ -675,6 +690,7 @@ fn hwp_to_ir_footnote_and_endnote_counters_are_independent() {
                     is_endnote: true,
                     paragraphs: Vec::new(),
                 }],
+                raw_para_text: None,
             },
             HwpParagraph {
                 text: String::new(),
@@ -684,6 +700,7 @@ fn hwp_to_ir_footnote_and_endnote_counters_are_independent() {
                     is_endnote: false,
                     paragraphs: Vec::new(),
                 }],
+                raw_para_text: None,
             },
         ],
     });
@@ -779,6 +796,7 @@ fn build_inlines_non_black_color_sets_css_hex() {
         char_shape_ids: vec![(0, 0)],
         para_shape_id: 0,
         controls: Vec::new(),
+        raw_para_text: None,
     };
     let inlines = build_inlines(&para, &doc_info);
     assert_eq!(inlines.len(), 1);
@@ -797,6 +815,7 @@ fn build_inlines_black_color_is_none() {
         char_shape_ids: vec![(0, 0)],
         para_shape_id: 0,
         controls: Vec::new(),
+        raw_para_text: None,
     };
     let inlines = build_inlines(&para, &doc_info);
     assert_eq!(inlines.len(), 1);
@@ -817,6 +836,7 @@ fn build_inlines_bgr_green_color_maps_correctly() {
         char_shape_ids: vec![(0, 0)],
         para_shape_id: 0,
         controls: Vec::new(),
+        raw_para_text: None,
     };
     let inlines = build_inlines(&para, &doc_info);
     assert_eq!(inlines[0].color.as_deref(), Some("#00FF00"));
@@ -839,6 +859,7 @@ fn build_inlines_face_id_resolves_font_name() {
         char_shape_ids: vec![(0, 0)],
         para_shape_id: 0,
         controls: Vec::new(),
+        raw_para_text: None,
     };
     let inlines = build_inlines(&para, &doc_info);
     assert_eq!(inlines.len(), 1);
@@ -858,6 +879,7 @@ fn build_inlines_face_id_out_of_bounds_font_name_is_none() {
         char_shape_ids: vec![(0, 0)],
         para_shape_id: 0,
         controls: Vec::new(),
+        raw_para_text: None,
     };
     let inlines = build_inlines(&para, &doc_info);
     assert!(inlines[0].font_name.is_none());

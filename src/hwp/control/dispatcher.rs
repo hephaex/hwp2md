@@ -1,10 +1,10 @@
 use super::common::find_children_end;
 use super::hyperlink::parse_hyperlink_url;
 use super::image::parse_gshape_ctrl;
-use super::ruby::parse_ruby_ctrl;
+use super::ruby::{fixup_ruby_base_text, parse_ruby_ctrl};
 use super::table::parse_table_ctrl;
 use crate::hwp::model::*;
-use crate::hwp::reader::{extract_paragraph_text, parse_char_shape_refs};
+use crate::hwp::reader::{extract_paragraph_text_with_raw, parse_char_shape_refs};
 use crate::hwp::record::*;
 
 /// Extract `HwpParagraph`s from records in `[start, end)`, treating them as a
@@ -22,7 +22,9 @@ pub(crate) fn extract_paragraphs_from_range(
         let rec = &records[idx];
         match rec.tag_id {
             HWPTAG_PARA_HEADER => {
-                if let Some(p) = current.take() {
+                if let Some(mut p) = current.take() {
+                    fixup_ruby_base_text(&mut p);
+                    p.raw_para_text = None;
                     paras.push(p);
                 }
                 let para_shape_id = if rec.data.len() >= 6 {
@@ -35,12 +37,15 @@ pub(crate) fn extract_paragraphs_from_range(
                     char_shape_ids: Vec::new(),
                     para_shape_id,
                     controls: Vec::new(),
+                    raw_para_text: None,
                 });
                 idx += 1;
             }
             HWPTAG_PARA_TEXT => {
                 if let Some(ref mut p) = current {
-                    p.text = extract_paragraph_text(&rec.data);
+                    let (text, raw) = extract_paragraph_text_with_raw(&rec.data);
+                    p.text = text;
+                    p.raw_para_text = Some(raw);
                 }
                 idx += 1;
             }
@@ -75,7 +80,9 @@ pub(crate) fn extract_paragraphs_from_range(
         }
     }
 
-    if let Some(p) = current {
+    if let Some(mut p) = current {
+        fixup_ruby_base_text(&mut p);
+        p.raw_para_text = None;
         paras.push(p);
     }
     paras
@@ -99,7 +106,7 @@ pub(crate) fn parse_ctrl_header_at(records: &[Record], ctrl_idx: usize) -> Optio
         CTRL_TABLE => {
             let (row_count, col_count, cells) = parse_table_ctrl(records, ctrl_idx);
             tracing::trace!(
-                "Parsed table: {row_count}×{col_count}, {} cells",
+                "Parsed table: {row_count}x{col_count}, {} cells",
                 cells.len()
             );
             Some(HwpControl::Table {

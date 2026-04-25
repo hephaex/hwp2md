@@ -337,6 +337,17 @@ pub(crate) fn read_section_stream(
     Ok(parse_section_from_records(&records))
 }
 
+/// Extract paragraph text from raw UTF-16LE `data`, also returning a clone of
+/// the raw bytes for subsequent Ruby base-text fixup.
+///
+/// The raw bytes are needed because control-character positions (the 0x0003
+/// markers) are only visible in the original byte stream, not in the decoded
+/// `String`.
+pub(crate) fn extract_paragraph_text_with_raw(data: &[u8]) -> (String, Vec<u8>) {
+    let text = extract_paragraph_text(data);
+    (text, data.to_vec())
+}
+
 pub(crate) fn extract_paragraph_text(data: &[u8]) -> String {
     let mut result = String::new();
     let mut i = 0;

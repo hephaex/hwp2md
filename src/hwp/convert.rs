@@ -432,5 +432,17 @@ fn mime_to_ext(mime: &str) -> &'static str {
 }
 
 #[cfg(test)]
-#[path = "convert_tests.rs"]
-mod tests;
+#[path = "convert_tests_control.rs"]
+mod tests_control;
+
+#[cfg(test)]
+#[path = "convert_tests_detect.rs"]
+mod tests_detect;
+
+#[cfg(test)]
+#[path = "convert_tests_ir.rs"]
+mod tests_ir;
+
+#[cfg(test)]
+#[path = "convert_tests_build.rs"]
+mod tests_build;

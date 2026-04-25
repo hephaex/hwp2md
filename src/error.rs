@@ -2,7 +2,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Hwp2MdError {
-    #[error("unsupported file format: {0}")]
+    #[error("Unsupported format: {0}")]
     UnsupportedFormat(String),
 
     #[error("HWP parse error: {0}")]
@@ -31,4 +31,10 @@ pub enum Hwp2MdError {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("XML write error: {0}")]
+    XmlWrite(#[from] quick_xml::Error),
+
+    #[error("ZIP error: {0}")]
+    Zip(#[from] zip::result::ZipError),
 }

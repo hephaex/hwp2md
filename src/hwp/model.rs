@@ -151,6 +151,9 @@ pub struct HwpParagraph {
     pub char_shape_ids: Vec<(u32, u16)>,
     pub para_shape_id: u16,
     pub controls: Vec<HwpControl>,
+    /// Raw UTF-16LE bytes from the PARA_TEXT record, used during Ruby base-text
+    /// fixup and cleared (set to `None`) once fixup is complete.
+    pub(crate) raw_para_text: Option<Vec<u8>>,
 }
 
 #[derive(Debug)]
