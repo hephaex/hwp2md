@@ -235,6 +235,10 @@ fn write_inlines<W: Write>(
 }
 
 /// Emit a single non-link inline as an `<hp:run>` with text.
+///
+/// When the inline carries a ruby annotation, the run body uses the OWPML
+/// `<hp:ruby>` structure instead of a plain `<hp:t>`.  When a `footnote_ref`
+/// is set and the text is empty, a `<hp:noteRef>` element is emitted instead.
 fn write_inline_run<W: Write>(
     writer: &mut Writer<W>,
     inline: &ir::Inline,
@@ -247,9 +251,36 @@ fn write_inline_run<W: Write>(
     run.push_attribute(("charPrIDRef", char_pr_id.to_string().as_str()));
     writer.write_event(Event::Start(run))?;
 
-    writer.write_event(Event::Start(BytesStart::new("hp:t")))?;
-    writer.write_event(Event::Text(BytesText::new(&inline.text)))?;
-    writer.write_event(Event::End(BytesEnd::new("hp:t")))?;
+    if let Some(ref annotation) = inline.ruby {
+        // Ruby annotation: wrap base text and annotation in <hp:ruby>.
+        writer.write_event(Event::Start(BytesStart::new("hp:ruby")))?;
+
+        writer.write_event(Event::Start(BytesStart::new("hp:baseText")))?;
+        writer.write_event(Event::Start(BytesStart::new("hp:t")))?;
+        writer.write_event(Event::Text(BytesText::new(&inline.text)))?;
+        writer.write_event(Event::End(BytesEnd::new("hp:t")))?;
+        writer.write_event(Event::End(BytesEnd::new("hp:baseText")))?;
+
+        writer.write_event(Event::Start(BytesStart::new("hp:rubyText")))?;
+        writer.write_event(Event::Start(BytesStart::new("hp:t")))?;
+        writer.write_event(Event::Text(BytesText::new(annotation)))?;
+        writer.write_event(Event::End(BytesEnd::new("hp:t")))?;
+        writer.write_event(Event::End(BytesEnd::new("hp:rubyText")))?;
+
+        writer.write_event(Event::End(BytesEnd::new("hp:ruby")))?;
+    } else if inline.text.is_empty() {
+        if let Some(ref note_id) = inline.footnote_ref {
+            // Footnote reference marker (no visible text).
+            let mut note_ref = BytesStart::new("hp:noteRef");
+            note_ref.push_attribute(("noteId", note_id.as_str()));
+            note_ref.push_attribute(("type", "FOOTNOTE"));
+            writer.write_event(Event::Empty(note_ref))?;
+        }
+    } else {
+        writer.write_event(Event::Start(BytesStart::new("hp:t")))?;
+        writer.write_event(Event::Text(BytesText::new(&inline.text)))?;
+        writer.write_event(Event::End(BytesEnd::new("hp:t")))?;
+    }
 
     writer.write_event(Event::End(BytesEnd::new("hp:run")))?;
     Ok(())

@@ -118,6 +118,52 @@ impl Inline {
             ..Self::default()
         }
     }
+
+    /// Construct an inline with all formatting fields set explicitly.
+    ///
+    /// This avoids the `..Default::default()` pattern which silently drops
+    /// newly-added fields.  The `link`, `footnote_ref`, `font_name`, `code`,
+    /// and `ruby` fields are left at their defaults and can be set via chained
+    /// builder methods (`with_ruby`, etc.).
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_formatting(
+        text: String,
+        bold: bool,
+        italic: bool,
+        underline: bool,
+        strikethrough: bool,
+        superscript: bool,
+        subscript: bool,
+        color: Option<String>,
+    ) -> Self {
+        Self {
+            text,
+            bold,
+            italic,
+            underline,
+            strikethrough,
+            superscript,
+            subscript,
+            color,
+            code: false,
+            link: None,
+            footnote_ref: None,
+            font_name: None,
+            ruby: None,
+        }
+    }
+
+    /// Set the `link` field, returning the modified inline.
+    pub fn with_link(mut self, link: Option<String>) -> Self {
+        self.link = link;
+        self
+    }
+
+    /// Set the `ruby` annotation field, returning the modified inline.
+    pub fn with_ruby(mut self, ruby: Option<String>) -> Self {
+        self.ruby = ruby;
+        self
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

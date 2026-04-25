@@ -155,22 +155,21 @@ pub(super) fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &
             ctx.in_text = false;
             if !ctx.current_text.is_empty() {
                 let text = std::mem::take(&mut ctx.current_text);
-                let inline = ir::Inline {
+                let inline = ir::Inline::with_formatting(
                     text,
-                    bold: ctx.current_bold,
-                    italic: ctx.current_italic,
-                    underline: ctx.current_underline,
-                    strikethrough: ctx.current_strike,
-                    superscript: ctx.current_superscript,
-                    subscript: ctx.current_subscript,
-                    color: ctx.current_color.clone(),
-                    link: if ctx.in_hyperlink {
-                        ctx.hyperlink_url.clone()
-                    } else {
-                        None
-                    },
-                    ..ir::Inline::default()
-                };
+                    ctx.current_bold,
+                    ctx.current_italic,
+                    ctx.current_underline,
+                    ctx.current_strike,
+                    ctx.current_superscript,
+                    ctx.current_subscript,
+                    ctx.current_color.clone(),
+                )
+                .with_link(if ctx.in_hyperlink {
+                    ctx.hyperlink_url.clone()
+                } else {
+                    None
+                });
                 ctx.push_inline(inline);
             }
         }
@@ -246,15 +245,21 @@ pub(super) fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &
             let base = std::mem::take(&mut ctx.ruby_base_text);
             let annotation = std::mem::take(&mut ctx.ruby_annotation_text);
             if !base.is_empty() || !annotation.is_empty() {
-                let inline = ir::Inline {
-                    text: base,
-                    ruby: if annotation.is_empty() {
-                        None
-                    } else {
-                        Some(annotation)
-                    },
-                    ..ir::Inline::default()
-                };
+                let inline = ir::Inline::with_formatting(
+                    base,
+                    ctx.current_bold,
+                    ctx.current_italic,
+                    ctx.current_underline,
+                    ctx.current_strike,
+                    ctx.current_superscript,
+                    ctx.current_subscript,
+                    ctx.current_color.clone(),
+                )
+                .with_ruby(if annotation.is_empty() {
+                    None
+                } else {
+                    Some(annotation)
+                });
                 ctx.push_inline(inline);
             }
             ctx.in_ruby = false;
