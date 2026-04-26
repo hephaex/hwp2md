@@ -626,7 +626,9 @@ fn build_list(entries: Vec<(u32, bool, ir::Block)>) -> ir::Block {
                     children: vec![],
                 });
             } else {
-                let parent = items.last_mut().expect("items is non-empty");
+                let Some(parent) = items.last_mut() else {
+                    continue;
+                };
                 parent.children.push(ir::ListItem {
                     blocks: vec![block],
                     children: vec![],
