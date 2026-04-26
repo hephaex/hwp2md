@@ -376,11 +376,16 @@ fn header_xml_contains_blockquote_para_pr() {
         header.contains(r#"<hh:paraPr id="1">"#),
         "header must contain paraPr id=\"1\":\n{header}"
     );
-    // itemCnt must be "4" for paraProperties (id=0 normal, id=1 blockquote,
-    // id=2 list-depth-0, id=3 list-depth-1+).
+    // paraPr id="4" (heading — wider line spacing) must exist.
     assert!(
-        header.contains(r#"itemCnt="4""#),
-        "paraProperties itemCnt must be 4:\n{header}"
+        header.contains(r#"<hh:paraPr id="4">"#),
+        "header must contain paraPr id=\"4\" for heading spacing:\n{header}"
+    );
+    // itemCnt must be "5" for paraProperties (id=0 normal, id=1 blockquote,
+    // id=2 list-depth-0, id=3 list-depth-1+, id=4 heading).
+    assert!(
+        header.contains(r#"itemCnt="5""#),
+        "paraProperties itemCnt must be 5:\n{header}"
     );
     // paraPr id="1" must have a left margin value of 800.
     assert!(

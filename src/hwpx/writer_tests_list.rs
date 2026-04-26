@@ -122,8 +122,8 @@ fn header_xml_numbering_id2_is_digit() {
     );
 }
 
-/// header.xml paraProperties must have itemCnt="4" (id=0 default, id=1 blockquote,
-/// id=2 list-depth-0, id=3 list-depth-1+).
+/// header.xml paraProperties must have itemCnt="5" (id=0 default, id=1 blockquote,
+/// id=2 list-depth-0, id=3 list-depth-1+, id=4 heading).
 #[test]
 fn header_xml_para_properties_has_four_entries() {
     let doc = doc_with_section(vec![]);
@@ -132,10 +132,10 @@ fn header_xml_para_properties_has_four_entries() {
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
     assert!(
-        header.contains(r#"<hh:paraProperties itemCnt="4""#),
-        "paraProperties must have itemCnt=\"4\":\n{header}"
+        header.contains(r#"<hh:paraProperties itemCnt="5""#),
+        "paraProperties must have itemCnt=\"5\":\n{header}"
     );
-    // All four IDs must be present.
+    // All five IDs must be present.
     assert!(
         header.contains(r#"<hh:paraPr id="0""#),
         "paraPr id=0 must exist:\n{header}"
@@ -151,6 +151,10 @@ fn header_xml_para_properties_has_four_entries() {
     assert!(
         header.contains(r#"<hh:paraPr id="3""#),
         "paraPr id=3 must exist:\n{header}"
+    );
+    assert!(
+        header.contains(r#"<hh:paraPr id="4""#),
+        "paraPr id=4 (heading) must exist:\n{header}"
     );
 }
 

@@ -3,7 +3,7 @@ use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
 use std::io::{Cursor, Write};
 
-use super::header::{NUM_PR_DIGIT, PARA_PR_LIST_D0, PARA_PR_LIST_D1};
+use super::header::{NUM_PR_DIGIT, PARA_PR_HEADING, PARA_PR_LIST_D0, PARA_PR_LIST_D1};
 use super::{CharPrKey, ImageAssetMap, RefTables};
 use crate::ir::{self, PageLayout};
 
@@ -95,10 +95,17 @@ fn write_block<W: Write>(
             let style_id_str = style_id.to_string();
             let id_str = para_id.to_string();
             *para_id += 1;
+            // Headings use their own paraPr entry (id=4) for wider line spacing,
+            // unless they are inside a block-quote (para_pr_ref="1" takes priority).
+            let heading_para_pr = if quote_depth > 0 {
+                para_pr_ref
+            } else {
+                PARA_PR_HEADING
+            };
             let mut p = BytesStart::new("hp:p");
             p.push_attribute(("id", id_str.as_str()));
             p.push_attribute(("hp:styleIDRef", style_id_str.as_str()));
-            p.push_attribute(("paraPrIDRef", para_pr_ref));
+            p.push_attribute(("paraPrIDRef", heading_para_pr));
             writer.write_event(Event::Start(p))?;
             write_inlines(writer, inlines, tables)?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;

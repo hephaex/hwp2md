@@ -276,27 +276,90 @@ fn write_char_properties<W: Write>(
 /// Left margin value for block-quote paragraphs (HWP units; 800 ≈ 20 mm).
 pub(super) const QUOTE_MARGIN_LEFT: &str = "800";
 
+/// OWPML paragraph-property ID for heading paragraphs (H1–H6).
+///
+/// Headings use a distinct `paraPr` entry with increased line spacing (180%)
+/// to provide more visual separation from surrounding body text.
+pub(super) const PARA_PR_HEADING: &str = "4";
+
+/// Configuration for a single `<hh:paraPr>` entry emitted to the OWPML
+/// header's `<hh:paraProperties>` list.
+///
+/// All margin values are in HWP units (1 HWP unit = 0.01 mm).
+/// Line spacing is expressed as an integer percentage (e.g. `160` = 160%).
+struct ParaPrConfig<'a> {
+    /// The numeric paragraph-property ID referenced by `paraPrIDRef` in section XML.
+    id: &'a str,
+    /// Left margin in HWP units.  Controls visual indentation level.
+    left_margin: &'a str,
+    /// Line spacing as a percentage string (e.g. `"160"`, `"180"`).
+    line_spacing: &'a str,
+    /// First-line indent in HWP units (`<hh:intent value="…"/>`).
+    first_indent: &'a str,
+}
+
+impl<'a> ParaPrConfig<'a> {
+    /// Construct a config with the given ID and left margin, using standard
+    /// defaults: 160% line spacing and no first-line indent.
+    const fn standard(id: &'a str, left_margin: &'a str) -> Self {
+        Self {
+            id,
+            left_margin,
+            line_spacing: "160",
+            first_indent: "0",
+        }
+    }
+
+    /// Construct a config with all fields specified explicitly.
+    const fn with_spacing(
+        id: &'a str,
+        left_margin: &'a str,
+        line_spacing: &'a str,
+        first_indent: &'a str,
+    ) -> Self {
+        Self {
+            id,
+            left_margin,
+            line_spacing,
+            first_indent,
+        }
+    }
+}
+
 fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::Error> {
-    // Four paraPr entries:
-    //   id=0: default (no left indent)
-    //   id=1: block-quote (left indent = 800)
-    //   id=2: list item depth 0 (left indent = 400)
-    //   id=3: list item depth 1+ (left indent = 800)
+    // Five paraPr entries:
+    //   id=0: default paragraph (no left indent, 160% line spacing)
+    //   id=1: block-quote (left indent = 800, 160% line spacing)
+    //   id=2: list item depth 0 (left indent = 400, 160% line spacing)
+    //   id=3: list item depth 1+ (left indent = 800, 160% line spacing)
+    //   id=4: heading (no left indent, 180% line spacing for visual separation)
     let mut para_properties = BytesStart::new("hh:paraProperties");
-    para_properties.push_attribute(("itemCnt", "4"));
+    para_properties.push_attribute(("itemCnt", "5"));
     w.write_event(Event::Start(para_properties))?;
 
-    // ── paraPr id=0: default (no left indent) ──
-    write_single_para_pr(w, "0", "0")?;
+    // ── paraPr id=0: default (no left indent, standard line spacing) ──
+    write_single_para_pr(w, &ParaPrConfig::standard("0", "0"))?;
 
     // ── paraPr id=1: block-quote (left indent) ──
-    write_single_para_pr(w, "1", QUOTE_MARGIN_LEFT)?;
+    write_single_para_pr(w, &ParaPrConfig::standard("1", QUOTE_MARGIN_LEFT))?;
 
     // ── paraPr id=2: top-level list item ──
-    write_single_para_pr(w, PARA_PR_LIST_D0, LIST_D0_MARGIN_LEFT)?;
+    write_single_para_pr(
+        w,
+        &ParaPrConfig::standard(PARA_PR_LIST_D0, LIST_D0_MARGIN_LEFT),
+    )?;
 
     // ── paraPr id=3: nested list item (depth ≥ 1) ──
-    write_single_para_pr(w, PARA_PR_LIST_D1, LIST_D1_MARGIN_LEFT)?;
+    write_single_para_pr(
+        w,
+        &ParaPrConfig::standard(PARA_PR_LIST_D1, LIST_D1_MARGIN_LEFT),
+    )?;
+
+    // ── paraPr id=4: heading (wider line spacing for readability) ──
+    write_single_para_pr(
+        w,
+        &ParaPrConfig::with_spacing(PARA_PR_HEADING, "0", "180", "0"),
+    )?;
 
     w.write_event(Event::End(BytesEnd::new("hh:paraProperties")))?;
     Ok(())
@@ -304,15 +367,16 @@ fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::E
 
 /// Emit a single `<hh:paraPr>` element with all required OWPML children.
 ///
-/// `left_margin` is the HWP-unit value for the `<hh:left>` child inside
-/// `<hh:margin>`.  All other margin children are emitted as `"0"`.
+/// `config.left_margin` is the HWP-unit value for the `<hh:left>` child inside
+/// `<hh:margin>`.  `config.line_spacing` controls the `<hh:lineSpacing>` value
+/// attribute (percentage string).  `config.first_indent` sets the `<hh:intent>`
+/// first-line indent (HWP units).  All other margin children are emitted as `"0"`.
 fn write_single_para_pr<W: Write>(
     w: &mut Writer<W>,
-    id: &str,
-    left_margin: &str,
+    config: &ParaPrConfig<'_>,
 ) -> Result<(), quick_xml::Error> {
     let mut para_pr = BytesStart::new("hh:paraPr");
-    para_pr.push_attribute(("id", id));
+    para_pr.push_attribute(("id", config.id));
     w.write_event(Event::Start(para_pr))?;
 
     // <align> requires both horizontal and vertical attributes.
@@ -341,17 +405,17 @@ fn write_single_para_pr<W: Write>(
 
     let mut line_spacing = BytesStart::new("hh:lineSpacing");
     line_spacing.push_attribute(("type", "PERCENT"));
-    line_spacing.push_attribute(("value", "160"));
+    line_spacing.push_attribute(("value", config.line_spacing));
     w.write_event(Event::Empty(line_spacing))?;
 
     // margin children are HWPValue elements (value attribute, no attrs on margin itself).
     w.write_event(Event::Start(BytesStart::new("hh:margin")))?;
     for child_name in &["hh:intent", "hh:left", "hh:right", "hh:prev", "hh:next"] {
         let mut child = BytesStart::new(*child_name);
-        let value = if *child_name == "hh:left" {
-            left_margin
-        } else {
-            "0"
+        let value = match *child_name {
+            "hh:left" => config.left_margin,
+            "hh:intent" => config.first_indent,
+            _ => "0",
         };
         child.push_attribute(("value", value));
         w.write_event(Event::Empty(child))?;

@@ -114,3 +114,6 @@ mod tests_code_lang;
 
 #[path = "writer_tests_page_layout.rs"]
 mod tests_page_layout;
+
+#[path = "writer_tests_para_pr.rs"]
+mod tests_para_pr;

@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - Unreleased
+## [0.4.0] - 2026-04-26
 
 ### Added
 - **Phase A-1**: Image embedding pipeline — file path and data URI images
@@ -40,21 +40,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   height, landscape, margins); HWPX reader parses `<hp:secPr>` →
   `<hp:pagePr>` → `<hp:pageSize>`/`<hp:margin>`; writer emits `<hp:secPr>`
   with A4 portrait defaults; 11 new page layout tests.
+- **Phase C-1**: Heading paraPr (id=4) with 180% line spacing; `ParaPrConfig`
+  struct replacing bare `(id, left_margin)` parameters; 14 new paraPr tests.
+- **Phase D-1**: Comprehensive roundtrip integration tests — 37 tests covering
+  all block types (paragraph, H1-H6, ordered/unordered/nested list, table,
+  code block, horizontal rule, blockquote, image, footnote, inline formatting,
+  combined document).
 
 ### Changed
-- `paraPr` table expanded from 2 to 4 entries (normal, blockquote,
-  list-depth-0, list-depth-1+).
+- `paraPr` table expanded from 2 to 5 entries (normal, blockquote,
+  list-depth-0, list-depth-1+, heading).
 - `writer_tests_roundtrip.rs` split: golden tests → `writer_tests_golden.rs`,
   code language tests → `writer_tests_code_lang.rs`.
 - `ir::Section` now carries `page_layout: Option<PageLayout>`.
+- Headings use `paraPrIDRef="4"` (180% line spacing) outside blockquotes.
 
 ### Fixed
 - Image filename collision: counter suffix dedup (`photo_2.png`) instead
   of silent drop; `unique_entry_name` bounded to 10,000 iterations.
 - XML comment injection: code language `-->` sanitized via `--` collapse.
 - `flush_paragraph` marked `#[cfg(test)]` instead of `#[allow(dead_code)]`.
-- Image filename collision: counter suffix dedup (`photo_2.png`) instead
-  of silent drop.
 
 ## [0.3.1] - 2026-04-26
 
