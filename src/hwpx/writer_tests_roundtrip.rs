@@ -156,7 +156,7 @@ fn roundtrip_mixed_plain_and_bold_preserved() {
 }
 
 #[test]
-fn roundtrip_all_formatting_combined() {
+fn roundtrip_bold_italic_underline_strike_color_combined() {
     let input = Inline {
         text: "all".into(),
         bold: true,
@@ -382,5 +382,297 @@ fn write_hwpx_image_roundtrip_preserves_asset() {
     assert_eq!(
         read_back.assets[0].mime_type, "image/png",
         "asset MIME type must be preserved"
+    );
+}
+
+// ── golden file test: verify actual XML output ─────────────────────────
+
+/// Golden file test that validates the writer's actual XML output byte-for-byte
+/// rather than relying on roundtrip fidelity.  Builds a comprehensive IR document
+/// (heading, bold paragraph, italic paragraph, table, list), writes it to HWPX,
+/// then inspects specific XML files inside the ZIP for expected patterns.
+#[test]
+fn golden_comprehensive_document_structure() {
+    use std::io::Read as _;
+
+    // ── 1. Build a comprehensive IR document ──
+
+    let doc = Document {
+        metadata: Metadata {
+            title: Some("Golden Test Doc".into()),
+            author: Some("Test Author".into()),
+            ..Metadata::default()
+        },
+        sections: vec![Section {
+            blocks: vec![
+                // H1 heading
+                Block::Heading {
+                    level: 1,
+                    inlines: vec![Inline::plain("Main Title")],
+                },
+                // Paragraph with bold inline
+                Block::Paragraph {
+                    inlines: vec![
+                        inline("Normal text "),
+                        bold_inline("bold text"),
+                    ],
+                },
+                // Paragraph with italic inline
+                Block::Paragraph {
+                    inlines: vec![italic_inline("italic text")],
+                },
+                // 2x2 table
+                Block::Table {
+                    rows: vec![
+                        TableRow {
+                            cells: vec![
+                                TableCell {
+                                    blocks: vec![Block::Paragraph {
+                                        inlines: vec![inline("Cell A1")],
+                                    }],
+                                    colspan: 1,
+                                    rowspan: 1,
+                                },
+                                TableCell {
+                                    blocks: vec![Block::Paragraph {
+                                        inlines: vec![inline("Cell B1")],
+                                    }],
+                                    colspan: 1,
+                                    rowspan: 1,
+                                },
+                            ],
+                            is_header: true,
+                        },
+                        TableRow {
+                            cells: vec![
+                                TableCell {
+                                    blocks: vec![Block::Paragraph {
+                                        inlines: vec![inline("Cell A2")],
+                                    }],
+                                    colspan: 1,
+                                    rowspan: 1,
+                                },
+                                TableCell {
+                                    blocks: vec![Block::Paragraph {
+                                        inlines: vec![inline("Cell B2")],
+                                    }],
+                                    colspan: 1,
+                                    rowspan: 1,
+                                },
+                            ],
+                            is_header: false,
+                        },
+                    ],
+                    col_count: 2,
+                },
+                // Unordered list
+                Block::List {
+                    ordered: false,
+                    start: 1,
+                    items: vec![
+                        ListItem {
+                            blocks: vec![Block::Paragraph {
+                                inlines: vec![inline("List item one")],
+                            }],
+                            children: Vec::new(),
+                        },
+                        ListItem {
+                            blocks: vec![Block::Paragraph {
+                                inlines: vec![inline("List item two")],
+                            }],
+                            children: Vec::new(),
+                        },
+                    ],
+                },
+            ],
+        }],
+        assets: Vec::new(),
+    };
+
+    // ── 2. Write to HWPX bytes ──
+
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    // ── 3. Open the ZIP and read specific XML entries ──
+
+    let file = std::fs::File::open(tmp.path()).expect("open zip");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+
+    // -- section0.xml assertions --
+    let section_xml = {
+        let mut entry = archive
+            .by_name("Contents/section0.xml")
+            .expect("section0.xml must exist in HWPX");
+        let mut buf = String::new();
+        entry.read_to_string(&mut buf).expect("read section0.xml");
+        buf
+    };
+
+    // Verify heading has styleIDRef
+    assert!(
+        section_xml.contains(r#"hp:styleIDRef="1""#),
+        "H1 heading must have hp:styleIDRef=\"1\" in section XML:\n{section_xml}"
+    );
+
+    // Verify heading text
+    assert!(
+        section_xml.contains("<hp:t>Main Title</hp:t>"),
+        "heading text 'Main Title' must appear in <hp:t>:\n{section_xml}"
+    );
+
+    // Verify bold inline charPr
+    assert!(
+        section_xml.contains(r#"bold="true""#),
+        "bold inline must emit charPr with bold=\"true\":\n{section_xml}"
+    );
+
+    // Verify bold text content
+    assert!(
+        section_xml.contains("<hp:t>bold text</hp:t>"),
+        "bold text content must appear in <hp:t>:\n{section_xml}"
+    );
+
+    // Verify italic inline charPr
+    assert!(
+        section_xml.contains(r#"italic="true""#),
+        "italic inline must emit charPr with italic=\"true\":\n{section_xml}"
+    );
+
+    // Verify italic text content
+    assert!(
+        section_xml.contains("<hp:t>italic text</hp:t>"),
+        "italic text content must appear in <hp:t>:\n{section_xml}"
+    );
+
+    // Verify normal (non-bold, non-italic) text
+    assert!(
+        section_xml.contains("<hp:t>Normal text </hp:t>"),
+        "plain text must appear in <hp:t>:\n{section_xml}"
+    );
+
+    // Verify table structure
+    assert!(
+        section_xml.contains(r#"<hp:tbl"#),
+        "table must emit <hp:tbl> element:\n{section_xml}"
+    );
+    assert!(
+        section_xml.contains(r#"rowCnt="2""#),
+        "table must have rowCnt=\"2\":\n{section_xml}"
+    );
+    assert!(
+        section_xml.contains(r#"colCnt="2""#),
+        "table must have colCnt=\"2\":\n{section_xml}"
+    );
+    assert!(
+        section_xml.contains("<hp:tr>"),
+        "table must contain <hp:tr> rows:\n{section_xml}"
+    );
+    assert!(
+        section_xml.contains("<hp:tc>"),
+        "table must contain <hp:tc> cells:\n{section_xml}"
+    );
+    assert!(
+        section_xml.contains("<hp:t>Cell A1</hp:t>"),
+        "table cell text 'Cell A1' must appear:\n{section_xml}"
+    );
+    assert!(
+        section_xml.contains("<hp:t>Cell B2</hp:t>"),
+        "table cell text 'Cell B2' must appear:\n{section_xml}"
+    );
+
+    // Verify list items are emitted as paragraphs
+    assert!(
+        section_xml.contains("<hp:t>List item one</hp:t>"),
+        "list item text 'List item one' must appear:\n{section_xml}"
+    );
+    assert!(
+        section_xml.contains("<hp:t>List item two</hp:t>"),
+        "list item text 'List item two' must appear:\n{section_xml}"
+    );
+
+    // Verify section XML namespace declarations
+    assert!(
+        section_xml.contains("xmlns:hs="),
+        "section XML must declare hs namespace:\n{section_xml}"
+    );
+    assert!(
+        section_xml.contains("xmlns:hp="),
+        "section XML must declare hp namespace:\n{section_xml}"
+    );
+
+    // Verify no inline <hp:charPr> for plain text runs (the plain text
+    // runs should only have a charPrIDRef attribute, not an inline element).
+    // We check that the number of <hp:charPr occurrences matches the number
+    // of formatted inlines (bold + italic = 2).
+    let charpr_count = section_xml.matches("<hp:charPr ").count();
+    assert_eq!(
+        charpr_count, 2,
+        "exactly 2 inline <hp:charPr> elements expected (bold + italic), found {charpr_count}:\n{section_xml}"
+    );
+
+    // -- content.hpf assertions --
+    let content_hpf = {
+        let mut entry = archive
+            .by_name("Contents/content.hpf")
+            .expect("content.hpf must exist in HWPX");
+        let mut buf = String::new();
+        entry.read_to_string(&mut buf).expect("read content.hpf");
+        buf
+    };
+
+    assert!(
+        content_hpf.contains("section0.xml"),
+        "content.hpf must reference section0.xml:\n{content_hpf}"
+    );
+    assert!(
+        content_hpf.contains("<hp:title>Golden Test Doc</hp:title>"),
+        "content.hpf must contain document title:\n{content_hpf}"
+    );
+    assert!(
+        content_hpf.contains("<hp:author>Test Author</hp:author>"),
+        "content.hpf must contain document author:\n{content_hpf}"
+    );
+
+    // -- header.xml assertions --
+    let header_xml = {
+        let mut entry = archive
+            .by_name("Contents/header.xml")
+            .expect("header.xml must exist in HWPX");
+        let mut buf = String::new();
+        entry.read_to_string(&mut buf).expect("read header.xml");
+        buf
+    };
+
+    // Header must contain fontface declarations
+    assert!(
+        header_xml.contains("hh:fontface"),
+        "header.xml must contain fontface declarations:\n{header_xml}"
+    );
+
+    // Header must contain charProperties
+    assert!(
+        header_xml.contains("hh:charPr"),
+        "header.xml must contain charPr entries:\n{header_xml}"
+    );
+
+    // Header must contain styles (heading styles)
+    assert!(
+        header_xml.contains("hh:style"),
+        "header.xml must contain style entries:\n{header_xml}"
+    );
+
+    // -- mimetype assertion --
+    let mimetype = {
+        let mut entry = archive
+            .by_name("mimetype")
+            .expect("mimetype must exist in HWPX");
+        let mut buf = String::new();
+        entry.read_to_string(&mut buf).expect("read mimetype");
+        buf
+    };
+    assert_eq!(
+        mimetype, "application/hwp+zip",
+        "mimetype must be exactly 'application/hwp+zip'"
     );
 }
