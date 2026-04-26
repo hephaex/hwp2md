@@ -22,12 +22,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `write_block()`; 6 new blockquote tests.
 - **Phase A-4**: Footnote OWPML structure — `<hp:fn noteId>` wrapping
   around footnote content blocks; 7 new footnote tests.
+- **Phase B-1**: HWPX nested list reader — `StagedBlock` enum for
+  list-paragraph grouping; `group_list_paragraphs` collapses flat
+  sequences into nested `Block::List`; `paraPrIDRef`/`numPrIDRef`
+  parsing from `<hp:p>`; 13 new reader list tests.
+- **Phase B-3**: HWPX lenient XML error recovery — malformed section
+  XML parsing continues with partial results; missing section files
+  skipped with warning; missing attributes use defaults.
+- **Phase C-3**: Code block language preservation — language hint stored
+  as `<!-- language: X -->` XML comment in HWPX; reader parses it back;
+  MD→HWPX→MD roundtrip preserves language info.
 
 ### Changed
 - `paraPr` table expanded from 2 to 4 entries (normal, blockquote,
   list-depth-0, list-depth-1+).
+- `writer_tests_roundtrip.rs` split: golden tests → `writer_tests_golden.rs`,
+  code language tests → `writer_tests_code_lang.rs`.
 
 ### Fixed
+- Image filename collision: counter suffix dedup (`photo_2.png`) instead
+  of silent drop.
 
 ## [0.3.1] - 2026-04-26
 

@@ -327,6 +327,7 @@ fn mime_from_extension(path: &str) -> &'static str {
 }
 
 /// A resolved image asset ready to be written into the HWPX ZIP.
+#[derive(Debug)]
 struct ResolvedAsset {
     /// The bare filename used as the BinData entry (e.g. `"photo.png"`).
     entry_name: String,
@@ -392,6 +393,30 @@ fn collect_image_assets(doc: &ir::Document) -> (ImageAssetMap, Vec<ResolvedAsset
     (asset_map, resolved)
 }
 
+/// Return a unique entry name derived from `preferred` that is not already
+/// present in `resolved`.
+///
+/// If `preferred` is already taken, inserts a numeric suffix before the
+/// extension: `"photo.png"` → `"photo_2.png"` → `"photo_3.png"` etc.
+fn unique_entry_name(preferred: &str, resolved: &[ResolvedAsset]) -> String {
+    if !resolved.iter().any(|r| r.entry_name == preferred) {
+        return preferred.to_owned();
+    }
+    // Split at the last `.` to get stem and extension.
+    let (stem, ext) = match preferred.rsplit_once('.') {
+        Some((s, e)) => (s, format!(".{e}")),
+        None => (preferred, String::new()),
+    };
+    let mut n: u32 = 2;
+    loop {
+        let candidate = format!("{stem}_{n}{ext}");
+        if !resolved.iter().any(|r| r.entry_name == candidate) {
+            return candidate;
+        }
+        n += 1;
+    }
+}
+
 /// Recursively walk `blocks` and resolve any `Block::Image` whose `src` has
 /// not already been added to `asset_map`.
 fn collect_images_from_blocks(
@@ -429,7 +454,7 @@ fn collect_images_from_blocks(
                     ImageSource::FilePath(path) => {
                         match std::fs::read(path) {
                             Ok(bytes) => {
-                                let entry_name = std::path::Path::new(path)
+                                let bare = std::path::Path::new(path)
                                     .file_name()
                                     .map(|n| n.to_string_lossy().into_owned())
                                     .unwrap_or_else(|| {
@@ -437,27 +462,23 @@ fn collect_images_from_blocks(
                                         format!("image_{counter}")
                                     });
                                 let mime = mime_from_extension(path).to_owned();
-                                asset_map.insert(src.clone(), entry_name.clone());
-                                // Avoid duplicate entry_name when multiple srcs
-                                // resolve to the same bare filename.  When a
-                                // collision is detected (different path, same
-                                // filename), the second image is mapped to the
-                                // same BinData entry as the first — warn so the
-                                // caller can diagnose unexpected output.
-                                if resolved.iter().any(|r| r.entry_name == entry_name) {
+                                // Deduplicate: if the bare filename is already
+                                // occupied by a different asset, append a
+                                // counter suffix (e.g. "photo_2.png").
+                                let entry_name = unique_entry_name(&bare, resolved);
+                                if entry_name != bare {
                                     tracing::warn!(
-                                        "Image filename collision: {path:?} maps to \
-                                         entry name {entry_name:?} which is already \
-                                         occupied by an earlier image; the file will \
-                                         share the existing BinData entry"
+                                        "Image filename collision: {path:?} \
+                                         renamed to {entry_name:?} to avoid \
+                                         overwriting an earlier BinData entry"
                                     );
-                                } else {
-                                    resolved.push(ResolvedAsset {
-                                        entry_name,
-                                        data: bytes,
-                                        mime_type: mime,
-                                    });
                                 }
+                                asset_map.insert(src.clone(), entry_name.clone());
+                                resolved.push(ResolvedAsset {
+                                    entry_name,
+                                    data: bytes,
+                                    mime_type: mime,
+                                });
                             }
                             Err(e) => {
                                 tracing::warn!("Cannot read image file {path:?}: {e}");

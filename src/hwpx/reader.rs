@@ -8,7 +8,8 @@ use std::path::Path;
 
 #[path = "context.rs"]
 mod context;
-pub(crate) use context::{flush_paragraph, ParseContext};
+pub(crate) use context::ParseContext;
+use context::{flush_paragraph_staged, group_list_paragraphs, StagedBlock};
 
 #[path = "handlers.rs"]
 mod handlers;
@@ -349,6 +350,15 @@ pub(crate) fn parse_section_xml_with_face_names(
     xml: &str,
     face_names: &[String],
 ) -> Result<ir::Section, Hwp2MdError> {
+    // `staged` collects both plain blocks and list-paragraph sentinels in
+    // document order.  After the XML event loop, `group_list_paragraphs`
+    // collapses consecutive list-paragraph sentinels into proper `Block::List`
+    // structures with nested `ListItem.children`.
+    let mut staged: Vec<StagedBlock> = Vec::new();
+
+    // `section` is still passed to handlers that push directly (cells, etc.),
+    // but we redirect the top-level paragraph / table / equation / footnote
+    // pushes through `staged` instead.
     let mut section = ir::Section { blocks: Vec::new() };
     let mut reader = Reader::from_str(xml);
     let mut buf = Vec::new();
@@ -368,7 +378,7 @@ pub(crate) fn parse_section_xml_with_face_names(
             Ok(Event::End(ref e)) => {
                 let local_name = e.local_name();
                 let local = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
-                handle_end_element(local, &mut context, &mut section);
+                handle_end_element(local, &mut context, &mut staged);
             }
             Ok(Event::Text(e)) => {
                 let text = e.unescape().unwrap_or_default().to_string();
@@ -377,7 +387,22 @@ pub(crate) fn parse_section_xml_with_face_names(
             Ok(Event::Empty(ref e)) => {
                 let local_name = e.local_name();
                 let local = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
-                handle_empty_element(local, e, &mut context, &mut section);
+                handle_empty_element(local, e, &mut context, &mut staged);
+            }
+            Ok(Event::Comment(ref e)) => {
+                // Detect the code-block language-hint convention emitted by our
+                // own HWPX writer: <!-- hwp2md:lang:LANG -->
+                // (e.g. <!-- hwp2md:lang:python --> or <!-- hwp2md:lang: -->)
+                let comment = e.unescape().unwrap_or_default();
+                let trimmed = comment.trim();
+                if let Some(lang_part) = trimmed.strip_prefix("hwp2md:lang:") {
+                    let language = if lang_part.is_empty() {
+                        None
+                    } else {
+                        Some(lang_part.to_string())
+                    };
+                    context.pending_code_lang = Some(language);
+                }
             }
             Ok(Event::Eof) => break,
             Err(e) => {
@@ -389,7 +414,14 @@ pub(crate) fn parse_section_xml_with_face_names(
         buf.clear();
     }
 
-    flush_paragraph(&mut context, &mut section);
+    // Flush any trailing paragraph that was not closed by a </hp:p> event
+    // (defensive; well-formed XML should not have this case).
+    if let Some(sb) = flush_paragraph_staged(&mut context) {
+        staged.push(sb);
+    }
+
+    // Group consecutive list-paragraph sentinels into Block::List structures.
+    section.blocks = group_list_paragraphs(staged);
 
     Ok(section)
 }
@@ -484,3 +516,11 @@ mod tests_footnotes;
 #[cfg(test)]
 #[path = "reader_tests_binrefs.rs"]
 mod tests_binrefs;
+
+#[cfg(test)]
+#[path = "reader_tests_lenient.rs"]
+mod tests_lenient;
+
+#[cfg(test)]
+#[path = "reader_tests_list.rs"]
+mod tests_list;

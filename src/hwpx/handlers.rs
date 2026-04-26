@@ -2,7 +2,7 @@ use crate::ir;
 
 use super::context::{
     apply_charpr_attrs, flush_cell_paragraph, flush_footnote_paragraph, flush_list_item_paragraph,
-    flush_paragraph, ParseContext, RubyPart,
+    flush_paragraph_staged, ParseContext, RubyPart, StagedBlock,
 };
 
 pub(super) fn handle_start_element(
@@ -16,14 +16,28 @@ pub(super) fn handle_start_element(
             ctx.current_text.clear();
             ctx.current_inlines.clear();
             ctx.heading_level = None;
+            ctx.current_para_pr_id = None;
+            ctx.current_num_pr_id = None;
 
             for attr in e.attributes().flatten() {
                 let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                if key == "styleIDRef" || key == "hp:styleIDRef" {
-                    let val = attr.unescape_value().unwrap_or_default().to_string();
-                    if let Some(level) = parse_heading_style(&val) {
-                        ctx.heading_level = Some(level);
+                let val = attr.unescape_value().unwrap_or_default().to_string();
+                match key {
+                    "styleIDRef" | "hp:styleIDRef" => {
+                        if let Some(level) = parse_heading_style(&val) {
+                            ctx.heading_level = Some(level);
+                        }
                     }
+                    // Paragraph-property reference: identifies the paragraph style
+                    // (indentation level) and is used to detect list paragraphs.
+                    "paraPrIDRef" | "hp:paraPrIDRef" => {
+                        ctx.current_para_pr_id = Some(val);
+                    }
+                    // Numbering-property reference: "1" means ordered (DIGIT).
+                    "numPrIDRef" | "hp:numPrIDRef" => {
+                        ctx.current_num_pr_id = Some(val);
+                    }
+                    _ => {}
                 }
             }
         }
@@ -135,7 +149,11 @@ pub(super) fn handle_start_element(
     }
 }
 
-pub(super) fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &mut ir::Section) {
+pub(super) fn handle_end_element(
+    local: &str,
+    ctx: &mut ParseContext,
+    staged: &mut Vec<StagedBlock>,
+) {
     match local {
         "p" | "hp:p" => {
             if ctx.in_footnote {
@@ -145,7 +163,12 @@ pub(super) fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &
             } else if ctx.in_list_item {
                 flush_list_item_paragraph(ctx);
             } else {
-                flush_paragraph(ctx, section);
+                // Use the staged variant for top-level paragraphs so that
+                // list-paragraph metadata (paraPrIDRef / numPrIDRef) is
+                // preserved for the post-processing grouping pass.
+                if let Some(sb) = flush_paragraph_staged(ctx) {
+                    staged.push(sb);
+                }
             }
             ctx.in_paragraph = false;
         }
@@ -185,7 +208,7 @@ pub(super) fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &
             );
             if !ctx.table_rows.is_empty() {
                 let rows = std::mem::take(&mut ctx.table_rows);
-                section.blocks.push(ir::Block::Table { rows, col_count });
+                staged.push(StagedBlock::Plain(ir::Block::Table { rows, col_count }));
             }
             ctx.in_table = false;
         }
@@ -218,18 +241,18 @@ pub(super) fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &
         "ol" | "ul" => {
             if !ctx.list_items.is_empty() {
                 let items = std::mem::take(&mut ctx.list_items);
-                section.blocks.push(ir::Block::List {
+                staged.push(StagedBlock::Plain(ir::Block::List {
                     ordered: ctx.list_ordered,
                     start: 1,
                     items,
-                });
+                }));
             }
             ctx.in_list = false;
         }
         "equation" | "hp:equation" | "eqEdit" | "hp:eqEdit" => {
             if !ctx.equation_text.is_empty() {
                 let tex = std::mem::take(&mut ctx.equation_text);
-                section.blocks.push(ir::Block::Math { display: true, tex });
+                staged.push(StagedBlock::Plain(ir::Block::Math { display: true, tex }));
             }
             ctx.in_equation = false;
         }
@@ -272,7 +295,7 @@ pub(super) fn handle_end_element(local: &str, ctx: &mut ParseContext, section: &
             if !ctx.footnote_blocks.is_empty() {
                 let id = std::mem::take(&mut ctx.footnote_id);
                 let content = std::mem::take(&mut ctx.footnote_blocks);
-                section.blocks.push(ir::Block::Footnote { id, content });
+                staged.push(StagedBlock::Plain(ir::Block::Footnote { id, content }));
             } else {
                 ctx.footnote_id.clear();
             }
@@ -304,7 +327,7 @@ pub(super) fn handle_empty_element(
     local: &str,
     e: &quick_xml::events::BytesStart,
     ctx: &mut ParseContext,
-    section: &mut ir::Section,
+    staged: &mut Vec<StagedBlock>,
 ) {
     match local {
         "img" | "hp:img" | "picture" | "hp:picture" => {
@@ -323,8 +346,11 @@ pub(super) fn handle_empty_element(
             }
             if !src.is_empty() {
                 let img = ir::Block::Image { src, alt };
+                // push_block_scoped routes the block to cell/list/footnote
+                // buffers when in a scoped context; at top-level it returns
+                // Some(block) which we route through the staging vector.
                 if let Some(block) = ctx.push_block_scoped(img) {
-                    section.blocks.push(block);
+                    staged.push(StagedBlock::Plain(block));
                 }
             }
         }

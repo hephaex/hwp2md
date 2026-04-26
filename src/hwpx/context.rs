@@ -68,6 +68,32 @@ pub(crate) struct ParseContext {
     pub(crate) ruby_annotation_text: String,
     /// Which sub-element of `<hp:ruby>` is currently active.
     pub(crate) ruby_current_part: RubyPart,
+    // ── OWPML flat-paragraph list detection ─────────────────────────────
+    /// `paraPrIDRef` value read from the current `<hp:p>` open tag.
+    ///
+    /// `None` means no `paraPrIDRef` attribute was present (normal paragraph).
+    /// `Some(id)` is the raw string value — recognised values are `"2"` (list
+    /// depth-0) and `"3"` (list depth-1+) as emitted by our own writer and as
+    /// defined in header.xml's `<hh:paraProperties>` table.
+    pub(crate) current_para_pr_id: Option<String>,
+    /// `numPrIDRef` value read from the current `<hp:p>` open tag.
+    ///
+    /// `Some("1")` means the paragraph is an ordered list item (DIGIT
+    /// numbering, the sole registered numbering definition).  `None` means it
+    /// is either a non-list paragraph or an unordered list item (bullet lists
+    /// omit `numPrIDRef` per the OWPML schema).
+    pub(crate) current_num_pr_id: Option<String>,
+    /// When `Some`, the next paragraph flushed by `flush_paragraph` should be
+    /// emitted as a `CodeBlock` rather than a plain `Paragraph`.
+    ///
+    /// The inner `Option<String>` carries the language hint parsed from the
+    /// `<!-- hwp2md:lang:LANG -->` comment preceding the paragraph:
+    /// - `Some(Some("python"))` → code block with language `"python"`
+    /// - `Some(None)`           → code block with no language hint
+    ///
+    /// Reset to `None` after each `flush_paragraph` call regardless of whether
+    /// any inlines were present.
+    pub(crate) pending_code_lang: Option<Option<String>>,
 }
 
 /// Which child element of a `<hp:ruby>` block is currently being parsed.
@@ -128,6 +154,9 @@ impl Default for ParseContext {
             ruby_base_text: String::new(),
             ruby_annotation_text: String::new(),
             ruby_current_part: RubyPart::None,
+            current_para_pr_id: None,
+            current_num_pr_id: None,
+            pending_code_lang: None,
         }
     }
 }
@@ -295,6 +324,16 @@ fn flush_inlines_to_blocks(
     }
 }
 
+/// Flush any pending paragraph inlines to `section.blocks`.
+///
+/// When `ctx.pending_code_lang` is `Some`, the accumulated inline text is
+/// treated as raw code source and emitted as a `Block::CodeBlock` with the
+/// indicated language hint.  The flag is always reset to `None` after the
+/// call regardless of whether any inlines were present.
+///
+/// Otherwise the inlines are emitted as a `Block::Heading` (when
+/// `ctx.heading_level` is set) or a plain `Block::Paragraph`.
+#[allow(dead_code)]
 pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section) {
     // Flush any trailing text run into the inline buffer first.
     if !ctx.current_text.is_empty() {
@@ -313,16 +352,252 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
             .with_font_name(ctx.current_font_name.clone()),
         );
     }
+
+    // Always consume the pending_code_lang hint so it does not bleed into the
+    // next paragraph when the current one turns out to be empty.
+    let code_lang = ctx.pending_code_lang.take();
+
     if ctx.current_inlines.is_empty() {
         return;
     }
+
     let inlines = std::mem::take(&mut ctx.current_inlines);
+
+    // When a language-hint comment preceded this paragraph, reconstruct the
+    // original CodeBlock.  The code text is recovered by concatenating all
+    // inline texts (the writer emits code as a single <hp:t> run with no
+    // formatting, so there will normally be exactly one inline).
+    if let Some(language) = code_lang {
+        let code = inlines.into_iter().map(|i| i.text).collect::<String>();
+        section.blocks.push(ir::Block::CodeBlock { language, code });
+        return;
+    }
+
     let block = if let Some(level) = ctx.heading_level {
         ir::Block::Heading { level, inlines }
     } else {
         ir::Block::Paragraph { inlines }
     };
     section.blocks.push(block);
+}
+
+/// Variant of [`flush_paragraph`] used during OWPML flat-paragraph list
+/// parsing.  Instead of pushing directly to `section.blocks` it returns a
+/// [`StagedBlock`] that the caller records in a staging vector.  The staging
+/// vector is later collapsed into proper `Block::List` structures by
+/// [`group_list_paragraphs`].
+///
+/// When the paragraph carries an OWPML `paraPrIDRef` value that identifies it
+/// as a list item, the returned variant is `StagedBlock::ListPara`; otherwise
+/// it is `StagedBlock::Plain`.
+///
+/// `paraPrIDRef` values recognised as list indicators (matching the constants
+/// in `writer_header.rs`):
+/// - `"2"` → depth 0  (`PARA_PR_LIST_D0`)
+/// - `"3"` → depth 1+ (`PARA_PR_LIST_D1`)
+///
+/// `numPrIDRef` values recognised:
+/// - `"1"` → ordered list (DIGIT numbering definition)
+/// - absent / anything else → unordered (bullet) list
+pub(crate) fn flush_paragraph_staged(ctx: &mut ParseContext) -> Option<StagedBlock> {
+    // Flush any trailing text run into the inline buffer.
+    if !ctx.current_text.is_empty() {
+        let t = std::mem::take(&mut ctx.current_text);
+        ctx.current_inlines.push(
+            ir::Inline::with_formatting(
+                t,
+                ctx.current_bold,
+                ctx.current_italic,
+                ctx.current_underline,
+                ctx.current_strike,
+                ctx.current_superscript,
+                ctx.current_subscript,
+                ctx.current_color.clone(),
+            )
+            .with_font_name(ctx.current_font_name.clone()),
+        );
+    }
+
+    // Always drain these context fields so they do not bleed into the next
+    // paragraph when the current one turns out to be empty.
+    let para_pr_id = ctx.current_para_pr_id.take();
+    let num_pr_id = ctx.current_num_pr_id.take();
+    let code_lang = ctx.pending_code_lang.take();
+
+    if ctx.current_inlines.is_empty() {
+        return None;
+    }
+
+    let inlines = std::mem::take(&mut ctx.current_inlines);
+
+    // Code block paragraphs (preceded by a <!-- hwp2md:lang:LANG --> comment)
+    // are never list items — emit them as plain staged blocks.
+    if let Some(language) = code_lang {
+        let code = inlines.into_iter().map(|i| i.text).collect::<String>();
+        return Some(StagedBlock::Plain(ir::Block::CodeBlock { language, code }));
+    }
+
+    let block = if let Some(level) = ctx.heading_level {
+        ir::Block::Heading { level, inlines }
+    } else {
+        ir::Block::Paragraph { inlines }
+    };
+
+    // Detect list-paragraph by paraPrIDRef.
+    // "2" = PARA_PR_LIST_D0 (depth 0); "3" = PARA_PR_LIST_D1 (depth ≥ 1).
+    // Headings are never list items even if they somehow carry paraPrIDRef.
+    let is_heading = ctx.heading_level.is_some();
+    let list_depth: Option<u32> = if is_heading {
+        None
+    } else {
+        match para_pr_id.as_deref() {
+            Some("2") => Some(0),
+            Some("3") => Some(1),
+            // Custom paraPr IDs >= 4: treat as depth 1 (deepest we track).
+            Some(s) if s.parse::<u32>().ok().is_some_and(|n| n >= 4) => Some(1),
+            _ => None,
+        }
+    };
+
+    Some(if let Some(depth) = list_depth {
+        let ordered = num_pr_id.as_deref() == Some("1");
+        StagedBlock::ListPara {
+            depth,
+            ordered,
+            block,
+        }
+    } else {
+        StagedBlock::Plain(block)
+    })
+}
+
+/// An intermediate block produced during OWPML section parsing before the
+/// flat list-paragraph sequence is collapsed into `Block::List` structures.
+///
+/// `Plain` wraps any block that is not part of an OWPML list.  `ListPara`
+/// wraps a paragraph that carries `paraPrIDRef` / `numPrIDRef` attributes
+/// identifying it as a list item at a given depth.
+#[derive(Debug)]
+pub(crate) enum StagedBlock {
+    Plain(ir::Block),
+    ListPara {
+        /// Nesting depth: 0 = top-level, 1 = first-level nested, …
+        depth: u32,
+        /// `true` when the paragraph carries `numPrIDRef="1"` (ordered list).
+        ordered: bool,
+        /// The paragraph block itself.
+        block: ir::Block,
+    },
+}
+
+/// Collapse a flat sequence of [`StagedBlock`]s into a proper `Vec<ir::Block>`
+/// where consecutive `ListPara` entries at the same or increasing depth are
+/// grouped into `Block::List` with `ListItem.children` for deeper levels.
+///
+/// # Algorithm
+///
+/// The algorithm walks the staged blocks left-to-right.  A run of consecutive
+/// `ListPara` entries is collected into a pending list group.  When a `Plain`
+/// block (or end of input) interrupts the run, the pending group is folded
+/// into a `Block::List` and appended to the output.
+///
+/// Within a pending group, depth transitions are handled as follows:
+/// - Same depth or decreasing depth: new top-level item in the same list.
+/// - Increasing depth: nested children attached to the most recent item.
+///
+/// The ordered/unordered flag for the top-level list is taken from the **first**
+/// item in the group.  If later items disagree (mixed ordered/unordered at the
+/// same level) they are folded into the same list with the flag of the first
+/// item — this matches OWPML reader behaviour where the list type is determined
+/// by the first paragraph's `numPrIDRef`.
+pub(crate) fn group_list_paragraphs(staged: Vec<StagedBlock>) -> Vec<ir::Block> {
+    let mut out: Vec<ir::Block> = Vec::with_capacity(staged.len());
+
+    // Pending run of consecutive ListPara entries.
+    // Each entry is (depth, ordered, ir::Block).
+    let mut pending: Vec<(u32, bool, ir::Block)> = Vec::new();
+
+    let flush_pending = |pending: &mut Vec<(u32, bool, ir::Block)>, out: &mut Vec<ir::Block>| {
+        if pending.is_empty() {
+            return;
+        }
+        let list = build_list(std::mem::take(pending));
+        out.push(list);
+    };
+
+    for staged_block in staged {
+        match staged_block {
+            StagedBlock::Plain(block) => {
+                flush_pending(&mut pending, &mut out);
+                out.push(block);
+            }
+            StagedBlock::ListPara {
+                depth,
+                ordered,
+                block,
+            } => {
+                pending.push((depth, ordered, block));
+            }
+        }
+    }
+    flush_pending(&mut pending, &mut out);
+
+    out
+}
+
+/// Convert a flat list of `(depth, ordered, block)` tuples into a `Block::List`
+/// with properly nested `ListItem` children.
+///
+/// The algorithm builds the top-level list using the `ordered` flag of the
+/// first item.  Items at depth 0 become direct items; items at depth 1+
+/// become children of the most recent depth-0 item.  Deeper nesting (depth 2+)
+/// is flattened to depth-1 children because the OWPML schema only defines two
+/// paraPr levels (`PARA_PR_LIST_D0` and `PARA_PR_LIST_D1`).
+fn build_list(entries: Vec<(u32, bool, ir::Block)>) -> ir::Block {
+    if entries.is_empty() {
+        // Should not happen, but produce a safe empty list.
+        return ir::Block::List {
+            ordered: false,
+            start: 1,
+            items: vec![],
+        };
+    }
+
+    let top_ordered = entries[0].1;
+
+    // We build top-level items.  Each item may have children (depth >= 1).
+    // Stack structure: we track items in progress.
+    let mut items: Vec<ir::ListItem> = Vec::new();
+
+    for (depth, _ordered, block) in entries {
+        if depth == 0 {
+            items.push(ir::ListItem {
+                blocks: vec![block],
+                children: vec![],
+            });
+        } else {
+            // Attach as a child of the last top-level item.
+            if items.is_empty() {
+                // No parent yet — promote to top level (defensive).
+                items.push(ir::ListItem {
+                    blocks: vec![block],
+                    children: vec![],
+                });
+            } else {
+                let parent = items.last_mut().expect("items is non-empty");
+                parent.children.push(ir::ListItem {
+                    blocks: vec![block],
+                    children: vec![],
+                });
+            }
+        }
+    }
+
+    ir::Block::List {
+        ordered: top_ordered,
+        start: 1,
+        items,
+    }
 }
 
 pub(crate) fn flush_cell_paragraph(ctx: &mut ParseContext) {

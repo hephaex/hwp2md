@@ -148,7 +148,18 @@ fn write_block<W: Write>(
             writer.write_event(Event::End(BytesEnd::new("hp:run")))?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
-        ir::Block::CodeBlock { code, .. } => {
+        ir::Block::CodeBlock { code, language } => {
+            // Emit a language-hint comment before the paragraph so the reader
+            // can reconstruct `CodeBlock` with the correct `language` field on
+            // roundtrip.  The convention is:
+            //   <!-- hwp2md:lang:LANG -->   (e.g. <!-- hwp2md:lang:python -->)
+            //   <!-- hwp2md:lang: -->       (no language hint)
+            //
+            // The comment is valid XML and invisible to OWPML validators.
+            let lang_str = language.as_deref().unwrap_or("");
+            let comment_text = format!(" hwp2md:lang:{lang_str} ");
+            writer.write_event(Event::Comment(BytesText::new(&comment_text)))?;
+
             let code_id = tables.code_block_char_pr_id().to_string();
             let id_str = para_id.to_string();
             *para_id += 1;

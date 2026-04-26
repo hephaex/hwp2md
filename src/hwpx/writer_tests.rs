@@ -97,3 +97,9 @@ mod tests_image;
 
 #[path = "writer_tests_list.rs"]
 mod tests_list;
+
+#[path = "writer_tests_golden.rs"]
+mod tests_golden;
+
+#[path = "writer_tests_code_lang.rs"]
+mod tests_code_lang;
