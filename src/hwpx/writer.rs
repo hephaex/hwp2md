@@ -439,8 +439,19 @@ fn collect_images_from_blocks(
                                 let mime = mime_from_extension(path).to_owned();
                                 asset_map.insert(src.clone(), entry_name.clone());
                                 // Avoid duplicate entry_name when multiple srcs
-                                // resolve to the same filename.
-                                if !resolved.iter().any(|r| r.entry_name == entry_name) {
+                                // resolve to the same bare filename.  When a
+                                // collision is detected (different path, same
+                                // filename), the second image is mapped to the
+                                // same BinData entry as the first — warn so the
+                                // caller can diagnose unexpected output.
+                                if resolved.iter().any(|r| r.entry_name == entry_name) {
+                                    tracing::warn!(
+                                        "Image filename collision: {path:?} maps to \
+                                         entry name {entry_name:?} which is already \
+                                         occupied by an earlier image; the file will \
+                                         share the existing BinData entry"
+                                    );
+                                } else {
                                     resolved.push(ResolvedAsset {
                                         entry_name,
                                         data: bytes,

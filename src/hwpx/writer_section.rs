@@ -7,6 +7,15 @@ use super::header::{NUM_PR_DIGIT, PARA_PR_LIST_D0, PARA_PR_LIST_D1};
 use super::{CharPrKey, ImageAssetMap, RefTables};
 use crate::ir;
 
+/// Maximum nesting depth for lists before further sub-levels are silently
+/// dropped.  Prevents stack overflow on pathologically deep Markdown input.
+const MAX_LIST_DEPTH: u32 = 10;
+
+/// Maximum nesting depth for block quotes before further nesting is silently
+/// dropped.  Mirrors the list depth guard to bound mutual recursion between
+/// `write_block` and `write_list_items`.
+const MAX_QUOTE_DEPTH: u32 = 10;
+
 // ---------------------------------------------------------------------------
 // section XML
 // ---------------------------------------------------------------------------
@@ -157,6 +166,11 @@ fn write_block<W: Write>(
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
         ir::Block::BlockQuote { blocks } => {
+            // Depth guard: silently stop recursing beyond MAX_QUOTE_DEPTH to
+            // prevent stack overflow on pathologically deeply nested quotes.
+            if quote_depth >= MAX_QUOTE_DEPTH {
+                return Ok(());
+            }
             for b in blocks {
                 write_block(writer, b, tables, para_id, quote_depth + 1, asset_map)?;
             }
@@ -276,7 +290,18 @@ fn write_list_items<W: Write>(
     list_depth: u32,
     asset_map: &ImageAssetMap,
 ) -> Result<(), quick_xml::Error> {
-    // Deeper nesting uses a larger left margin (paraPr id=3).
+    // Depth guard: silently stop recursing beyond MAX_LIST_DEPTH to prevent
+    // stack overflow when `write_block` (called for non-paragraph items)
+    // and this function mutually recurse on deeply nested list input.
+    if list_depth >= MAX_LIST_DEPTH {
+        return Ok(());
+    }
+
+    // Select the paragraph property ID that controls left indentation.
+    // OWPML only has two list paragraph styles: D0 (top level) and D1
+    // (indented for depth ≥ 1).  Depths > 1 are intentionally mapped to D1
+    // because no additional paraPr entries are defined for deeper nesting —
+    // they appear visually identical to depth-1 items in Hancom Writer.
     let para_pr_ref = if list_depth == 0 {
         PARA_PR_LIST_D0
     } else {
