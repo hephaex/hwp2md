@@ -57,9 +57,9 @@ pub(super) fn generate_section_xml(
     sec.push_attribute(("xmlns:hp", "http://www.hancom.co.kr/hwpml/2011/paragraph"));
     writer.write_event(Event::Start(sec))?;
 
+    // Section-level page_layout takes precedence over the style template.
     let layout = section
         .page_layout
-        .clone()
         .unwrap_or_else(|| style_page_layout(tables));
     write_sec_pr(&mut writer, &layout)?;
 

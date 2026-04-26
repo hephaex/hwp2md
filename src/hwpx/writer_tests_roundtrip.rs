@@ -528,7 +528,7 @@ fn page_layout_survives_hwpx_roundtrip() {
             blocks: vec![Block::Paragraph {
                 inlines: vec![Inline::plain("roundtrip text")],
             }],
-            page_layout: Some(layout.clone()),
+            page_layout: Some(layout),
         }],
         assets: Vec::new(),
     };

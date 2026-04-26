@@ -274,3 +274,87 @@ fn style_template_heading_line_spacing_in_header() {
         "heading line spacing 220 must appear in header: {content}"
     );
 }
+
+#[test]
+fn style_template_default_font_in_header() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = crate::ir::Document {
+        metadata: crate::ir::Metadata::default(),
+        sections: vec![Section {
+            blocks: vec![Block::Paragraph {
+                inlines: vec![Inline::plain("text")],
+            }],
+            page_layout: None,
+        }],
+        assets: Vec::new(),
+    };
+    let style_yaml = r#"font:
+  default: "맑은 고딕"
+"#;
+    let style_path = tempfile::NamedTempFile::new().expect("style tmp");
+    std::fs::write(style_path.path(), style_yaml).unwrap();
+    write_hwpx(&doc, tmp.path(), Some(style_path.path())).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    std::io::Read::read_to_string(&mut entry, &mut content).expect("read");
+
+    assert!(
+        content.contains("맑은 고딕"),
+        "custom default font must appear in header: {content}"
+    );
+}
+
+#[test]
+fn section_page_layout_takes_precedence_over_style() {
+    let custom_layout = PageLayout {
+        width: Some(42000),
+        height: Some(60000),
+        landscape: false,
+        margin_left: Some(1111),
+        margin_right: Some(2222),
+        margin_top: Some(3333),
+        margin_bottom: Some(4444),
+    };
+    let blocks = vec![Block::Paragraph {
+        inlines: vec![Inline::plain("test")],
+    }];
+    let doc = crate::ir::Document {
+        metadata: crate::ir::Metadata::default(),
+        sections: vec![Section {
+            blocks,
+            page_layout: Some(custom_layout),
+        }],
+        assets: Vec::new(),
+    };
+    let style = StyleTemplate::from_yaml(
+        r#"
+page:
+  width: 70000
+  height: 90000
+  margin:
+    left: 9999
+"#,
+    )
+    .unwrap();
+    let tables = RefTables::build(&doc, Some(style));
+    let sec = &doc.sections[0];
+    let empty_asset_map = ImageAssetMap::new();
+    let xml =
+        generate_section_xml(sec, 0, &tables, &empty_asset_map).expect("generate_section_xml");
+
+    assert!(
+        xml.contains(r#"width="42000""#),
+        "section layout width must win over style: {xml}"
+    );
+    assert!(
+        xml.contains(r#"left="1111""#),
+        "section layout margin must win over style: {xml}"
+    );
+    assert!(
+        !xml.contains(r#"width="70000""#),
+        "style template width must NOT appear: {xml}"
+    );
+}

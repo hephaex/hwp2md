@@ -75,8 +75,9 @@ pub fn to_markdown(
 /// Reads `input` (`.md` or `.markdown`), parses it into the intermediate
 /// representation, and writes a conformant HWPX archive to `output`.  When
 /// `output` is `None` the output path is derived by replacing the input
-/// extension with `.hwpx`.  The optional `style` argument is reserved for a
-/// future style-template feature and is currently ignored.
+/// extension with `.hwpx`.  The optional `style` argument points to a YAML
+/// style template that overrides page dimensions, margins, fonts, and heading
+/// line spacing in the generated HWPX output.
 ///
 /// # Errors
 ///

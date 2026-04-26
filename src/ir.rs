@@ -56,7 +56,7 @@ pub struct Metadata {
 ///
 /// This struct is stored on [`Section`] because HWPX allows each section to
 /// have independent page layout settings via its own `<hp:secPr>` element.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PageLayout {
     /// Page width in HWP units (`<hp:pageSize width="…"/>`).
     pub width: Option<u32>,

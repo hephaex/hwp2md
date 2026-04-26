@@ -95,8 +95,32 @@ impl StyleTemplate {
 
     /// Parse a style template from a YAML string.
     pub fn from_yaml(yaml: &str) -> Result<Self, Hwp2MdError> {
-        serde_yaml::from_str(yaml)
-            .map_err(|e| Hwp2MdError::StyleLoad(format!("invalid style YAML: {e}")))
+        let t: Self = serde_yml::from_str(yaml)
+            .map_err(|e| Hwp2MdError::StyleLoad(format!("invalid style YAML: {e}")))?;
+        t.validate()?;
+        Ok(t)
+    }
+
+    /// Validate that all numeric values are within sane ranges.
+    fn validate(&self) -> Result<(), Hwp2MdError> {
+        if let Some(w) = self.page.width {
+            if w == 0 {
+                return Err(Hwp2MdError::StyleLoad("page.width must be > 0".into()));
+            }
+        }
+        if let Some(h) = self.page.height {
+            if h == 0 {
+                return Err(Hwp2MdError::StyleLoad("page.height must be > 0".into()));
+            }
+        }
+        if let Some(ls) = self.heading.line_spacing {
+            if ls == 0 {
+                return Err(Hwp2MdError::StyleLoad(
+                    "heading.line_spacing must be > 0".into(),
+                ));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -170,6 +194,24 @@ heading:
     #[test]
     fn missing_file_returns_error() {
         let result = StyleTemplate::from_file(Path::new("/nonexistent/style.yaml"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn zero_width_rejected() {
+        let result = StyleTemplate::from_yaml("page:\n  width: 0");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn zero_height_rejected() {
+        let result = StyleTemplate::from_yaml("page:\n  height: 0");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn zero_line_spacing_rejected() {
+        let result = StyleTemplate::from_yaml("heading:\n  line_spacing: 0");
         assert!(result.is_err());
     }
 }

@@ -125,7 +125,7 @@ fn header_xml_numbering_id2_is_digit() {
 /// header.xml paraProperties must have itemCnt="5" (id=0 default, id=1 blockquote,
 /// id=2 list-depth-0, id=3 list-depth-1+, id=4 heading).
 #[test]
-fn header_xml_para_properties_has_four_entries() {
+fn header_xml_para_properties_has_five_entries() {
     let doc = doc_with_section(vec![]);
     let tables = RefTables::build(&doc, None);
     let header =
