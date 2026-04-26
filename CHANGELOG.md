@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.1] - 2026-04-26
 
 ### Added
+- **Phase 14**: Section-level inline `<hp:charPr>` emission in
+  `write_inline_charpr()`: bold, italic, underline, strikeout, superscript,
+  subscript, and color attributes are now written inside `<hp:run>` elements
+  for OWPML conformance; 16 new bold/italic/underline/strike/color roundtrip
+  tests; 3 new `xml_escape_content` tests (apostrophe, all special chars,
+  passthrough).
+- **Phase 13**: Font name reader: `parse_face_names()` from header.xml
+  `<hh:fontface>` entries; `faceNameIDRef` / `hangulIDRef` resolution in
+  `apply_charpr_attrs`; `with_font_name()` builder method on `Inline`; 9 new
+  font resolution tests; README updated with Phase 9-12 features (hyperlinks,
+  ruby, footnote_ref, inline code, metadata).
 - **Phase 12**: `writer_tests.rs` split into 8 topic-based test modules
   (`writer_tests_charpr`, `writer_tests_section`, `writer_tests_metadata`,
   `writer_tests_hyperlink`, `writer_tests_ruby`, `writer_tests_footnote`,
@@ -21,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explicitly.
 
 ### Fixed
+- Font name propagation in flush paths (`flush_paragraph`,
+  `flush_cell_paragraph`, `flush_list_item_paragraph`,
+  `flush_footnote_paragraph`) now chains `.with_font_name()`.
+- Replaced `.unwrap()` with `if let` pattern in `write_inlines` to prevent
+  potential panic on link URL access.
 - Empty text inline run guard in `writer_section.rs`: zero-length text runs are
   skipped, preventing emission of empty `<hp:t/>` elements.
 - Dead code removed: `InlineStyle.code` field (superseded by the `CharPrKey`

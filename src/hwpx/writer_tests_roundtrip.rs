@@ -261,6 +261,79 @@ fn section_xml_plain_inline_no_charpr_element() {
     );
 }
 
+// ── font_name roundtrip ────────────────────────────────────────────────
+
+#[test]
+fn roundtrip_font_name_preserved() {
+    let input = Inline {
+        text: "styled".into(),
+        font_name: Some("Malgun Gothic".into()),
+        ..Inline::default()
+    };
+    let result = roundtrip_inlines(vec![input]);
+    assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
+    assert_eq!(result[0].text, "styled");
+    assert_eq!(
+        result[0].font_name.as_deref(),
+        Some("Malgun Gothic"),
+        "font_name must survive roundtrip: {result:?}"
+    );
+}
+
+#[test]
+fn roundtrip_font_name_with_bold_preserved() {
+    let input = Inline {
+        text: "bold styled".into(),
+        bold: true,
+        font_name: Some("Malgun Gothic".into()),
+        ..Inline::default()
+    };
+    let result = roundtrip_inlines(vec![input]);
+    assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
+    assert_eq!(result[0].text, "bold styled");
+    assert!(result[0].bold, "bold must survive roundtrip: {result:?}");
+    assert_eq!(
+        result[0].font_name.as_deref(),
+        Some("Malgun Gothic"),
+        "font_name must survive roundtrip with bold: {result:?}"
+    );
+}
+
+#[test]
+fn section_xml_font_name_emits_face_name_id_ref() {
+    let input = Inline {
+        text: "hello".into(),
+        font_name: Some("Malgun Gothic".into()),
+        ..Inline::default()
+    };
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![input],
+    }]);
+    assert!(
+        xml.contains("faceNameIDRef="),
+        "section XML must contain faceNameIDRef for font_name inline: {xml}"
+    );
+}
+
+#[test]
+fn header_xml_font_name_registered_in_fontface() {
+    let input = Inline {
+        text: "hello".into(),
+        font_name: Some("Malgun Gothic".into()),
+        ..Inline::default()
+    };
+    let doc = doc_with_section(vec![Block::Paragraph {
+        inlines: vec![input],
+    }]);
+    let tables = RefTables::build(&doc);
+    let header =
+        super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
+    assert!(
+        header.contains("Malgun Gothic"),
+        "header XML must contain the registered font name: {header}"
+    );
+}
+
 // ── image roundtrip ─────────────────────────────────────────────────────
 
 #[test]

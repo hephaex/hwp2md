@@ -261,7 +261,7 @@ fn write_inline_run<W: Write>(
     // Emit section-level inline charPr when any formatting is set.
     // Header charPr only carries font/height/textColor/supscript; bold,
     // italic, underline, and strikeout live on the section-level charPr.
-    write_inline_charpr(writer, inline)?;
+    write_inline_charpr(writer, inline, tables)?;
 
     if let Some(ref annotation) = inline.ruby {
         // Ruby annotation: wrap base text and annotation in <hp:ruby>.
@@ -300,14 +300,19 @@ fn write_inline_run<W: Write>(
 
 /// Emit an inline `<hp:charPr>` element inside `<hp:run>` when the inline
 /// carries any formatting flags (bold, italic, underline, strikethrough,
-/// superscript, subscript, or a non-default color).
+/// superscript, subscript, a non-default color, or a custom font name).
 ///
 /// This is the *section-level* charPr (as opposed to the header-level charPr
 /// which only stores font/height/textColor/supscript).  Bold and italic in
 /// particular MUST be emitted here for OWPML conformance.
+///
+/// When `font_name` is set, a `faceNameIDRef` attribute is emitted pointing
+/// to the index of that font in the header fontface table.  This allows the
+/// reader to resolve the font name on roundtrip via `apply_charpr_attrs`.
 fn write_inline_charpr<W: Write>(
     writer: &mut Writer<W>,
     inline: &ir::Inline,
+    tables: &RefTables,
 ) -> Result<(), quick_xml::Error> {
     let has_formatting = inline.bold
         || inline.italic
@@ -315,7 +320,8 @@ fn write_inline_charpr<W: Write>(
         || inline.strikethrough
         || inline.superscript
         || inline.subscript
-        || inline.color.is_some();
+        || inline.color.is_some()
+        || inline.font_name.is_some();
 
     if !has_formatting {
         return Ok(());
@@ -342,8 +348,14 @@ fn write_inline_charpr<W: Write>(
     }
     if let Some(ref color) = inline.color {
         // IR stores color as "#RRGGBB"; OWPML expects "RRGGBB" (no leading #).
-        let raw = color.trim_start_matches('#');
+        let raw = color.strip_prefix('#').unwrap_or(color);
         charpr.push_attribute(("color", raw));
+    }
+    if let Some(ref font) = inline.font_name {
+        // Resolve font name to its index in the header fontface table.
+        if let Some(idx) = tables.font_names.iter().position(|f| f == font) {
+            charpr.push_attribute(("faceNameIDRef", idx.to_string().as_str()));
+        }
     }
 
     writer.write_event(Event::Empty(charpr))?;
