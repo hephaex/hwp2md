@@ -362,7 +362,7 @@ fn header_xml_contains_blockquote_para_pr() {
     let doc = doc_with_section(vec![Block::Paragraph {
         inlines: vec![inline("text")],
     }]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
@@ -399,7 +399,7 @@ fn header_xml_para_pr_0_has_zero_left_margin() {
     let doc = doc_with_section(vec![Block::Paragraph {
         inlines: vec![inline("text")],
     }]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 

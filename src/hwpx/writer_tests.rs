@@ -45,7 +45,7 @@ fn section_xml(blocks: Vec<Block>) -> String {
         }],
         assets: Vec::new(),
     };
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let sec = Section {
         blocks,
         page_layout: None,

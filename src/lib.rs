@@ -46,6 +46,7 @@ pub mod hwp;
 pub mod hwpx;
 pub mod ir;
 pub mod md;
+pub mod style;
 pub(crate) mod url_util;
 
 pub use error::Hwp2MdError;

@@ -1,5 +1,6 @@
 use crate::error::Hwp2MdError;
 use crate::ir;
+use crate::style::StyleTemplate;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
@@ -33,7 +34,7 @@ pub(crate) type ImageAssetMap = HashMap<String, String>;
 // ---------------------------------------------------------------------------
 
 const DEFAULT_FONT: &str = "\u{BC14}\u{D0D5}"; // 바탕
-pub(crate) const CODE_FONT: &str = "Courier New";
+const DEFAULT_CODE_FONT: &str = "Courier New";
 pub(crate) const LANG_SLOTS: [&str; 7] = [
     "HANGUL", "LATIN", "HANJA", "JAPANESE", "OTHER", "SYMBOL", "USER",
 ];
@@ -74,11 +75,9 @@ impl CharPrKey {
         }
     }
 
-    fn from_inline(inline: &ir::Inline) -> Self {
-        // When the inline is marked as code, force monospace font regardless
-        // of any other font_name the inline may carry.
+    fn from_inline(inline: &ir::Inline, code_font: &str) -> Self {
         let font_name = if inline.code {
-            Some(CODE_FONT.to_owned())
+            Some(code_font.to_owned())
         } else {
             inline.font_name.clone()
         };
@@ -97,7 +96,7 @@ impl CharPrKey {
         }
     }
 
-    fn code_block() -> Self {
+    fn code_block(code_font: &str) -> Self {
         Self {
             bold: false,
             italic: false,
@@ -107,7 +106,7 @@ impl CharPrKey {
             superscript: false,
             subscript: false,
             color: None,
-            font_name: Some(CODE_FONT.to_owned()),
+            font_name: Some(code_font.to_owned()),
             height: 1000,
         }
     }
@@ -137,10 +136,14 @@ pub(crate) struct RefTables {
     pub(crate) font_names: Vec<String>,
     /// The single default borderFill entry ID (always 1).
     pub(crate) border_fill_id: u32,
+    /// Resolved code font name (from style template or default).
+    pub(crate) code_font: String,
+    /// User-supplied style template (for page layout, heading spacing, etc.).
+    pub(crate) style: Option<StyleTemplate>,
 }
 
 impl RefTables {
-    fn build(doc: &ir::Document) -> Self {
+    fn build(doc: &ir::Document, style: Option<StyleTemplate>) -> Self {
         let mut char_pr_ids: HashMap<CharPrKey, u32> = HashMap::new();
         let mut font_names: Vec<String> = Vec::new();
         let mut font_set: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -148,9 +151,19 @@ impl RefTables {
         // id=0 is always the plain entry.
         char_pr_ids.insert(CharPrKey::plain(), 0);
 
-        // Collect default font as id=0 font.
-        font_set.insert(DEFAULT_FONT.to_owned());
-        font_names.push(DEFAULT_FONT.to_owned());
+        // Resolve default font from style template or built-in default.
+        let default_font = style
+            .as_ref()
+            .and_then(|s| s.font.default.as_deref())
+            .unwrap_or(DEFAULT_FONT);
+        font_set.insert(default_font.to_owned());
+        font_names.push(default_font.to_owned());
+
+        let code_font = style
+            .as_ref()
+            .and_then(|s| s.font.code.as_deref())
+            .unwrap_or(DEFAULT_CODE_FONT)
+            .to_owned();
 
         let mut next_id: u32 = 1;
 
@@ -161,10 +174,10 @@ impl RefTables {
                 &mut next_id,
                 &mut font_names,
                 &mut font_set,
+                &code_font,
             );
         }
 
-        // Register heading charPr entries (one per level 1-6).
         for level in 1..=6u8 {
             let key = CharPrKey::heading(level);
             if let std::collections::hash_map::Entry::Vacant(e) = char_pr_ids.entry(key) {
@@ -173,14 +186,13 @@ impl RefTables {
             }
         }
 
-        // Always register the code-block monospace entry.
-        let code_key = CharPrKey::code_block();
+        let code_key = CharPrKey::code_block(&code_font);
         if let std::collections::hash_map::Entry::Vacant(e) = char_pr_ids.entry(code_key) {
             e.insert(next_id);
             next_id += 1;
         }
-        if font_set.insert(CODE_FONT.to_owned()) {
-            font_names.push(CODE_FONT.to_owned());
+        if font_set.insert(code_font.clone()) {
+            font_names.push(code_font.clone());
         }
         let _ = next_id;
 
@@ -188,11 +200,13 @@ impl RefTables {
             char_pr_ids,
             font_names,
             border_fill_id: 1,
+            code_font,
+            style,
         }
     }
 
     fn code_block_char_pr_id(&self) -> u32 {
-        self.char_pr_id(&CharPrKey::code_block())
+        self.char_pr_id(&CharPrKey::code_block(&self.code_font))
     }
 
     fn heading_char_pr_id(&self, level: u8) -> u32 {
@@ -210,11 +224,12 @@ fn collect_from_blocks(
     next_id: &mut u32,
     font_names: &mut Vec<String>,
     font_set: &mut std::collections::HashSet<String>,
+    code_font: &str,
 ) {
     for block in blocks {
         match block {
             ir::Block::Heading { inlines, .. } | ir::Block::Paragraph { inlines } => {
-                collect_from_inlines(inlines, char_pr_ids, next_id, font_names, font_set);
+                collect_from_inlines(inlines, char_pr_ids, next_id, font_names, font_set, code_font);
             }
             ir::Block::Table { rows, .. } => {
                 for row in rows {
@@ -225,6 +240,7 @@ fn collect_from_blocks(
                             next_id,
                             font_names,
                             font_set,
+                            code_font,
                         );
                     }
                 }
@@ -233,11 +249,11 @@ fn collect_from_blocks(
             | ir::Block::Footnote {
                 content: blocks, ..
             } => {
-                collect_from_blocks(blocks, char_pr_ids, next_id, font_names, font_set);
+                collect_from_blocks(blocks, char_pr_ids, next_id, font_names, font_set, code_font);
             }
             ir::Block::List { items, .. } => {
                 for item in items {
-                    collect_from_blocks(&item.blocks, char_pr_ids, next_id, font_names, font_set);
+                    collect_from_blocks(&item.blocks, char_pr_ids, next_id, font_names, font_set, code_font);
                 }
             }
             ir::Block::CodeBlock { .. }
@@ -254,9 +270,10 @@ fn collect_from_inlines(
     next_id: &mut u32,
     font_names: &mut Vec<String>,
     font_set: &mut std::collections::HashSet<String>,
+    code_font: &str,
 ) {
     for inline in inlines {
-        let key = CharPrKey::from_inline(inline);
+        let key = CharPrKey::from_inline(inline, code_font);
 
         // Register the font from the resolved key (which overrides
         // font_name to CODE_FONT for inline code), not from the raw
@@ -616,9 +633,10 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, Hwp2MdError> {
 pub fn write_hwpx(
     doc: &ir::Document,
     output: &Path,
-    _style: Option<&Path>,
+    style: Option<&Path>,
 ) -> Result<(), Hwp2MdError> {
-    let tables = RefTables::build(doc);
+    let template = style.map(StyleTemplate::from_file).transpose()?;
+    let tables = RefTables::build(doc, template);
     let (asset_map, resolved_assets) = collect_image_assets(doc);
 
     let file = std::fs::File::create(output)?;

@@ -17,7 +17,7 @@ use super::*;
 #[test]
 fn header_xml_para_properties_item_cnt_is_five() {
     let doc = doc_with_section(vec![]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
@@ -31,7 +31,7 @@ fn header_xml_para_properties_item_cnt_is_five() {
 #[test]
 fn header_xml_all_five_para_pr_ids_present() {
     let doc = doc_with_section(vec![]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
@@ -50,7 +50,7 @@ fn header_xml_all_five_para_pr_ids_present() {
 #[test]
 fn header_xml_para_pr_0_default_margins_and_spacing() {
     let doc = doc_with_section(vec![]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
@@ -76,7 +76,7 @@ fn header_xml_para_pr_0_default_margins_and_spacing() {
 #[test]
 fn header_xml_para_pr_1_blockquote_left_800_and_160_spacing() {
     let doc = doc_with_section(vec![]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
@@ -99,7 +99,7 @@ fn header_xml_para_pr_1_blockquote_left_800_and_160_spacing() {
 #[test]
 fn header_xml_para_pr_2_list_d0_left_400_and_160_spacing() {
     let doc = doc_with_section(vec![]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
@@ -122,7 +122,7 @@ fn header_xml_para_pr_2_list_d0_left_400_and_160_spacing() {
 #[test]
 fn header_xml_para_pr_3_list_d1_left_800_and_160_spacing() {
     let doc = doc_with_section(vec![]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
@@ -147,7 +147,7 @@ fn header_xml_para_pr_3_list_d1_left_800_and_160_spacing() {
 #[test]
 fn header_xml_para_pr_4_heading_left_0_and_180_spacing() {
     let doc = doc_with_section(vec![]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
@@ -170,7 +170,7 @@ fn header_xml_para_pr_4_heading_left_0_and_180_spacing() {
 #[test]
 fn header_xml_para_pr_4_heading_first_indent_zero() {
     let doc = doc_with_section(vec![]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
@@ -189,7 +189,7 @@ fn header_xml_para_pr_4_heading_first_indent_zero() {
 #[test]
 fn header_xml_para_pr_4_appears_after_id_3() {
     let doc = doc_with_section(vec![]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 

@@ -321,7 +321,7 @@ fn section_xml_font_name_emits_face_name_id_ref() {
     let doc = doc_with_section(vec![Block::Paragraph {
         inlines: vec![input],
     }]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let sec = &doc.sections[0];
     let xml = generate_section_xml(sec, 0, &tables, &ImageAssetMap::new())
         .expect("generate_section_xml failed");
@@ -360,7 +360,7 @@ fn header_xml_font_name_registered_in_fontface() {
     let doc = doc_with_section(vec![Block::Paragraph {
         inlines: vec![input],
     }]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
     assert!(
@@ -414,7 +414,7 @@ fn roundtrip_unknown_font_name_not_in_table() {
             ..Inline::default()
         }],
     }]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
 
     // Verify that the unknown font is indeed absent from the table.
     assert!(

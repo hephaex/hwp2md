@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.5.0] - Unreleased
 
 ### Added
+- **Phase B-1**: YAML-based style template (`--style`) — `StyleTemplate` with
+  page dimensions/margins, font overrides (body + code), and heading line
+  spacing; `RefTables` carries resolved `code_font` and optional template;
+  `CharPrKey` parameterized with `code_font`; `writer_section` applies style
+  page layout; `writer_header` reads heading `line_spacing` from template;
+  `serde_yaml` dependency added; 4 integration tests + 5 unit tests.
 
 ### Changed
 - **Phase A-1**: `ParseContext` god object (37 flat fields) refactored into 5

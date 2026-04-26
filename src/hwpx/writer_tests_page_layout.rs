@@ -1,5 +1,6 @@
 use super::*;
 use crate::ir::{Block, Inline, PageLayout, Section};
+use crate::style::StyleTemplate;
 
 // ── Phase B-4 tests: page layout (secPr) emission ─────────────────────
 
@@ -16,7 +17,7 @@ fn section_xml_with_layout(layout: Option<PageLayout>) -> String {
         }],
         assets: Vec::new(),
     };
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let sec = &doc.sections[0];
     let empty_asset_map = ImageAssetMap::new();
     generate_section_xml(sec, 0, &tables, &empty_asset_map).expect("generate_section_xml failed")
@@ -134,5 +135,142 @@ fn section_xml_custom_margins_are_emitted() {
     assert!(
         xml.contains(r#"bottom="4000""#),
         "bottom margin 4000: {xml}"
+    );
+}
+
+// ── Style template integration tests ─────────────────────────────────
+
+fn section_xml_with_style(style_yaml: &str) -> String {
+    let blocks = vec![Block::Paragraph {
+        inlines: vec![Inline::plain("test")],
+    }];
+    let doc = crate::ir::Document {
+        metadata: crate::ir::Metadata::default(),
+        sections: vec![Section {
+            blocks: blocks.clone(),
+            page_layout: None,
+        }],
+        assets: Vec::new(),
+    };
+    let template = StyleTemplate::from_yaml(style_yaml).unwrap();
+    let tables = RefTables::build(&doc, Some(template));
+    let sec = &doc.sections[0];
+    let empty_asset_map = ImageAssetMap::new();
+    generate_section_xml(sec, 0, &tables, &empty_asset_map).expect("generate_section_xml failed")
+}
+
+#[test]
+fn style_template_overrides_page_dimensions() {
+    let xml = section_xml_with_style(
+        r#"
+page:
+  width: 70000
+  height: 90000
+  landscape: true
+  margin:
+    left: 3000
+    right: 3000
+    top: 2000
+    bottom: 2000
+"#,
+    );
+    assert!(xml.contains(r#"width="70000""#), "custom width: {xml}");
+    assert!(xml.contains(r#"height="90000""#), "custom height: {xml}");
+    assert!(
+        xml.contains(r#"landscape="true""#),
+        "landscape: {xml}"
+    );
+    assert!(xml.contains(r#"left="3000""#), "custom left margin: {xml}");
+    assert!(xml.contains(r#"top="2000""#), "custom top margin: {xml}");
+}
+
+#[test]
+fn style_template_partial_overrides_keep_defaults() {
+    let xml = section_xml_with_style(
+        r#"
+page:
+  width: 70000
+  margin:
+    left: 3000
+"#,
+    );
+    assert!(xml.contains(r#"width="70000""#), "custom width: {xml}");
+    assert!(
+        xml.contains(r#"height="84188""#),
+        "default height preserved: {xml}"
+    );
+    assert!(xml.contains(r#"left="3000""#), "custom left margin: {xml}");
+    assert!(
+        xml.contains(r#"right="5670""#),
+        "default right margin preserved: {xml}"
+    );
+}
+
+#[test]
+fn style_template_custom_code_font_in_header() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = crate::ir::Document {
+        metadata: crate::ir::Metadata::default(),
+        sections: vec![Section {
+            blocks: vec![Block::Paragraph {
+                inlines: vec![Inline {
+                    text: "code".into(),
+                    code: true,
+                    ..Inline::default()
+                }],
+            }],
+            page_layout: None,
+        }],
+        assets: Vec::new(),
+    };
+    let style_yaml = r#"font:
+  code: "D2Coding"
+"#;
+    let style_path = tempfile::NamedTempFile::new().expect("style tmp");
+    std::fs::write(style_path.path(), style_yaml).unwrap();
+    write_hwpx(&doc, tmp.path(), Some(style_path.path())).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    std::io::Read::read_to_string(&mut entry, &mut content).expect("read");
+
+    assert!(
+        content.contains("D2Coding"),
+        "custom code font D2Coding must appear in header: {content}"
+    );
+}
+
+#[test]
+fn style_template_heading_line_spacing_in_header() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = crate::ir::Document {
+        metadata: crate::ir::Metadata::default(),
+        sections: vec![Section {
+            blocks: vec![Block::Heading {
+                level: 1,
+                inlines: vec![Inline::plain("Title")],
+            }],
+            page_layout: None,
+        }],
+        assets: Vec::new(),
+    };
+    let style_yaml = r#"heading:
+  line_spacing: 220
+"#;
+    let style_path = tempfile::NamedTempFile::new().expect("style tmp");
+    std::fs::write(style_path.path(), style_yaml).unwrap();
+    write_hwpx(&doc, tmp.path(), Some(style_path.path())).expect("write_hwpx");
+
+    let file = std::fs::File::open(tmp.path()).expect("open");
+    let mut archive = zip::ZipArchive::new(file).expect("parse zip");
+    let mut entry = archive.by_name("Contents/header.xml").expect("header.xml");
+    let mut content = String::new();
+    std::io::Read::read_to_string(&mut entry, &mut content).expect("read");
+
+    assert!(
+        content.contains(r#"value="220""#),
+        "heading line spacing 220 must appear in header: {content}"
     );
 }

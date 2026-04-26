@@ -27,7 +27,7 @@ fn header_xml_contains_numbering_list() {
             children: vec![],
         }],
     }]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
@@ -52,7 +52,7 @@ fn header_xml_numbering_list_always_present() {
     let doc = doc_with_section(vec![Block::Paragraph {
         inlines: vec![inline("no lists here")],
     }]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
@@ -68,7 +68,7 @@ fn header_xml_numbering_list_always_present() {
 #[test]
 fn header_xml_numbering_id1_is_bullet() {
     let doc = doc_with_section(vec![]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
@@ -102,7 +102,7 @@ fn header_xml_numbering_id1_is_bullet() {
 #[test]
 fn header_xml_numbering_id2_is_digit() {
     let doc = doc_with_section(vec![]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 
@@ -127,7 +127,7 @@ fn header_xml_numbering_id2_is_digit() {
 #[test]
 fn header_xml_para_properties_has_four_entries() {
     let doc = doc_with_section(vec![]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
     let header =
         super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
 

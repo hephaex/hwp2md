@@ -7,6 +7,20 @@ use super::header::{NUM_PR_DIGIT, PARA_PR_HEADING, PARA_PR_LIST_D0, PARA_PR_LIST
 use super::{CharPrKey, ImageAssetMap, RefTables};
 use crate::ir::{self, PageLayout};
 
+/// Build a `PageLayout` from the style template or A4 portrait defaults.
+fn style_page_layout(tables: &RefTables) -> PageLayout {
+    let style = tables.style.as_ref();
+    PageLayout {
+        width: style.and_then(|s| s.page.width),
+        height: style.and_then(|s| s.page.height),
+        landscape: style.and_then(|s| s.page.landscape).unwrap_or(false),
+        margin_left: style.and_then(|s| s.page.margin.left),
+        margin_right: style.and_then(|s| s.page.margin.right),
+        margin_top: style.and_then(|s| s.page.margin.top),
+        margin_bottom: style.and_then(|s| s.page.margin.bottom),
+    }
+}
+
 /// Maximum nesting depth for lists before further sub-levels are silently
 /// dropped.  Prevents stack overflow on pathologically deep Markdown input.
 const MAX_LIST_DEPTH: u32 = 10;
@@ -43,12 +57,10 @@ pub(super) fn generate_section_xml(
     sec.push_attribute(("xmlns:hp", "http://www.hancom.co.kr/hwpml/2011/paragraph"));
     writer.write_event(Event::Start(sec))?;
 
-    // Emit section properties (<hp:secPr>) before content blocks.
-    // Use the PageLayout from the IR when available, otherwise A4 portrait defaults.
     let layout = section
         .page_layout
         .clone()
-        .unwrap_or_else(PageLayout::a4_portrait);
+        .unwrap_or_else(|| style_page_layout(tables));
     write_sec_pr(&mut writer, &layout)?;
 
     let mut para_id: u32 = 0;
@@ -495,7 +507,7 @@ fn write_inline_run<W: Write>(
         return Ok(());
     }
 
-    let key = CharPrKey::from_inline(inline);
+    let key = CharPrKey::from_inline(inline, &tables.code_font);
     let char_pr_id = tables.char_pr_id(&key);
 
     let mut run = BytesStart::new("hp:run");

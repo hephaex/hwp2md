@@ -52,4 +52,8 @@ pub enum Hwp2MdError {
     /// An error was returned by the `zip` archive library.
     #[error("ZIP error: {0}")]
     Zip(#[from] zip::result::ZipError),
+
+    /// A style template file could not be loaded or parsed.
+    #[error("Style template error: {0}")]
+    StyleLoad(String),
 }

@@ -256,7 +256,7 @@ fn charpr_key_from_inline_code_sets_code_true_and_monospace_font() {
         code: true,
         ..Inline::default()
     };
-    let key = CharPrKey::from_inline(&inline_val);
+    let key = CharPrKey::from_inline(&inline_val, "Courier New");
     assert!(key.code, "code flag must be true");
     assert_eq!(
         key.font_name.as_deref(),
@@ -274,7 +274,7 @@ fn charpr_key_from_inline_code_overrides_custom_font() {
         font_name: Some("Arial".into()),
         ..Inline::default()
     };
-    let key = CharPrKey::from_inline(&inline_val);
+    let key = CharPrKey::from_inline(&inline_val, "Courier New");
     assert_eq!(
         key.font_name.as_deref(),
         Some("Courier New"),
@@ -290,7 +290,7 @@ fn charpr_key_plain_has_code_false() {
 
 #[test]
 fn charpr_key_code_block_has_code_true() {
-    let key = CharPrKey::code_block();
+    let key = CharPrKey::code_block("Courier New");
     assert!(key.code, "code_block key must have code=true");
     assert_eq!(key.font_name.as_deref(), Some("Courier New"));
 }
@@ -307,14 +307,14 @@ fn inline_code_gets_distinct_charpr_id_from_plain() {
             },
         ],
     }]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
 
     let plain_id = tables.char_pr_id(&CharPrKey::plain());
     let code_key = CharPrKey::from_inline(&Inline {
         text: "code".into(),
         code: true,
         ..Inline::default()
-    });
+    }, "Courier New");
     let code_id = tables.char_pr_id(&code_key);
 
     assert_ne!(
@@ -361,14 +361,14 @@ fn charpr_key_superscript_gets_distinct_id_from_plain() {
             },
         ],
     }]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
 
     let plain_id = tables.char_pr_id(&CharPrKey::plain());
     let sup_key = CharPrKey::from_inline(&Inline {
         text: "sup".into(),
         superscript: true,
         ..Inline::default()
-    });
+    }, "Courier New");
     let sup_id = tables.char_pr_id(&sup_key);
 
     assert_ne!(
@@ -389,14 +389,14 @@ fn charpr_key_subscript_gets_distinct_id_from_plain() {
             },
         ],
     }]);
-    let tables = RefTables::build(&doc);
+    let tables = RefTables::build(&doc, None);
 
     let plain_id = tables.char_pr_id(&CharPrKey::plain());
     let sub_key = CharPrKey::from_inline(&Inline {
         text: "sub".into(),
         subscript: true,
         ..Inline::default()
-    });
+    }, "Courier New");
     let sub_id = tables.char_pr_id(&sub_key);
 
     assert_ne!(

@@ -72,7 +72,7 @@ pub(super) fn generate_header_xml(
     write_font_faces(&mut w, tables)?;
     write_border_fills(&mut w, tables)?;
     write_char_properties(&mut w, tables)?;
-    write_para_properties(&mut w)?;
+    write_para_properties(&mut w, tables)?;
     write_styles(&mut w, tables)?;
 
     // <hh:numberingList> must be inside <hh:refList> per OWPML schema.
@@ -326,7 +326,7 @@ impl<'a> ParaPrConfig<'a> {
     }
 }
 
-fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::Error> {
+fn write_para_properties<W: Write>(w: &mut Writer<W>, tables: &RefTables) -> Result<(), quick_xml::Error> {
     // Five paraPr entries:
     //   id=0: default paragraph (no left indent, 160% line spacing)
     //   id=1: block-quote (left indent = 800, 160% line spacing)
@@ -356,9 +356,15 @@ fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::E
     )?;
 
     // ── paraPr id=4: heading (wider line spacing for readability) ──
+    let heading_spacing = tables
+        .style
+        .as_ref()
+        .and_then(|s| s.heading.line_spacing)
+        .unwrap_or(180);
+    let heading_spacing_str = heading_spacing.to_string();
     write_single_para_pr(
         w,
-        &ParaPrConfig::with_spacing(PARA_PR_HEADING, "0", "180", "0"),
+        &ParaPrConfig::with_spacing(PARA_PR_HEADING, "0", &heading_spacing_str, "0"),
     )?;
 
     w.write_event(Event::End(BytesEnd::new("hh:paraProperties")))?;

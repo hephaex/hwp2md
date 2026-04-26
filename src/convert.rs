@@ -99,10 +99,6 @@ pub fn to_hwpx(
         )));
     }
 
-    if style.is_some() {
-        tracing::warn!("--style option is not yet implemented and will be ignored");
-    }
-
     let content = fs::read_to_string(input)?;
     let doc = md::parse_markdown(&content);
 
