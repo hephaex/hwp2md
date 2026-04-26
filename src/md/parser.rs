@@ -10,6 +10,7 @@ pub fn parse_markdown(input: &str) -> ir::Document {
     options.extension.footnotes = true;
     options.extension.math_dollars = true;
     options.extension.superscript = true;
+    options.extension.tasklist = true;
 
     let root = parse_document(&arena, input, &options);
 
@@ -112,15 +113,27 @@ fn node_to_block<'a>(node: &'a AstNode<'a>) -> Option<ir::Block> {
                 .children()
                 .filter_map(|item| {
                     let item_data = item.data.borrow();
-                    if matches!(item_data.value, NodeValue::Item(_)) {
-                        let blocks: Vec<_> =
-                            item.children().filter_map(|c| node_to_block(c)).collect();
-                        Some(ir::ListItem {
-                            blocks,
-                            children: Vec::new(),
-                        })
-                    } else {
-                        None
+                    match &item_data.value {
+                        NodeValue::Item(_) => {
+                            let blocks: Vec<_> =
+                                item.children().filter_map(|c| node_to_block(c)).collect();
+                            Some(ir::ListItem {
+                                blocks,
+                                children: Vec::new(),
+                                checked: None,
+                            })
+                        }
+                        NodeValue::TaskItem(symbol) => {
+                            let checked = symbol.is_some();
+                            let blocks: Vec<_> =
+                                item.children().filter_map(|c| node_to_block(c)).collect();
+                            Some(ir::ListItem {
+                                blocks,
+                                children: Vec::new(),
+                                checked: Some(checked),
+                            })
+                        }
+                        _ => None,
                     }
                 })
                 .collect();

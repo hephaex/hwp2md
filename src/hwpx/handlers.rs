@@ -234,6 +234,7 @@ pub(super) fn handle_end_element(
             ctx.list.items.push(ir::ListItem {
                 blocks,
                 children: Vec::new(),
+                checked: None,
             });
             ctx.list.in_item = false;
         }

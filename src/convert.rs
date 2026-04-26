@@ -148,6 +148,44 @@ pub fn show_info(input: &Path) -> Result<(), Hwp2MdError> {
     Ok(())
 }
 
+/// Validate a file by parsing it into the IR without producing any output.
+///
+/// Detects the format from the file extension, reads the file, and attempts
+/// to parse it.  Returns `Ok(())` if parsing succeeds, or an [`Hwp2MdError`]
+/// with details if the file cannot be read or is structurally invalid.
+///
+/// Supported extensions: `.hwp`, `.hwpx`, `.md`, `.markdown`.
+pub fn check(input: &Path) -> Result<(), Hwp2MdError> {
+    let ext = input
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    match ext.as_str() {
+        "hwp" => {
+            tracing::info!("Checking HWP 5.0: {:?}", input);
+            hwp::read_hwp(input)?;
+        }
+        "hwpx" => {
+            tracing::info!("Checking HWPX: {:?}", input);
+            hwpx::read_hwpx(input)?;
+        }
+        "md" | "markdown" => {
+            tracing::info!("Checking Markdown: {:?}", input);
+            let content = fs::read_to_string(input)?;
+            let _doc = md::parse_markdown(&content);
+        }
+        _ => {
+            return Err(Hwp2MdError::UnsupportedFormat(format!(
+                ".{ext}. Expected .hwp, .hwpx, .md, or .markdown"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
 fn print_info(doc: &ir::Document, path: &Path) {
     println!("File: {}", path.display());
     println!(
@@ -401,10 +439,12 @@ mod tests {
                 ListItem {
                     blocks: vec![para("alpha")],
                     children: vec![],
+                    checked: None,
                 },
                 ListItem {
                     blocks: vec![para("beta")],
                     children: vec![],
+                    checked: None,
                 },
             ],
         };
@@ -504,6 +544,7 @@ mod tests {
             items: vec![ListItem {
                 blocks: vec![para("note item")],
                 children: vec![],
+                checked: None,
             }],
         };
         let block = Block::Footnote {
@@ -660,5 +701,104 @@ mod tests {
             msg.contains("Unsupported format"),
             "unexpected error message: {msg}"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // check — valid .md file
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn check_valid_md_returns_ok() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("doc.md");
+        std::fs::write(&input, "# Hello\n\nParagraph.\n").unwrap();
+        assert!(check(&input).is_ok());
+    }
+
+    #[test]
+    fn check_valid_markdown_extension_returns_ok() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("doc.markdown");
+        std::fs::write(&input, "Some *content*.\n").unwrap();
+        assert!(check(&input).is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // check — valid HWPX (roundtrip through to_hwpx)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn check_valid_hwpx_returns_ok() {
+        let dir = tempfile::tempdir().unwrap();
+        let md_in = dir.path().join("source.md");
+        std::fs::write(&md_in, "# Check test\n\nBody.\n").unwrap();
+        let hwpx_out = dir.path().join("output.hwpx");
+        to_hwpx(&md_in, Some(&hwpx_out), None).unwrap();
+
+        assert!(check(&hwpx_out).is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // check — unsupported extension
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn check_unsupported_extension_returns_err() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("document.docx");
+        std::fs::write(&input, b"placeholder").unwrap();
+        let result = check(&input);
+        assert!(result.is_err());
+        let msg = format!("{}", result.unwrap_err());
+        assert!(
+            msg.contains("Unsupported format"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn check_no_extension_returns_err() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("noext");
+        std::fs::write(&input, b"data").unwrap();
+        let result = check(&input);
+        assert!(result.is_err());
+        let msg = format!("{}", result.unwrap_err());
+        assert!(
+            msg.contains("Unsupported format"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // check — I/O error (file does not exist)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn check_nonexistent_md_file_returns_io_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("missing.md");
+        let result = check(&input);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn check_nonexistent_hwpx_file_returns_error() {
+        let input = std::path::Path::new("/nonexistent/path/doc.hwpx");
+        let result = check(input);
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // check — invalid HWPX (truncated / corrupt ZIP)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn check_invalid_hwpx_returns_err() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("corrupt.hwpx");
+        std::fs::write(&input, b"not a zip file").unwrap();
+        let result = check(&input);
+        assert!(result.is_err());
     }
 }

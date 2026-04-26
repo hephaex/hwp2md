@@ -788,3 +788,113 @@ fn parse_markdown_strikethrough_inline() {
         panic!("expected Paragraph, got {:?}", blocks[0]);
     }
 }
+
+// -----------------------------------------------------------------------
+// parse_markdown — task list (GitHub-style checkboxes)
+// -----------------------------------------------------------------------
+
+#[test]
+fn parse_markdown_task_list_unchecked_item() {
+    let doc = parse_markdown("- [ ] unchecked\n");
+    let blocks = first_section_blocks(&doc);
+    if let ir::Block::List { items, ordered, .. } = &blocks[0] {
+        assert!(!ordered, "task list must be unordered");
+        assert_eq!(items.len(), 1);
+        assert_eq!(
+            items[0].checked,
+            Some(false),
+            "unchecked item must have checked=Some(false); item: {:?}",
+            items[0]
+        );
+    } else {
+        panic!("expected List, got {:?}", blocks[0]);
+    }
+}
+
+#[test]
+fn parse_markdown_task_list_checked_item() {
+    let doc = parse_markdown("- [x] checked\n");
+    let blocks = first_section_blocks(&doc);
+    if let ir::Block::List { items, .. } = &blocks[0] {
+        assert_eq!(items.len(), 1);
+        assert_eq!(
+            items[0].checked,
+            Some(true),
+            "checked item must have checked=Some(true); item: {:?}",
+            items[0]
+        );
+    } else {
+        panic!("expected List, got {:?}", blocks[0]);
+    }
+}
+
+#[test]
+fn parse_markdown_task_list_checked_capital_x() {
+    let doc = parse_markdown("- [X] also checked\n");
+    let blocks = first_section_blocks(&doc);
+    if let ir::Block::List { items, .. } = &blocks[0] {
+        assert_eq!(items.len(), 1);
+        assert_eq!(
+            items[0].checked,
+            Some(true),
+            "capital-X checked item must have checked=Some(true); item: {:?}",
+            items[0]
+        );
+    } else {
+        panic!("expected List, got {:?}", blocks[0]);
+    }
+}
+
+#[test]
+fn parse_markdown_task_list_mixed_items() {
+    let md = "- [x] done\n- [ ] todo\n- [ ] also todo\n";
+    let doc = parse_markdown(md);
+    let blocks = first_section_blocks(&doc);
+    if let ir::Block::List { items, .. } = &blocks[0] {
+        assert_eq!(items.len(), 3, "expected 3 items; got {}", items.len());
+        assert_eq!(items[0].checked, Some(true), "item[0] must be checked");
+        assert_eq!(items[1].checked, Some(false), "item[1] must be unchecked");
+        assert_eq!(items[2].checked, Some(false), "item[2] must be unchecked");
+    } else {
+        panic!("expected List, got {:?}", blocks[0]);
+    }
+}
+
+#[test]
+fn parse_markdown_normal_list_item_has_checked_none() {
+    let doc = parse_markdown("- plain item\n");
+    let blocks = first_section_blocks(&doc);
+    if let ir::Block::List { items, .. } = &blocks[0] {
+        assert_eq!(
+            items[0].checked, None,
+            "normal list item must have checked=None; item: {:?}",
+            items[0]
+        );
+    } else {
+        panic!("expected List, got {:?}", blocks[0]);
+    }
+}
+
+#[test]
+fn parse_markdown_task_list_text_is_preserved() {
+    let doc = parse_markdown("- [x] buy milk\n");
+    let blocks = first_section_blocks(&doc);
+    if let ir::Block::List { items, .. } = &blocks[0] {
+        let text: String = items[0]
+            .blocks
+            .iter()
+            .flat_map(|b| match b {
+                ir::Block::Paragraph { inlines } => {
+                    inlines.iter().map(|i| i.text.as_str()).collect::<Vec<_>>()
+                }
+                _ => vec![],
+            })
+            .collect();
+        assert!(
+            text.contains("buy milk"),
+            "item text must be preserved; got: {text:?}"
+        );
+    } else {
+        panic!("expected List, got {:?}", blocks[0]);
+    }
+}

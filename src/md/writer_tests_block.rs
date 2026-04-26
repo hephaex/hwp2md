@@ -157,12 +157,14 @@ fn write_markdown_unordered_list() {
                     inlines: vec![plain("alpha")],
                 }],
                 children: Vec::new(),
+                checked: None,
             },
             ir::ListItem {
                 blocks: vec![ir::Block::Paragraph {
                     inlines: vec![plain("beta")],
                 }],
                 children: Vec::new(),
+                checked: None,
             },
         ],
     }]);
@@ -182,12 +184,14 @@ fn write_markdown_ordered_list() {
                     inlines: vec![plain("first")],
                 }],
                 children: Vec::new(),
+                checked: None,
             },
             ir::ListItem {
                 blocks: vec![ir::Block::Paragraph {
                     inlines: vec![plain("second")],
                 }],
                 children: Vec::new(),
+                checked: None,
             },
         ],
     }]);
@@ -211,6 +215,7 @@ fn write_markdown_list_item_with_multiple_blocks() {
                 },
             ],
             children: Vec::new(),
+            checked: None,
         }],
     }]);
     let md = write_markdown(&doc, false);
@@ -286,4 +291,101 @@ fn write_markdown_blockquote_nested_paragraph() {
     }]);
     let md = write_markdown(&doc, false);
     assert!(md.contains("> quoted text"), "got: {md}");
+}
+
+// -----------------------------------------------------------------------
+// write_markdown — task list (GitHub-style checkboxes)
+// -----------------------------------------------------------------------
+
+fn task_item(text: &str, checked: Option<bool>) -> ir::ListItem {
+    ir::ListItem {
+        blocks: vec![ir::Block::Paragraph {
+            inlines: vec![plain(text)],
+        }],
+        children: vec![],
+        checked,
+    }
+}
+
+#[test]
+fn write_markdown_task_list_unchecked_emits_bracket_space() {
+    let doc = make_doc_with_blocks(vec![ir::Block::List {
+        ordered: false,
+        start: 1,
+        items: vec![task_item("buy milk", Some(false))],
+    }]);
+    let md = write_markdown(&doc, false);
+    assert!(
+        md.contains("- [ ] buy milk"),
+        "unchecked task item must emit '- [ ] '; got: {md:?}"
+    );
+}
+
+#[test]
+fn write_markdown_task_list_checked_emits_bracket_x() {
+    let doc = make_doc_with_blocks(vec![ir::Block::List {
+        ordered: false,
+        start: 1,
+        items: vec![task_item("done", Some(true))],
+    }]);
+    let md = write_markdown(&doc, false);
+    assert!(
+        md.contains("- [x] done"),
+        "checked task item must emit '- [x] '; got: {md:?}"
+    );
+}
+
+#[test]
+fn write_markdown_task_list_normal_item_emits_plain_bullet() {
+    let doc = make_doc_with_blocks(vec![ir::Block::List {
+        ordered: false,
+        start: 1,
+        items: vec![task_item("normal", None)],
+    }]);
+    let md = write_markdown(&doc, false);
+    assert!(
+        md.contains("- normal"),
+        "normal list item must emit '- '; got: {md:?}"
+    );
+    assert!(
+        !md.contains("- [ ]") && !md.contains("- [x]"),
+        "normal list item must not emit checkbox; got: {md:?}"
+    );
+}
+
+#[test]
+fn write_markdown_task_list_mixed_items() {
+    let doc = make_doc_with_blocks(vec![ir::Block::List {
+        ordered: false,
+        start: 1,
+        items: vec![
+            task_item("done", Some(true)),
+            task_item("todo", Some(false)),
+            task_item("normal", None),
+        ],
+    }]);
+    let md = write_markdown(&doc, false);
+    assert!(md.contains("- [x] done"), "checked item; got: {md:?}");
+    assert!(md.contains("- [ ] todo"), "unchecked item; got: {md:?}");
+    assert!(md.contains("- normal"), "normal item; got: {md:?}");
+}
+
+#[test]
+fn write_markdown_task_list_roundtrip() {
+    use crate::md::parser::parse_markdown;
+    let input = "- [x] alpha\n- [ ] beta\n- plain\n";
+    let doc = parse_markdown(input);
+    let output = write_markdown(&doc, false);
+    assert!(
+        output.contains("- [x] alpha"),
+        "roundtrip checked; got: {output:?}"
+    );
+    assert!(
+        output.contains("- [ ] beta"),
+        "roundtrip unchecked; got: {output:?}"
+    );
+    assert!(
+        output.contains("- plain"),
+        "roundtrip normal; got: {output:?}"
+    );
 }

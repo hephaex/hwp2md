@@ -25,6 +25,7 @@ fn header_xml_contains_numbering_list() {
                 inlines: vec![inline("item")],
             }],
             children: vec![],
+            checked: None,
         }],
     }]);
     let tables = RefTables::build(&doc, None);
@@ -173,6 +174,7 @@ fn section_xml_unordered_list_item_has_num_pr_id_ref_1() {
                 inlines: vec![inline("bullet item")],
             }],
             children: vec![],
+            checked: None,
         }],
     }]);
     assert!(
@@ -196,6 +198,7 @@ fn section_xml_unordered_list_item_has_para_pr_id_ref_2() {
                 inlines: vec![inline("bullet")],
             }],
             children: vec![],
+            checked: None,
         }],
     }]);
     assert!(
@@ -222,18 +225,21 @@ fn section_xml_multiple_unordered_items_all_have_num_pr_id_ref_1() {
                     inlines: vec![inline("alpha")],
                 }],
                 children: vec![],
+                checked: None,
             },
             ListItem {
                 blocks: vec![Block::Paragraph {
                     inlines: vec![inline("beta")],
                 }],
                 children: vec![],
+                checked: None,
             },
             ListItem {
                 blocks: vec![Block::Paragraph {
                     inlines: vec![inline("gamma")],
                 }],
                 children: vec![],
+                checked: None,
             },
         ],
     }]);
@@ -260,6 +266,7 @@ fn section_xml_ordered_list_item_has_num_pr_id_ref_2() {
                 inlines: vec![inline("first")],
             }],
             children: vec![],
+            checked: None,
         }],
     }]);
     assert!(
@@ -280,6 +287,7 @@ fn section_xml_ordered_list_item_has_para_pr_id_ref_2() {
                 inlines: vec![inline("numbered")],
             }],
             children: vec![],
+            checked: None,
         }],
     }]);
     assert!(
@@ -300,12 +308,14 @@ fn section_xml_multiple_ordered_items_all_have_num_pr_id_ref_2() {
                     inlines: vec![inline("one")],
                 }],
                 children: vec![],
+                checked: None,
             },
             ListItem {
                 blocks: vec![Block::Paragraph {
                     inlines: vec![inline("two")],
                 }],
                 children: vec![],
+                checked: None,
             },
         ],
     }]);
@@ -333,6 +343,7 @@ fn section_xml_ordered_and_unordered_use_different_num_pr_id_refs() {
                     inlines: vec![inline("bullet")],
                 }],
                 children: vec![],
+                checked: None,
             }],
         },
         Block::List {
@@ -343,6 +354,7 @@ fn section_xml_ordered_and_unordered_use_different_num_pr_id_refs() {
                     inlines: vec![inline("number")],
                 }],
                 children: vec![],
+                checked: None,
             }],
         },
     ]);
@@ -376,18 +388,21 @@ fn section_xml_list_items_produce_correct_paragraph_count() {
                     inlines: vec![inline("a")],
                 }],
                 children: vec![],
+                checked: None,
             },
             ListItem {
                 blocks: vec![Block::Paragraph {
                     inlines: vec![inline("b")],
                 }],
                 children: vec![],
+                checked: None,
             },
             ListItem {
                 blocks: vec![Block::Paragraph {
                     inlines: vec![inline("c")],
                 }],
                 children: vec![],
+                checked: None,
             },
         ],
     }]);
@@ -427,6 +442,7 @@ fn section_xml_list_item_with_bold_inline_has_both_num_pr_and_charpr() {
                 inlines: vec![bold_inline("important")],
             }],
             children: vec![],
+            checked: None,
         }],
     }]);
     assert!(
@@ -452,6 +468,7 @@ fn section_xml_list_item_empty_paragraph_no_panic() {
         items: vec![ListItem {
             blocks: vec![Block::Paragraph { inlines: vec![] }],
             children: vec![],
+            checked: None,
         }],
     }]);
     assert!(
@@ -482,7 +499,9 @@ fn section_xml_nested_list_via_children_uses_para_pr_id_ref_3() {
                     inlines: vec![inline("child item")],
                 }],
                 children: vec![],
+                checked: None,
             }],
+            checked: None,
         }],
     }]);
     assert!(xml.contains("parent item"), "parent item text: {xml}");
@@ -520,10 +539,12 @@ fn section_xml_nested_block_list_inside_item_uses_para_pr_id_ref_3() {
                             inlines: vec![inline("inner item")],
                         }],
                         children: vec![],
+                        checked: None,
                     }],
                 },
             ],
             children: vec![],
+            checked: None,
         }],
     }]);
     assert!(xml.contains("outer item"), "outer item text: {xml}");
@@ -550,12 +571,14 @@ fn section_xml_list_paragraph_ids_are_sequential() {
                     inlines: vec![inline("item 0")],
                 }],
                 children: vec![],
+                checked: None,
             },
             ListItem {
                 blocks: vec![Block::Paragraph {
                     inlines: vec![inline("item 1")],
                 }],
                 children: vec![],
+                checked: None,
             },
         ],
     }]);
@@ -585,6 +608,7 @@ fn section_xml_list_paragraph_ids_continue_after_preceding_blocks() {
                     inlines: vec![inline("list item")],
                 }],
                 children: vec![],
+                checked: None,
             }],
         },
     ]);
@@ -615,12 +639,14 @@ fn roundtrip_ordered_list_text_preserved_in_hwpx() {
                             inlines: vec![inline("step one")],
                         }],
                         children: vec![],
+                        checked: None,
                     },
                     ListItem {
                         blocks: vec![Block::Paragraph {
                             inlines: vec![inline("step two")],
                         }],
                         children: vec![],
+                        checked: None,
                     },
                 ],
             }],
@@ -670,12 +696,14 @@ fn roundtrip_unordered_list_text_preserved_in_hwpx() {
                             inlines: vec![inline("alpha")],
                         }],
                         children: vec![],
+                        checked: None,
                     },
                     ListItem {
                         blocks: vec![Block::Paragraph {
                             inlines: vec![inline("beta")],
                         }],
                         children: vec![],
+                        checked: None,
                     },
                 ],
             }],
@@ -723,6 +751,7 @@ fn roundtrip_header_xml_contains_numbering_list() {
                         inlines: vec![inline("item")],
                     }],
                     children: vec![],
+                    checked: None,
                 }],
             }],
 
@@ -752,5 +781,88 @@ fn roundtrip_header_xml_contains_numbering_list() {
     assert!(
         header.contains(r#"numFormat="DIGIT""#),
         "header.xml must contain DIGIT numbering:\n{header}"
+    );
+}
+
+// ── Task list (checked/unchecked items) ─────────────────────────────────────
+
+fn task_item(text: &str, checked: Option<bool>) -> ListItem {
+    ListItem {
+        blocks: vec![Block::Paragraph {
+            inlines: vec![inline(text)],
+        }],
+        children: vec![],
+        checked,
+    }
+}
+
+#[test]
+fn section_xml_unchecked_task_item_has_unchecked_checkbox_char() {
+    let xml = section_xml(vec![Block::List {
+        ordered: false,
+        start: 1,
+        items: vec![task_item("todo", Some(false))],
+    }]);
+    assert!(
+        xml.contains("☐"),
+        "unchecked task item must emit '☐' checkbox character:\n{xml}"
+    );
+    assert!(xml.contains("todo"), "item text must be present: {xml}");
+}
+
+#[test]
+fn section_xml_checked_task_item_has_checked_checkbox_char() {
+    let xml = section_xml(vec![Block::List {
+        ordered: false,
+        start: 1,
+        items: vec![task_item("done", Some(true))],
+    }]);
+    assert!(
+        xml.contains("☑"),
+        "checked task item must emit '☑' checkbox character:\n{xml}"
+    );
+    assert!(xml.contains("done"), "item text must be present: {xml}");
+}
+
+#[test]
+fn section_xml_normal_item_has_no_checkbox_char() {
+    let xml = section_xml(vec![Block::List {
+        ordered: false,
+        start: 1,
+        items: vec![task_item("plain", None)],
+    }]);
+    assert!(
+        !xml.contains("☐") && !xml.contains("☑"),
+        "normal list item must NOT emit a checkbox character:\n{xml}"
+    );
+    assert!(xml.contains("plain"), "item text must be present: {xml}");
+}
+
+#[test]
+fn section_xml_task_list_mixed_items() {
+    let xml = section_xml(vec![Block::List {
+        ordered: false,
+        start: 1,
+        items: vec![
+            task_item("done", Some(true)),
+            task_item("todo", Some(false)),
+            task_item("plain", None),
+        ],
+    }]);
+    assert!(xml.contains("☑"), "checked item must have ☑: {xml}");
+    assert!(xml.contains("☐"), "unchecked item must have ☐: {xml}");
+    assert!(xml.contains("done"), "done text: {xml}");
+    assert!(xml.contains("todo"), "todo text: {xml}");
+    assert!(xml.contains("plain"), "plain text: {xml}");
+    // Plain item must not duplicate checkbox chars — count occurrences
+    let checked_count = xml.matches('☑').count();
+    let unchecked_count = xml.matches('☐').count();
+    assert_eq!(
+        checked_count, 1,
+        "exactly one ☑ for one checked item: {xml}"
+    );
+    assert_eq!(
+        unchecked_count, 1,
+        "exactly one ☐ for one unchecked item: {xml}"
     );
 }

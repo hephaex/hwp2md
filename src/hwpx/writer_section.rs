@@ -372,6 +372,13 @@ fn write_list_items<W: Write>(
                         p.push_attribute(("numPrIDRef", NUM_PR_DIGIT));
                     }
                     writer.write_event(Event::Start(p))?;
+                    // For task list items, prepend a checkbox character run
+                    // before the normal inline content.
+                    if let Some(checked) = item.checked {
+                        let checkbox = if checked { "☑ " } else { "☐ " };
+                        let checkbox_inline = ir::Inline::plain(checkbox);
+                        write_inline_run(writer, &checkbox_inline, tables)?;
+                    }
                     write_inlines(writer, inlines, tables)?;
                     writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
                 }

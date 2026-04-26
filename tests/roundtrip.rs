@@ -127,12 +127,14 @@ fn roundtrip_ir_to_md_to_ir_unordered_list() {
                     inlines: vec![plain("alpha")],
                 }],
                 children: Vec::new(),
+                checked: None,
             },
             ir::ListItem {
                 blocks: vec![ir::Block::Paragraph {
                     inlines: vec![plain("beta")],
                 }],
                 children: Vec::new(),
+                checked: None,
             },
         ],
     }]);
@@ -162,12 +164,14 @@ fn roundtrip_ir_to_md_to_ir_ordered_list() {
                     inlines: vec![plain("one")],
                 }],
                 children: Vec::new(),
+                checked: None,
             },
             ir::ListItem {
                 blocks: vec![ir::Block::Paragraph {
                     inlines: vec![plain("two")],
                 }],
                 children: Vec::new(),
+                checked: None,
             },
         ],
     }]);
@@ -314,6 +318,7 @@ fn roundtrip_mixed_content() {
                     inlines: vec![plain("list item")],
                 }],
                 children: Vec::new(),
+                checked: None,
             }],
         },
     ]);
@@ -489,7 +494,9 @@ fn roundtrip_ir_to_md_to_ir_nested_list() {
                     inlines: vec![plain("child")],
                 }],
                 children: Vec::new(),
+                checked: None,
             }],
+            checked: None,
         }],
     }]);
 

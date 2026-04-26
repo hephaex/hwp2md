@@ -404,12 +404,14 @@ fn roundtrip_nested_list_md_to_hwpx_to_md() {
             inlines: vec![Inline::plain("nested item".to_string())],
         }],
         children: vec![],
+        checked: None,
     };
     let outer_item = ListItem {
         blocks: vec![Block::Paragraph {
             inlines: vec![Inline::plain("top item".to_string())],
         }],
         children: vec![inner_item],
+        checked: None,
     };
     let doc = Document {
         metadata: Metadata::default(),

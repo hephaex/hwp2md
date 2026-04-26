@@ -188,6 +188,7 @@ fn group_list_paragraphs(staged: Vec<StagedBlock>) -> Vec<ir::Block> {
                 let item = ir::ListItem {
                     blocks: vec![block],
                     children: vec![],
+                    checked: None,
                 };
                 match pending {
                     Some((ref p_ordered, ref mut items)) if *p_ordered == ordered => {

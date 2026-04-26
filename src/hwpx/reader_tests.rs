@@ -954,6 +954,7 @@ fn resolve_bin_refs_inside_list() {
                     alt: String::new(),
                 }],
                 children: Vec::new(),
+                checked: None,
             }],
         }],
     

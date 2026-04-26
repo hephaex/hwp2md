@@ -348,12 +348,10 @@ pub(crate) fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut Pa
                 ctx.fmt.italic = val.as_ref() == "true" || val.as_ref() == "1"
             }
             "underline" | "hp:underline" => {
-                ctx.fmt.underline =
-                    !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0"
+                ctx.fmt.underline = !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0"
             }
             "strikeout" | "hp:strikeout" => {
-                ctx.fmt.strike =
-                    !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0"
+                ctx.fmt.strike = !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0"
             }
             "supscript" | "hp:supscript" => {
                 ctx.fmt.superscript = val.as_ref() == "superscript";
@@ -569,6 +567,7 @@ fn build_list(entries: Vec<(u32, bool, ir::Block)>) -> ir::Block {
             items.push(ir::ListItem {
                 blocks: vec![block],
                 children: vec![],
+                checked: None,
             });
         } else {
             let Some(parent) = items.last_mut() else {
@@ -577,6 +576,7 @@ fn build_list(entries: Vec<(u32, bool, ir::Block)>) -> ir::Block {
             parent.children.push(ir::ListItem {
                 blocks: vec![block],
                 children: vec![],
+                checked: None,
             });
         }
     }

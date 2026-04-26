@@ -312,12 +312,14 @@ fn section_xml_ordered_list() {
                     inlines: vec![inline("first")],
                 }],
                 children: vec![],
+                checked: None,
             },
             ListItem {
                 blocks: vec![Block::Paragraph {
                     inlines: vec![inline("second")],
                 }],
                 children: vec![],
+                checked: None,
             },
         ],
     }]);
@@ -336,6 +338,7 @@ fn section_xml_unordered_list() {
                 inlines: vec![inline("bullet")],
             }],
             children: vec![],
+            checked: None,
         }],
     }]);
     assert!(xml.contains("bullet"), "{xml}");

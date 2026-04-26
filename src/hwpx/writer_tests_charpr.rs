@@ -310,11 +310,14 @@ fn inline_code_gets_distinct_charpr_id_from_plain() {
     let tables = RefTables::build(&doc, None);
 
     let plain_id = tables.char_pr_id(&CharPrKey::plain());
-    let code_key = CharPrKey::from_inline(&Inline {
-        text: "code".into(),
-        code: true,
-        ..Inline::default()
-    }, "Courier New");
+    let code_key = CharPrKey::from_inline(
+        &Inline {
+            text: "code".into(),
+            code: true,
+            ..Inline::default()
+        },
+        "Courier New",
+    );
     let code_id = tables.char_pr_id(&code_key);
 
     assert_ne!(
@@ -364,11 +367,14 @@ fn charpr_key_superscript_gets_distinct_id_from_plain() {
     let tables = RefTables::build(&doc, None);
 
     let plain_id = tables.char_pr_id(&CharPrKey::plain());
-    let sup_key = CharPrKey::from_inline(&Inline {
-        text: "sup".into(),
-        superscript: true,
-        ..Inline::default()
-    }, "Courier New");
+    let sup_key = CharPrKey::from_inline(
+        &Inline {
+            text: "sup".into(),
+            superscript: true,
+            ..Inline::default()
+        },
+        "Courier New",
+    );
     let sup_id = tables.char_pr_id(&sup_key);
 
     assert_ne!(
@@ -392,11 +398,14 @@ fn charpr_key_subscript_gets_distinct_id_from_plain() {
     let tables = RefTables::build(&doc, None);
 
     let plain_id = tables.char_pr_id(&CharPrKey::plain());
-    let sub_key = CharPrKey::from_inline(&Inline {
-        text: "sub".into(),
-        subscript: true,
-        ..Inline::default()
-    }, "Courier New");
+    let sub_key = CharPrKey::from_inline(
+        &Inline {
+            text: "sub".into(),
+            subscript: true,
+            ..Inline::default()
+        },
+        "Courier New",
+    );
     let sub_id = tables.char_pr_id(&sub_key);
 
     assert_ne!(

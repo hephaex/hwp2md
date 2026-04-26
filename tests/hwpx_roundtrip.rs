@@ -535,14 +535,17 @@ fn full_roundtrip_nested_list_ir_children_text_preserved() {
                                 inlines: vec![ir::Inline::plain("child alpha")],
                             }],
                             children: vec![],
+                            checked: None,
                         },
                         ir::ListItem {
                             blocks: vec![ir::Block::Paragraph {
                                 inlines: vec![ir::Inline::plain("child beta")],
                             }],
                             children: vec![],
+                            checked: None,
                         },
                     ],
+                    checked: None,
                 }],
             }],
             page_layout: None,
@@ -1165,12 +1168,14 @@ fn full_roundtrip_combined_all_block_types_text_preserved() {
                                 inlines: vec![ir::Inline::plain("bullet item one")],
                             }],
                             children: vec![],
+                            checked: None,
                         },
                         ir::ListItem {
                             blocks: vec![ir::Block::Paragraph {
                                 inlines: vec![ir::Inline::plain("bullet item two")],
                             }],
                             children: vec![],
+                            checked: None,
                         },
                     ],
                 },
@@ -1184,12 +1189,14 @@ fn full_roundtrip_combined_all_block_types_text_preserved() {
                                 inlines: vec![ir::Inline::plain("ordered item one")],
                             }],
                             children: vec![],
+                            checked: None,
                         },
                         ir::ListItem {
                             blocks: vec![ir::Block::Paragraph {
                                 inlines: vec![ir::Inline::plain("ordered item two")],
                             }],
                             children: vec![],
+                            checked: None,
                         },
                     ],
                 },

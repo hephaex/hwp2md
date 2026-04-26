@@ -176,10 +176,7 @@ page:
     );
     assert!(xml.contains(r#"width="70000""#), "custom width: {xml}");
     assert!(xml.contains(r#"height="90000""#), "custom height: {xml}");
-    assert!(
-        xml.contains(r#"landscape="true""#),
-        "landscape: {xml}"
-    );
+    assert!(xml.contains(r#"landscape="true""#), "landscape: {xml}");
     assert!(xml.contains(r#"left="3000""#), "custom left margin: {xml}");
     assert!(xml.contains(r#"top="2000""#), "custom top margin: {xml}");
 }

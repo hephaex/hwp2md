@@ -351,10 +351,19 @@ fn cell_to_text(cell: &ir::TableCell) -> String {
 fn write_list(out: &mut String, items: &[ir::ListItem], ordered: bool, start: u32, indent: usize) {
     let prefix_str: String = "  ".repeat(indent);
     for (i, item) in items.iter().enumerate() {
-        let marker = if ordered {
+        let base_marker = if ordered {
             format!("{}.", start as usize + i)
         } else {
             "-".to_string()
+        };
+
+        // For task list items, append the checkbox token immediately after the
+        // bullet/number, e.g. `- [x] ` or `- [ ] `.  For normal items the
+        // marker is used unchanged.
+        let marker = match item.checked {
+            Some(true) => format!("{base_marker} [x]"),
+            Some(false) => format!("{base_marker} [ ]"),
+            None => base_marker,
         };
 
         for (bi, block) in item.blocks.iter().enumerate() {

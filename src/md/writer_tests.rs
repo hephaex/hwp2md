@@ -286,12 +286,14 @@ fn write_markdown_unordered_list() {
                     inlines: vec![plain("alpha")],
                 }],
                 children: Vec::new(),
+                checked: None,
             },
             ir::ListItem {
                 blocks: vec![ir::Block::Paragraph {
                     inlines: vec![plain("beta")],
                 }],
                 children: Vec::new(),
+                checked: None,
             },
         ],
     }]);
@@ -311,12 +313,14 @@ fn write_markdown_ordered_list() {
                     inlines: vec![plain("first")],
                 }],
                 children: Vec::new(),
+                checked: None,
             },
             ir::ListItem {
                 blocks: vec![ir::Block::Paragraph {
                     inlines: vec![plain("second")],
                 }],
                 children: Vec::new(),
+                checked: None,
             },
         ],
     }]);
@@ -920,6 +924,7 @@ fn write_markdown_list_item_with_multiple_blocks() {
                 },
             ],
             children: Vec::new(),
+            checked: None,
         }],
     }]);
     let md = write_markdown(&doc, false);

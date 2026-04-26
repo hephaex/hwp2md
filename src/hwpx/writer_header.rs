@@ -326,7 +326,10 @@ impl<'a> ParaPrConfig<'a> {
     }
 }
 
-fn write_para_properties<W: Write>(w: &mut Writer<W>, tables: &RefTables) -> Result<(), quick_xml::Error> {
+fn write_para_properties<W: Write>(
+    w: &mut Writer<W>,
+    tables: &RefTables,
+) -> Result<(), quick_xml::Error> {
     // Five paraPr entries:
     //   id=0: default paragraph (no left indent, 160% line spacing)
     //   id=1: block-quote (left indent = 800, 160% line spacing)

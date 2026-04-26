@@ -46,6 +46,11 @@ enum Commands {
         /// Input HWP or HWPX file
         input: PathBuf,
     },
+    /// Validate a file by parsing it without writing output
+    Check {
+        /// Input file (.hwp, .hwpx, .md, or .markdown)
+        input: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -78,6 +83,10 @@ fn main() -> Result<()> {
         }
         Commands::Info { input } => {
             hwp2md::convert::show_info(&input)?;
+        }
+        Commands::Check { input } => {
+            hwp2md::convert::check(&input)?;
+            println!("OK: {}", input.display());
         }
     }
 

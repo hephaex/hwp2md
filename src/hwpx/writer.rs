@@ -229,7 +229,14 @@ fn collect_from_blocks(
     for block in blocks {
         match block {
             ir::Block::Heading { inlines, .. } | ir::Block::Paragraph { inlines } => {
-                collect_from_inlines(inlines, char_pr_ids, next_id, font_names, font_set, code_font);
+                collect_from_inlines(
+                    inlines,
+                    char_pr_ids,
+                    next_id,
+                    font_names,
+                    font_set,
+                    code_font,
+                );
             }
             ir::Block::Table { rows, .. } => {
                 for row in rows {
@@ -249,11 +256,25 @@ fn collect_from_blocks(
             | ir::Block::Footnote {
                 content: blocks, ..
             } => {
-                collect_from_blocks(blocks, char_pr_ids, next_id, font_names, font_set, code_font);
+                collect_from_blocks(
+                    blocks,
+                    char_pr_ids,
+                    next_id,
+                    font_names,
+                    font_set,
+                    code_font,
+                );
             }
             ir::Block::List { items, .. } => {
                 for item in items {
-                    collect_from_blocks(&item.blocks, char_pr_ids, next_id, font_names, font_set, code_font);
+                    collect_from_blocks(
+                        &item.blocks,
+                        char_pr_ids,
+                        next_id,
+                        font_names,
+                        font_set,
+                        code_font,
+                    );
                 }
             }
             ir::Block::CodeBlock { .. }

@@ -325,6 +325,24 @@ pub struct ListItem {
     pub blocks: Vec<Block>,
     /// Nested child list items for multi-level lists.
     pub children: Vec<ListItem>,
+    /// GitHub-style task list checkbox state.
+    ///
+    /// - `None` — normal list item, no checkbox
+    /// - `Some(false)` — unchecked `- [ ]`
+    /// - `Some(true)` — checked `- [x]`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checked: Option<bool>,
+}
+
+impl ListItem {
+    /// Create a new unchecked list item with the given blocks and children.
+    pub fn new(blocks: Vec<Block>, children: Vec<ListItem>) -> Self {
+        Self {
+            blocks,
+            children,
+            checked: None,
+        }
+    }
 }
 
 /// A binary asset (image, font, …) embedded in the document.
@@ -411,5 +429,51 @@ mod tests {
         // Both must be empty — compare structurally via their serialized form.
         assert_eq!(a.sections.len(), b.sections.len());
         assert_eq!(a.assets.len(), b.assets.len());
+    }
+
+    #[test]
+    fn list_item_new_has_checked_none() {
+        let item = ListItem::new(vec![], vec![]);
+        assert!(item.checked.is_none());
+    }
+
+    #[test]
+    fn list_item_checked_some_false() {
+        let item = ListItem {
+            blocks: vec![],
+            children: vec![],
+            checked: Some(false),
+        };
+        assert_eq!(item.checked, Some(false));
+    }
+
+    #[test]
+    fn list_item_checked_some_true() {
+        let item = ListItem {
+            blocks: vec![],
+            children: vec![],
+            checked: Some(true),
+        };
+        assert_eq!(item.checked, Some(true));
+    }
+
+    #[test]
+    fn list_item_checked_none_by_default_via_new() {
+        let item = ListItem::new(vec![Block::Paragraph { inlines: vec![] }], vec![]);
+        assert!(
+            item.checked.is_none(),
+            "ListItem::new must produce checked=None"
+        );
+    }
+
+    #[test]
+    fn list_item_clone_preserves_checked() {
+        let item = ListItem {
+            blocks: vec![],
+            children: vec![],
+            checked: Some(true),
+        };
+        let cloned = item.clone();
+        assert_eq!(cloned.checked, Some(true));
     }
 }

@@ -102,12 +102,14 @@ fn golden_comprehensive_document_structure() {
                                 inlines: vec![inline("List item one")],
                             }],
                             children: Vec::new(),
+                            checked: None,
                         },
                         ListItem {
                             blocks: vec![Block::Paragraph {
                                 inlines: vec![inline("List item two")],
                             }],
                             children: Vec::new(),
+                            checked: None,
                         },
                     ],
                 },

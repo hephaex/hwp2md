@@ -326,3 +326,165 @@ fn cli_to_hwpx_from_md() {
         &bytes[..4.min(bytes.len())]
     );
 }
+
+// ---------------------------------------------------------------------------
+// 12. check --help → shows input option
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cli_check_help() {
+    let output = cargo_bin()
+        .args(["check", "--help"])
+        .output()
+        .expect("failed to execute hwp2md check --help");
+    assert!(
+        output.status.success(),
+        "expected zero exit; stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("input") || stdout.contains("INPUT"),
+        "input option missing: {stdout}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 13. check on a valid .md file → exit 0, stdout contains "OK"
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cli_check_valid_md_exits_zero() {
+    let dir = tempdir().expect("tempdir");
+    let md_file = dir.path().join("valid.md");
+    std::fs::write(&md_file, b"# Title\n\nSome content.\n").expect("write md");
+
+    let output = cargo_bin()
+        .args(["check", md_file.to_str().unwrap()])
+        .output()
+        .expect("failed to execute hwp2md check");
+    assert!(
+        output.status.success(),
+        "expected exit 0 for valid .md; stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("OK"),
+        "expected 'OK' in stdout, got: {stdout}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 14. check on a valid .hwpx (produced by to-hwpx) → exit 0, stdout "OK"
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cli_check_valid_hwpx_exits_zero() {
+    let dir = tempdir().expect("tempdir");
+
+    // Produce a valid HWPX via to-hwpx.
+    let md_src = dir.path().join("src.md");
+    std::fs::write(&md_src, b"# Check Test\n\nContent.\n").expect("write md");
+    let hwpx_path = dir.path().join("doc.hwpx");
+    let conv = cargo_bin()
+        .args([
+            "to-hwpx",
+            md_src.to_str().unwrap(),
+            "--output",
+            hwpx_path.to_str().unwrap(),
+        ])
+        .output()
+        .expect("failed to run to-hwpx");
+    assert!(
+        conv.status.success(),
+        "to-hwpx failed; stderr: {}",
+        String::from_utf8_lossy(&conv.stderr)
+    );
+
+    let output = cargo_bin()
+        .args(["check", hwpx_path.to_str().unwrap()])
+        .output()
+        .expect("failed to execute hwp2md check");
+    assert!(
+        output.status.success(),
+        "expected exit 0 for valid .hwpx; stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("OK"),
+        "expected 'OK' in stdout, got: {stdout}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 15. check on a nonexistent file → exit 1, error on stderr
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cli_check_nonexistent_file_exits_nonzero() {
+    let output = cargo_bin()
+        .args(["check", "/nonexistent/path/doc.hwpx"])
+        .output()
+        .expect("failed to execute hwp2md check");
+    assert!(
+        !output.status.success(),
+        "expected non-zero exit for missing file"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.is_empty(),
+        "expected error message on stderr, got empty"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 16. check on an unsupported extension → exit 1, "Unsupported" on stderr
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cli_check_unsupported_extension_exits_nonzero() {
+    let dir = tempdir().expect("tempdir");
+    let bad_file = dir.path().join("document.pdf");
+    std::fs::write(&bad_file, b"fake-pdf").expect("write file");
+
+    let output = cargo_bin()
+        .args(["check", bad_file.to_str().unwrap()])
+        .output()
+        .expect("failed to execute hwp2md check");
+    assert!(
+        !output.status.success(),
+        "expected non-zero exit for unsupported extension"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Unsupported") || stderr.contains("unsupported"),
+        "expected unsupported-format error, got: {stderr}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 17. check on a corrupt .hwpx → exit 1, error on stderr
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cli_check_corrupt_hwpx_exits_nonzero() {
+    let dir = tempdir().expect("tempdir");
+    let bad_hwpx = dir.path().join("corrupt.hwpx");
+    std::fs::write(&bad_hwpx, b"not a zip file at all").expect("write file");
+
+    let output = cargo_bin()
+        .args(["check", bad_hwpx.to_str().unwrap()])
+        .output()
+        .expect("failed to execute hwp2md check");
+    assert!(
+        !output.status.success(),
+        "expected non-zero exit for corrupt .hwpx"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.is_empty(),
+        "expected error message on stderr, got empty"
+    );
+}
