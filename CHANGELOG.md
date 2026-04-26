@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- **Phase A-1**: `ParseContext` god object (37 flat fields) refactored into 5
+  sub-structs: `FormattingState`, `TableState`, `ListState`, `FootnoteState`,
+  `PageLayoutState`; `flush_inlines_to_blocks` simplified from 11 parameters
+  to 4 (buffers + `&FormattingState`); `make_inline()` helper extracted.
+- **Phase A-2**: Page layout parsing deduplication — `pageSize`, `margin`, and
+  `pagePr` attribute parsing extracted into `PageLayoutState` methods
+  (`parse_page_size`, `parse_margin`, `parse_page_pr`), eliminating 50-line
+  duplication between `handle_start_element` and `handle_empty_element`.
+- `build_list` merged identical `depth == 0` and `items.is_empty()` branches
+  (clippy `if_same_then_else` fix).
 
 ### Fixed
 

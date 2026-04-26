@@ -28,12 +28,9 @@ pub(super) fn handle_start_element(
                             ctx.heading_level = Some(level);
                         }
                     }
-                    // Paragraph-property reference: identifies the paragraph style
-                    // (indentation level) and is used to detect list paragraphs.
                     "paraPrIDRef" | "hp:paraPrIDRef" => {
                         ctx.current_para_pr_id = Some(val);
                     }
-                    // Numbering-property reference: "1" means ordered (DIGIT).
                     "numPrIDRef" | "hp:numPrIDRef" => {
                         ctx.current_num_pr_id = Some(val);
                     }
@@ -43,64 +40,56 @@ pub(super) fn handle_start_element(
         }
         "run" | "hp:run" => {
             ctx.in_run = true;
-            ctx.current_bold = false;
-            ctx.current_italic = false;
-            ctx.current_underline = false;
-            ctx.current_strike = false;
-            ctx.current_superscript = false;
-            ctx.current_subscript = false;
-            ctx.current_color = None;
-            ctx.current_font_name = None;
+            ctx.fmt.reset();
         }
         "charPr" | "hp:charPr" => apply_charpr_attrs(e, ctx),
         "t" | "hp:t" => {
             ctx.in_text = true;
         }
         "tbl" | "hp:tbl" => {
-            ctx.in_table = true;
-            ctx.table_rows.clear();
-            ctx.col_count = 0;
+            ctx.table.active = true;
+            ctx.table.rows.clear();
+            ctx.table.col_count = 0;
             for attr in e.attributes().flatten() {
                 let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                 if key == "colCnt" || key == "hp:colCnt" {
                     if let Ok(n) = attr.unescape_value().unwrap_or_default().parse::<usize>() {
-                        ctx.col_count = n;
+                        ctx.table.col_count = n;
                     }
                 }
             }
         }
         "tr" | "hp:tr" => {
-            ctx.current_row_cells.clear();
+            ctx.table.current_row_cells.clear();
         }
         "tc" | "hp:tc" => {
-            ctx.in_cell = true;
-            ctx.cell_blocks.clear();
-            ctx.cell_inlines.clear();
-            ctx.cell_text.clear();
-            ctx.current_colspan = 1;
-            ctx.current_rowspan = 1;
+            ctx.table.in_cell = true;
+            ctx.table.cell_blocks.clear();
+            ctx.table.cell_inlines.clear();
+            ctx.table.cell_text.clear();
+            ctx.table.current_colspan = 1;
+            ctx.table.current_rowspan = 1;
         }
         "ol" => {
-            ctx.in_list = true;
-            ctx.list_ordered = true;
-            ctx.list_items.clear();
+            ctx.list.active = true;
+            ctx.list.ordered = true;
+            ctx.list.items.clear();
         }
         "ul" => {
-            ctx.in_list = true;
-            ctx.list_ordered = false;
-            ctx.list_items.clear();
+            ctx.list.active = true;
+            ctx.list.ordered = false;
+            ctx.list.items.clear();
         }
         "li" | "hp:li" => {
-            ctx.in_list_item = true;
-            ctx.list_item_blocks.clear();
-            ctx.list_item_inlines.clear();
-            ctx.list_item_text.clear();
+            ctx.list.in_item = true;
+            ctx.list.item_blocks.clear();
+            ctx.list.item_inlines.clear();
+            ctx.list.item_text.clear();
         }
         "equation" | "hp:equation" | "eqEdit" | "hp:eqEdit" => {
             ctx.in_equation = true;
             ctx.equation_text.clear();
         }
-        // <hp:fieldBegin type="HYPERLINK" command="https://..."> (non-self-closing)
         "fieldBegin" | "hp:fieldBegin" => {
             let mut field_type = String::new();
             let mut command = String::new();
@@ -139,76 +128,23 @@ pub(super) fn handle_start_element(
                     break;
                 }
             }
-            ctx.in_footnote = true;
-            ctx.footnote_id = id;
-            ctx.footnote_blocks.clear();
-            ctx.footnote_inlines.clear();
-            ctx.footnote_text.clear();
+            ctx.footnote.active = true;
+            ctx.footnote.id = id;
+            ctx.footnote.blocks.clear();
+            ctx.footnote.inlines.clear();
+            ctx.footnote.text.clear();
         }
-        // Section properties: <hp:secPr> marks the presence of layout data.
         "secPr" | "hp:secPr" => {
-            ctx.has_sec_pr = true;
+            ctx.page_layout.has_sec_pr = true;
         }
-        // Page properties: <hp:pagePr landscape="…"/>
         "pagePr" | "hp:pagePr" => {
-            for attr in e.attributes().flatten() {
-                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                let val = attr.unescape_value().unwrap_or_default();
-                if key == "landscape" || key == "hp:landscape" {
-                    ctx.page_layout_landscape = val.as_ref() == "true" || val.as_ref() == "1";
-                }
-            }
+            ctx.page_layout.parse_page_pr(e);
         }
-        // <hp:pageSize width="59528" height="84188"/> (self-closing)
         "pageSize" | "hp:pageSize" => {
-            for attr in e.attributes().flatten() {
-                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                let val = attr.unescape_value().unwrap_or_default();
-                match key {
-                    "width" | "hp:width" => {
-                        if let Ok(n) = val.as_ref().parse::<u32>() {
-                            ctx.page_layout_width = Some(n);
-                        }
-                    }
-                    "height" | "hp:height" => {
-                        if let Ok(n) = val.as_ref().parse::<u32>() {
-                            ctx.page_layout_height = Some(n);
-                        }
-                    }
-                    _ => {}
-                }
-            }
+            ctx.page_layout.parse_page_size(e);
         }
-        // <hp:margin left="5670" right="5670" top="4252" bottom="4252"
-        //            header="4252" footer="4252" gutter="0"/> (self-closing)
         "margin" | "hp:margin" => {
-            for attr in e.attributes().flatten() {
-                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                let val = attr.unescape_value().unwrap_or_default();
-                match key {
-                    "left" | "hp:left" => {
-                        if let Ok(n) = val.as_ref().parse::<u32>() {
-                            ctx.page_layout_margin_left = Some(n);
-                        }
-                    }
-                    "right" | "hp:right" => {
-                        if let Ok(n) = val.as_ref().parse::<u32>() {
-                            ctx.page_layout_margin_right = Some(n);
-                        }
-                    }
-                    "top" | "hp:top" => {
-                        if let Ok(n) = val.as_ref().parse::<u32>() {
-                            ctx.page_layout_margin_top = Some(n);
-                        }
-                    }
-                    "bottom" | "hp:bottom" => {
-                        if let Ok(n) = val.as_ref().parse::<u32>() {
-                            ctx.page_layout_margin_bottom = Some(n);
-                        }
-                    }
-                    _ => {}
-                }
-            }
+            ctx.page_layout.parse_margin(e);
         }
         _ => {}
     }
@@ -221,16 +157,13 @@ pub(super) fn handle_end_element(
 ) {
     match local {
         "p" | "hp:p" => {
-            if ctx.in_footnote {
+            if ctx.footnote.active {
                 flush_footnote_paragraph(ctx);
-            } else if ctx.in_cell {
+            } else if ctx.table.in_cell {
                 flush_cell_paragraph(ctx);
-            } else if ctx.in_list_item {
+            } else if ctx.list.in_item {
                 flush_list_item_paragraph(ctx);
             } else {
-                // Use the staged variant for top-level paragraphs so that
-                // list-paragraph metadata (paraPrIDRef / numPrIDRef) is
-                // preserved for the post-processing grouping pass.
                 if let Some(sb) = flush_paragraph_staged(ctx) {
                     staged.push(sb);
                 }
@@ -246,15 +179,15 @@ pub(super) fn handle_end_element(
                 let text = std::mem::take(&mut ctx.current_text);
                 let inline = ir::Inline::with_formatting(
                     text,
-                    ctx.current_bold,
-                    ctx.current_italic,
-                    ctx.current_underline,
-                    ctx.current_strike,
-                    ctx.current_superscript,
-                    ctx.current_subscript,
-                    ctx.current_color.clone(),
+                    ctx.fmt.bold,
+                    ctx.fmt.italic,
+                    ctx.fmt.underline,
+                    ctx.fmt.strike,
+                    ctx.fmt.superscript,
+                    ctx.fmt.subscript,
+                    ctx.fmt.color.clone(),
                 )
-                .with_font_name(ctx.current_font_name.clone())
+                .with_font_name(ctx.fmt.font_name.clone())
                 .with_link(if ctx.in_hyperlink {
                     ctx.hyperlink_url.clone()
                 } else {
@@ -264,55 +197,56 @@ pub(super) fn handle_end_element(
             }
         }
         "tbl" | "hp:tbl" => {
-            let col_count = ctx.col_count.max(
-                ctx.table_rows
+            let col_count = ctx.table.col_count.max(
+                ctx.table
+                    .rows
                     .iter()
                     .map(|r| r.cells.len())
                     .max()
                     .unwrap_or(0),
             );
-            if !ctx.table_rows.is_empty() {
-                let rows = std::mem::take(&mut ctx.table_rows);
+            if !ctx.table.rows.is_empty() {
+                let rows = std::mem::take(&mut ctx.table.rows);
                 staged.push(StagedBlock::Plain(ir::Block::Table { rows, col_count }));
             }
-            ctx.in_table = false;
+            ctx.table.active = false;
         }
         "tr" | "hp:tr" => {
-            let cells = std::mem::take(&mut ctx.current_row_cells);
-            ctx.table_rows.push(ir::TableRow {
+            let cells = std::mem::take(&mut ctx.table.current_row_cells);
+            ctx.table.rows.push(ir::TableRow {
                 cells,
-                is_header: ctx.table_rows.is_empty(),
+                is_header: ctx.table.rows.is_empty(),
             });
         }
         "tc" | "hp:tc" => {
             flush_cell_paragraph(ctx);
-            let blocks = std::mem::take(&mut ctx.cell_blocks);
-            ctx.current_row_cells.push(ir::TableCell {
+            let blocks = std::mem::take(&mut ctx.table.cell_blocks);
+            ctx.table.current_row_cells.push(ir::TableCell {
                 blocks,
-                colspan: ctx.current_colspan,
-                rowspan: ctx.current_rowspan,
+                colspan: ctx.table.current_colspan,
+                rowspan: ctx.table.current_rowspan,
             });
-            ctx.in_cell = false;
+            ctx.table.in_cell = false;
         }
         "li" | "hp:li" => {
             flush_list_item_paragraph(ctx);
-            let blocks = std::mem::take(&mut ctx.list_item_blocks);
-            ctx.list_items.push(ir::ListItem {
+            let blocks = std::mem::take(&mut ctx.list.item_blocks);
+            ctx.list.items.push(ir::ListItem {
                 blocks,
                 children: Vec::new(),
             });
-            ctx.in_list_item = false;
+            ctx.list.in_item = false;
         }
         "ol" | "ul" => {
-            if !ctx.list_items.is_empty() {
-                let items = std::mem::take(&mut ctx.list_items);
+            if !ctx.list.items.is_empty() {
+                let items = std::mem::take(&mut ctx.list.items);
                 staged.push(StagedBlock::Plain(ir::Block::List {
-                    ordered: ctx.list_ordered,
+                    ordered: ctx.list.ordered,
                     start: 1,
                     items,
                 }));
             }
-            ctx.in_list = false;
+            ctx.list.active = false;
         }
         "equation" | "hp:equation" | "eqEdit" | "hp:eqEdit" => {
             if !ctx.equation_text.is_empty() {
@@ -321,12 +255,10 @@ pub(super) fn handle_end_element(
             }
             ctx.in_equation = false;
         }
-        // Non-self-closing fieldEnd (closing tag clears hyperlink state)
         "fieldEnd" | "hp:fieldEnd" => {
             ctx.in_hyperlink = false;
             ctx.hyperlink_url = None;
         }
-        // Non-self-closing fieldBegin end tag (no-op; state set on open)
         "fieldBegin" | "hp:fieldBegin" => {}
         "rubyText" | "hp:rubyText" | "baseText" | "hp:baseText" => {
             ctx.ruby_current_part = RubyPart::None;
@@ -337,13 +269,13 @@ pub(super) fn handle_end_element(
             if !base.is_empty() || !annotation.is_empty() {
                 let inline = ir::Inline::with_formatting(
                     base,
-                    ctx.current_bold,
-                    ctx.current_italic,
-                    ctx.current_underline,
-                    ctx.current_strike,
-                    ctx.current_superscript,
-                    ctx.current_subscript,
-                    ctx.current_color.clone(),
+                    ctx.fmt.bold,
+                    ctx.fmt.italic,
+                    ctx.fmt.underline,
+                    ctx.fmt.strike,
+                    ctx.fmt.superscript,
+                    ctx.fmt.subscript,
+                    ctx.fmt.color.clone(),
                 )
                 .with_ruby(if annotation.is_empty() {
                     None
@@ -357,14 +289,14 @@ pub(super) fn handle_end_element(
         }
         "fn" | "hp:fn" | "footnote" | "hp:footnote" | "en" | "hp:en" | "endnote" | "hp:endnote" => {
             flush_footnote_paragraph(ctx);
-            if !ctx.footnote_blocks.is_empty() {
-                let id = std::mem::take(&mut ctx.footnote_id);
-                let content = std::mem::take(&mut ctx.footnote_blocks);
+            if !ctx.footnote.blocks.is_empty() {
+                let id = std::mem::take(&mut ctx.footnote.id);
+                let content = std::mem::take(&mut ctx.footnote.blocks);
                 staged.push(StagedBlock::Plain(ir::Block::Footnote { id, content }));
             } else {
-                ctx.footnote_id.clear();
+                ctx.footnote.id.clear();
             }
-            ctx.in_footnote = false;
+            ctx.footnote.active = false;
         }
         _ => {}
     }
@@ -411,9 +343,6 @@ pub(super) fn handle_empty_element(
             }
             if !src.is_empty() {
                 let img = ir::Block::Image { src, alt };
-                // push_block_scoped routes the block to cell/list/footnote
-                // buffers when in a scoped context; at top-level it returns
-                // Some(block) which we route through the staging vector.
                 if let Some(block) = ctx.push_block_scoped(img) {
                     staged.push(StagedBlock::Plain(block));
                 }
@@ -422,8 +351,6 @@ pub(super) fn handle_empty_element(
         "lineBreak" | "hp:lineBreak" => {
             ctx.active_text_buf().push('\n');
         }
-        // <hp:cellAddr colAddr="0" rowAddr="0" colSpan="2" rowSpan="1"/>
-        // Appears as a self-closing child inside <hp:tc>.
         "cellAddr" | "hp:cellAddr" => {
             for attr in e.attributes().flatten() {
                 let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
@@ -432,14 +359,14 @@ pub(super) fn handle_empty_element(
                     "colSpan" | "hp:colSpan" => {
                         if let Ok(n) = val.parse::<u32>() {
                             if n >= 1 {
-                                ctx.current_colspan = n;
+                                ctx.table.current_colspan = n;
                             }
                         }
                     }
                     "rowSpan" | "hp:rowSpan" => {
                         if let Ok(n) = val.parse::<u32>() {
                             if n >= 1 {
-                                ctx.current_rowspan = n;
+                                ctx.table.current_rowspan = n;
                             }
                         }
                     }
@@ -447,10 +374,7 @@ pub(super) fn handle_empty_element(
                 }
             }
         }
-        // <hp:charPr bold="true" italic="true" .../>  (self-closing variant)
-        // Delegates to apply_charpr_attrs -- same logic as the Start element path.
         "charPr" | "hp:charPr" => apply_charpr_attrs(e, ctx),
-        // <hp:fieldBegin type="HYPERLINK" command="https://..." />
         "fieldBegin" | "hp:fieldBegin" => {
             let mut field_type = String::new();
             let mut command = String::new();
@@ -468,18 +392,10 @@ pub(super) fn handle_empty_element(
                 ctx.hyperlink_url = Some(command);
             }
         }
-        // <hp:fieldEnd type="HYPERLINK" />
         "fieldEnd" | "hp:fieldEnd" => {
             ctx.in_hyperlink = false;
             ctx.hyperlink_url = None;
         }
-        // Footnote / endnote reference inline: a self-closing marker that records
-        // which footnote the current text position cites.
-        //
-        // Accepted forms:
-        //   <hp:noteRef noteId="1"/>
-        //   <hp:ctrl id="fn" idRef="1"/>
-        //   <hp:ctrl id="en" idRef="1"/>
         "noteRef" | "hp:noteRef" => {
             let mut note_id = String::new();
             for attr in e.attributes().flatten() {
@@ -493,7 +409,6 @@ pub(super) fn handle_empty_element(
                 ctx.push_inline(ir::Inline::footnote_ref(note_id));
             }
         }
-        // <hp:ctrl id="fn" idRef="1"/> -- HWP-binary-style ctrl inline.
         "ctrl" | "hp:ctrl" => {
             let mut ctrl_kind = String::new();
             let mut id_ref = String::new();
@@ -510,65 +425,18 @@ pub(super) fn handle_empty_element(
                 ctx.push_inline(ir::Inline::footnote_ref(id_ref));
             }
         }
-        // <hp:pageSize width="59528" height="84188"/> (self-closing child of pagePr)
         "pageSize" | "hp:pageSize" => {
-            for attr in e.attributes().flatten() {
-                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                let val = attr.unescape_value().unwrap_or_default();
-                match key {
-                    "width" | "hp:width" => {
-                        if let Ok(n) = val.as_ref().parse::<u32>() {
-                            ctx.page_layout_width = Some(n);
-                        }
-                    }
-                    "height" | "hp:height" => {
-                        if let Ok(n) = val.as_ref().parse::<u32>() {
-                            ctx.page_layout_height = Some(n);
-                        }
-                    }
-                    _ => {}
-                }
-            }
+            ctx.page_layout.parse_page_size(e);
         }
-        // <hp:margin left="5670" right="5670" top="4252" bottom="4252"
-        //            header="4252" footer="4252" gutter="0"/> (self-closing)
         "margin" | "hp:margin" => {
-            for attr in e.attributes().flatten() {
-                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                let val = attr.unescape_value().unwrap_or_default();
-                match key {
-                    "left" | "hp:left" => {
-                        if let Ok(n) = val.as_ref().parse::<u32>() {
-                            ctx.page_layout_margin_left = Some(n);
-                        }
-                    }
-                    "right" | "hp:right" => {
-                        if let Ok(n) = val.as_ref().parse::<u32>() {
-                            ctx.page_layout_margin_right = Some(n);
-                        }
-                    }
-                    "top" | "hp:top" => {
-                        if let Ok(n) = val.as_ref().parse::<u32>() {
-                            ctx.page_layout_margin_top = Some(n);
-                        }
-                    }
-                    "bottom" | "hp:bottom" => {
-                        if let Ok(n) = val.as_ref().parse::<u32>() {
-                            ctx.page_layout_margin_bottom = Some(n);
-                        }
-                    }
-                    _ => {}
-                }
-            }
+            ctx.page_layout.parse_margin(e);
         }
         _ => {}
     }
 }
 
-/// Parse a HWP style ID reference and return the heading level (1–6) if it
-/// identifies a heading style, or `None` otherwise.
+/// Parse a HWP style ID reference and return the heading level (1–6).
 pub(crate) fn parse_heading_style(style_ref: &str) -> Option<u8> {
-    // Numeric style IDs: "1"–"6" map directly to heading levels.
     if let Ok(n) = style_ref.parse::<u8>() {
         if (1..=6).contains(&n) {
             return Some(n);

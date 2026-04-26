@@ -1004,20 +1004,20 @@ fn apply_attrs_via_xml(tag: &str, attrs: &[(&str, &str)]) -> super::context::Par
 #[test]
 fn apply_charpr_attrs_color_sets_current_color() {
     let ctx = apply_attrs_via_xml("charPr", &[("color", "#FF0000")]);
-    assert_eq!(ctx.current_color.as_deref(), Some("#FF0000"));
+    assert_eq!(ctx.fmt.color.as_deref(), Some("#FF0000"));
 }
 
 #[test]
 fn apply_charpr_attrs_color_without_hash_normalises() {
     let ctx = apply_attrs_via_xml("charPr", &[("color", "FF0000")]);
-    assert_eq!(ctx.current_color.as_deref(), Some("#FF0000"));
+    assert_eq!(ctx.fmt.color.as_deref(), Some("#FF0000"));
 }
 
 #[test]
 fn apply_charpr_attrs_black_color_sets_none() {
     let ctx = apply_attrs_via_xml("charPr", &[("color", "#000000")]);
     assert!(
-        ctx.current_color.is_none(),
+        ctx.fmt.color.is_none(),
         "black color must not be propagated"
     );
 }
@@ -1025,25 +1025,25 @@ fn apply_charpr_attrs_black_color_sets_none() {
 #[test]
 fn apply_charpr_attrs_black_color_without_hash_sets_none() {
     let ctx = apply_attrs_via_xml("charPr", &[("color", "000000")]);
-    assert!(ctx.current_color.is_none());
+    assert!(ctx.fmt.color.is_none());
 }
 
 #[test]
 fn apply_charpr_attrs_empty_color_sets_none() {
     let ctx = apply_attrs_via_xml("charPr", &[("color", "")]);
-    assert!(ctx.current_color.is_none());
+    assert!(ctx.fmt.color.is_none());
 }
 
 #[test]
 fn apply_charpr_attrs_hp_color_prefix_accepted() {
     let ctx = apply_attrs_via_xml("hp:charPr", &[("hp:color", "0000FF")]);
-    assert_eq!(ctx.current_color.as_deref(), Some("#0000FF"));
+    assert_eq!(ctx.fmt.color.as_deref(), Some("#0000FF"));
 }
 
 #[test]
 fn apply_charpr_attrs_color_lowercase_normalised_to_upper() {
     let ctx = apply_attrs_via_xml("charPr", &[("color", "ff0000")]);
-    assert_eq!(ctx.current_color.as_deref(), Some("#FF0000"));
+    assert_eq!(ctx.fmt.color.as_deref(), Some("#FF0000"));
 }
 
 // -----------------------------------------------------------------------
@@ -1055,7 +1055,7 @@ fn flush_paragraph_propagates_color_to_inline() {
     let mut ctx = super::context::ParseContext::default();
     ctx.in_paragraph = true;
     ctx.current_text = "colored".to_string();
-    ctx.current_color = Some("#00FF00".to_string());
+    ctx.fmt.color = Some("#00FF00".to_string());
 
     let mut section = crate::ir::Section { blocks: Vec::new(), page_layout: None };
     super::context::flush_paragraph(&mut ctx, &mut section);
@@ -1073,7 +1073,6 @@ fn flush_paragraph_no_color_propagates_none() {
     let mut ctx = super::context::ParseContext::default();
     ctx.in_paragraph = true;
     ctx.current_text = "plain".to_string();
-    ctx.current_color = None;
 
     let mut section = crate::ir::Section { blocks: Vec::new(), page_layout: None };
     super::context::flush_paragraph(&mut ctx, &mut section);
