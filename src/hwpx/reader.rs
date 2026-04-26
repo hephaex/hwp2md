@@ -359,7 +359,10 @@ pub(crate) fn parse_section_xml_with_face_names(
     // `section` is still passed to handlers that push directly (cells, etc.),
     // but we redirect the top-level paragraph / table / equation / footnote
     // pushes through `staged` instead.
-    let mut section = ir::Section { blocks: Vec::new() };
+    let mut section = ir::Section {
+        blocks: Vec::new(),
+        page_layout: None,
+    };
     let mut reader = Reader::from_str(xml);
     let mut buf = Vec::new();
 
@@ -422,6 +425,9 @@ pub(crate) fn parse_section_xml_with_face_names(
 
     // Group consecutive list-paragraph sentinels into Block::List structures.
     section.blocks = group_list_paragraphs(staged);
+
+    // Transfer accumulated page layout metadata from context to the section.
+    section.page_layout = context.take_page_layout();
 
     Ok(section)
 }
@@ -524,3 +530,7 @@ mod tests_lenient;
 #[cfg(test)]
 #[path = "reader_tests_list.rs"]
 mod tests_list;
+
+#[cfg(test)]
+#[path = "reader_tests_page_layout.rs"]
+mod tests_page_layout;

@@ -205,6 +205,8 @@ fn roundtrip_code_block_with_language_preserved() {
                 language: Some("python".into()),
                 code: "x = 1\nprint(x)\n".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -243,6 +245,8 @@ fn roundtrip_code_block_no_language_preserved() {
                 language: None,
                 code: "plain code".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -281,6 +285,8 @@ fn roundtrip_code_block_unusual_language_names() {
                     language: Some((*lang).to_string()),
                     code: format!("// {lang} code"),
                 }],
+
+                page_layout: None,
             }],
             assets: Vec::new(),
         };
@@ -327,6 +333,8 @@ fn roundtrip_code_block_followed_by_paragraph() {
                     inlines: vec![inline("after code")],
                 },
             ],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -361,6 +369,8 @@ fn md_writer_code_block_with_language_emits_fence_with_lang() {
                 language: Some("python".into()),
                 code: "x = 42\n".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -386,6 +396,8 @@ fn md_writer_code_block_no_language_emits_plain_fence() {
                 language: None,
                 code: "no lang\n".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -397,4 +409,52 @@ fn md_writer_code_block_no_language_emits_plain_fence() {
         "Markdown must have plain ``` fence when language is None: {md}"
     );
     assert!(md.contains("no lang"), "code content must appear: {md}");
+}
+
+// ── XML comment injection guard ───────────────────────────────────────────
+
+/// A language string containing `-->` must not break the surrounding XML
+/// comment.  The writer sanitizes `--` → `-` so the emitted comment remains
+/// well-formed and parseable.
+#[test]
+fn section_xml_code_block_language_with_comment_injection_is_sanitized() {
+    // A language that embeds `-->` would close the XML comment prematurely
+    // and produce invalid XML.  After sanitization `-->` becomes `->`.
+    let xml = section_xml(vec![Block::CodeBlock {
+        language: Some("x-->inject".into()),
+        code: "boom".into(),
+    }]);
+    // The raw `-->` sequence must NOT appear inside the emitted comment.
+    // Find where our comment starts and verify the payload has no `-->`.
+    let comment_start = xml
+        .find("<!-- hwp2md:lang:")
+        .expect("lang comment must be present in XML");
+    let comment_end = xml[comment_start..]
+        .find("-->")
+        .expect("comment must be closed");
+    let comment_inner = &xml[comment_start..comment_start + comment_end];
+    assert!(
+        !comment_inner.contains("-->"),
+        "comment interior must not contain `-->` (XML comment injection): {comment_inner}"
+    );
+    // The sanitized form must still be recognisable as the language prefix.
+    assert!(
+        xml.contains("hwp2md:lang:"),
+        "lang sentinel must be present: {xml}"
+    );
+    // Code content must survive.
+    assert!(xml.contains("boom"), "code content must be present: {xml}");
+}
+
+/// A language with a single `-` (not `--`) must pass through unchanged.
+#[test]
+fn section_xml_code_block_language_single_dash_unchanged() {
+    let xml = section_xml(vec![Block::CodeBlock {
+        language: Some("objective-c".into()),
+        code: "int x;".into(),
+    }]);
+    assert!(
+        xml.contains("hwp2md:lang:objective-c"),
+        "single-dash language must not be altered: {xml}"
+    );
 }

@@ -14,6 +14,8 @@ fn roundtrip_doc(inlines: Vec<Inline>) -> Document {
         metadata: Metadata::default(),
         sections: vec![Section {
             blocks: vec![Block::Paragraph { inlines }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     }
@@ -430,6 +432,8 @@ fn roundtrip_unknown_font_name_not_in_table() {
                 ..Inline::default()
             }],
         }],
+
+        page_layout: None,
     };
     let xml = generate_section_xml(&rogue_section, 0, &tables, &ImageAssetMap::new())
         .expect("generate_section_xml failed");
@@ -462,6 +466,8 @@ fn write_hwpx_image_roundtrip_preserves_asset() {
                 src: "photo.png".into(),
                 alt: "a photo".into(),
             }],
+
+            page_layout: None,
         }],
         assets: vec![Asset {
             name: "photo.png".into(),
@@ -496,5 +502,127 @@ fn write_hwpx_image_roundtrip_preserves_asset() {
     assert_eq!(
         read_back.assets[0].mime_type, "image/png",
         "asset MIME type must be preserved"
+    );
+}
+
+// ── Phase B-4: page layout roundtrip tests ───────────────────────────────
+
+#[test]
+fn page_layout_survives_hwpx_roundtrip() {
+    use crate::ir::PageLayout;
+
+    // Construct a document with a custom page layout.
+    let layout = PageLayout {
+        width: Some(59528),
+        height: Some(84188),
+        landscape: false,
+        margin_left: Some(2835),
+        margin_right: Some(2835),
+        margin_top: Some(2835),
+        margin_bottom: Some(2835),
+    };
+
+    let original = Document {
+        metadata: Metadata::default(),
+        sections: vec![Section {
+            blocks: vec![Block::Paragraph {
+                inlines: vec![Inline::plain("roundtrip text")],
+            }],
+            page_layout: Some(layout.clone()),
+        }],
+        assets: Vec::new(),
+    };
+
+    let tmp = tempfile::NamedTempFile::with_suffix(".hwpx").unwrap();
+    write_hwpx(&original, tmp.path(), None).expect("write_hwpx failed");
+
+    let read_back = read_hwpx(tmp.path()).expect("read_hwpx failed");
+
+    assert_eq!(
+        read_back.sections.len(),
+        1,
+        "one section must survive roundtrip"
+    );
+    let read_layout = read_back.sections[0]
+        .page_layout
+        .as_ref()
+        .expect("page_layout must survive HWPX roundtrip");
+
+    assert_eq!(read_layout.width, layout.width, "width must roundtrip");
+    assert_eq!(read_layout.height, layout.height, "height must roundtrip");
+    assert_eq!(
+        read_layout.landscape, layout.landscape,
+        "landscape must roundtrip"
+    );
+    assert_eq!(
+        read_layout.margin_left, layout.margin_left,
+        "margin_left must roundtrip"
+    );
+    assert_eq!(
+        read_layout.margin_right, layout.margin_right,
+        "margin_right must roundtrip"
+    );
+    assert_eq!(
+        read_layout.margin_top, layout.margin_top,
+        "margin_top must roundtrip"
+    );
+    assert_eq!(
+        read_layout.margin_bottom, layout.margin_bottom,
+        "margin_bottom must roundtrip"
+    );
+}
+
+#[test]
+fn default_page_layout_roundtrip_produces_a4_values() {
+    // A section with no page_layout (None) should be written with A4 defaults
+    // and read back with a4_portrait values.
+    use crate::ir::PageLayout;
+
+    let original = Document {
+        metadata: Metadata::default(),
+        sections: vec![Section {
+            blocks: vec![Block::Paragraph {
+                inlines: vec![Inline::plain("default layout")],
+            }],
+            page_layout: None,
+        }],
+        assets: Vec::new(),
+    };
+
+    let tmp = tempfile::NamedTempFile::with_suffix(".hwpx").unwrap();
+    write_hwpx(&original, tmp.path(), None).expect("write_hwpx failed");
+
+    let read_back = read_hwpx(tmp.path()).expect("read_hwpx failed");
+
+    assert_eq!(read_back.sections.len(), 1, "one section must survive");
+
+    // The reader should parse the A4 defaults written by the writer.
+    let read_layout = read_back.sections[0]
+        .page_layout
+        .as_ref()
+        .expect("page_layout must be present after roundtrip of default layout");
+
+    let expected = PageLayout::a4_portrait();
+    assert_eq!(read_layout.width, expected.width, "width roundtrip");
+    assert_eq!(read_layout.height, expected.height, "height roundtrip");
+    assert_eq!(
+        read_layout.landscape, expected.landscape,
+        "landscape roundtrip"
+    );
+    assert_eq!(
+        read_layout.margin_left, expected.margin_left,
+        "margin_left roundtrip"
+    );
+    assert_eq!(
+        read_layout.margin_right, expected.margin_right,
+        "margin_right roundtrip"
+    );
+    assert_eq!(
+        read_layout.margin_top, expected.margin_top,
+        "margin_top roundtrip"
+    );
+    assert_eq!(
+        read_layout.margin_bottom, expected.margin_bottom,
+        "margin_bottom roundtrip"
     );
 }

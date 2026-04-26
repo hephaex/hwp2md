@@ -94,6 +94,20 @@ pub(crate) struct ParseContext {
     /// Reset to `None` after each `flush_paragraph` call regardless of whether
     /// any inlines were present.
     pub(crate) pending_code_lang: Option<Option<String>>,
+    // ── Page layout (parsed from <hp:secPr>) ────────────────────────────
+    /// Accumulated page layout parsed from `<hp:secPr><hp:pagePr>` and its
+    /// `<hp:pageSize>` / `<hp:margin>` children.  Populated during section
+    /// XML parsing and transferred to `ir::Section::page_layout` after the
+    /// event loop completes.
+    pub(crate) page_layout_landscape: bool,
+    pub(crate) page_layout_width: Option<u32>,
+    pub(crate) page_layout_height: Option<u32>,
+    pub(crate) page_layout_margin_left: Option<u32>,
+    pub(crate) page_layout_margin_right: Option<u32>,
+    pub(crate) page_layout_margin_top: Option<u32>,
+    pub(crate) page_layout_margin_bottom: Option<u32>,
+    /// True when at least one `<hp:secPr>` element was encountered.
+    pub(crate) has_sec_pr: bool,
 }
 
 /// Which child element of a `<hp:ruby>` block is currently being parsed.
@@ -157,11 +171,39 @@ impl Default for ParseContext {
             current_para_pr_id: None,
             current_num_pr_id: None,
             pending_code_lang: None,
+            page_layout_landscape: false,
+            page_layout_width: None,
+            page_layout_height: None,
+            page_layout_margin_left: None,
+            page_layout_margin_right: None,
+            page_layout_margin_top: None,
+            page_layout_margin_bottom: None,
+            has_sec_pr: false,
         }
     }
 }
 
 impl ParseContext {
+    /// Extract the accumulated `PageLayout` from the context.
+    ///
+    /// Returns `Some(PageLayout)` when at least one `<hp:secPr>` element was
+    /// encountered during parsing, `None` otherwise (e.g. very minimal HWPX
+    /// files that omit section properties).
+    pub(crate) fn take_page_layout(&self) -> Option<ir::PageLayout> {
+        if !self.has_sec_pr {
+            return None;
+        }
+        Some(ir::PageLayout {
+            width: self.page_layout_width,
+            height: self.page_layout_height,
+            landscape: self.page_layout_landscape,
+            margin_left: self.page_layout_margin_left,
+            margin_right: self.page_layout_margin_right,
+            margin_top: self.page_layout_margin_top,
+            margin_bottom: self.page_layout_margin_bottom,
+        })
+    }
+
     /// Returns a mutable reference to the active text buffer.
     ///
     /// Priority: footnote > list_item > cell > default paragraph buffer.
@@ -333,7 +375,7 @@ fn flush_inlines_to_blocks(
 ///
 /// Otherwise the inlines are emitted as a `Block::Heading` (when
 /// `ctx.heading_level` is set) or a plain `Block::Paragraph`.
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section) {
     // Flush any trailing text run into the inline buffer first.
     if !ctx.current_text.is_empty() {

@@ -54,6 +54,8 @@ fn collect_image_assets_local_file_reads_bytes_and_maps_src() {
                 src: src.clone(),
                 alt: "test image".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -95,6 +97,8 @@ fn collect_image_assets_data_uri_decodes_base64() {
                 src: src.clone(),
                 alt: "data uri image".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -130,6 +134,8 @@ fn collect_image_assets_http_url_not_embedded() {
                 src: src.clone(),
                 alt: "remote".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -156,6 +162,8 @@ fn collect_image_assets_missing_file_graceful() {
                 src: src.clone(),
                 alt: "broken".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -184,6 +192,8 @@ fn collect_image_assets_pre_existing_assets_included() {
                 src: "photo.png".into(),
                 alt: "pre-existing".into(),
             }],
+
+            page_layout: None,
         }],
         assets: vec![Asset {
             name: "photo.png".into(),
@@ -222,6 +232,8 @@ fn write_hwpx_local_image_creates_bindata_entry() {
                 src: img_path.to_str().expect("path utf-8").to_owned(),
                 alt: "a photo".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -250,6 +262,8 @@ fn write_hwpx_local_image_bytes_preserved_in_bindata() {
                 src: img_path.to_str().expect("path utf-8").to_owned(),
                 alt: "pic".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -270,6 +284,8 @@ fn write_hwpx_data_uri_image_creates_bindata_entry() {
                 src,
                 alt: "data uri".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -294,6 +310,8 @@ fn write_hwpx_http_url_no_bindata_entry() {
                 src: "https://example.com/photo.png".into(),
                 alt: "remote".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -320,6 +338,8 @@ fn write_hwpx_content_hpf_has_bindata_manifest_entry() {
                 src: img_path.to_str().expect("path utf-8").to_owned(),
                 alt: "logo".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -353,6 +373,8 @@ fn write_hwpx_section_xml_uses_entry_name_as_binary_item_id_ref() {
                 src: img_path.to_str().expect("path utf-8").to_owned(),
                 alt: "my image".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -376,6 +398,8 @@ fn write_hwpx_http_url_src_used_verbatim_as_binary_item_id_ref() {
                 src: url.into(),
                 alt: "remote".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -398,6 +422,8 @@ fn write_hwpx_missing_file_does_not_panic() {
                 src: "/no/such/file.png".into(),
                 alt: "broken".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -436,6 +462,8 @@ fn image_file_path_roundtrip_md_to_hwpx_embeds_bytes() {
                 src: src.clone(),
                 alt: "roundtrip image".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -476,6 +504,8 @@ fn image_jpeg_extension_gets_correct_mime_type() {
                 src,
                 alt: "jpeg".into(),
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -592,6 +622,8 @@ fn collect_image_assets_filename_collision_dedup_counter_suffix() {
                     alt: "second".into(),
                 },
             ],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -688,6 +720,8 @@ fn collect_image_assets_three_way_collision_increments_counter() {
                     alt: String::new(),
                 })
                 .collect(),
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };

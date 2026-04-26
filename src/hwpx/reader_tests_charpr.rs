@@ -103,7 +103,10 @@ fn flush_paragraph_propagates_color_to_inline() {
         ..Default::default()
     };
 
-    let mut section = crate::ir::Section { blocks: Vec::new() };
+    let mut section = crate::ir::Section {
+        blocks: Vec::new(),
+        page_layout: None,
+    };
     super::context::flush_paragraph(&mut ctx, &mut section);
 
     assert_eq!(section.blocks.len(), 1);
@@ -123,7 +126,10 @@ fn flush_paragraph_no_color_propagates_none() {
         ..Default::default()
     };
 
-    let mut section = crate::ir::Section { blocks: Vec::new() };
+    let mut section = crate::ir::Section {
+        blocks: Vec::new(),
+        page_layout: None,
+    };
     super::context::flush_paragraph(&mut ctx, &mut section);
 
     if let crate::ir::Block::Paragraph { inlines } = &section.blocks[0] {

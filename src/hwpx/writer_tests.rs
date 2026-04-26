@@ -40,11 +40,16 @@ fn section_xml(blocks: Vec<Block>) -> String {
         metadata: Metadata::default(),
         sections: vec![Section {
             blocks: blocks.clone(),
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
     let tables = RefTables::build(&doc);
-    let sec = Section { blocks };
+    let sec = Section {
+        blocks,
+        page_layout: None,
+    };
     let empty_asset_map = ImageAssetMap::new();
     generate_section_xml(&sec, 0, &tables, &empty_asset_map).expect("generate_section_xml failed")
 }
@@ -64,7 +69,10 @@ fn read_hwpx_section_xml(xml: &str) -> Section {
 fn doc_with_section(blocks: Vec<Block>) -> Document {
     Document {
         metadata: Metadata::default(),
-        sections: vec![Section { blocks }],
+        sections: vec![Section {
+            blocks,
+            page_layout: None,
+        }],
         assets: Vec::new(),
     }
 }
@@ -103,3 +111,6 @@ mod tests_golden;
 
 #[path = "writer_tests_code_lang.rs"]
 mod tests_code_lang;
+
+#[path = "writer_tests_page_layout.rs"]
+mod tests_page_layout;

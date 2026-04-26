@@ -343,6 +343,8 @@ fn write_markdown_paragraph_with_ruby_inline() {
                 ..ir::Inline::default()
             }],
         }],
+
+        page_layout: None,
     });
     let md = write_markdown(&doc, false);
     assert!(

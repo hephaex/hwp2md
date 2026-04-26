@@ -49,11 +49,61 @@ pub struct Metadata {
     pub keywords: Vec<String>,
 }
 
+/// Page layout metadata parsed from `<hp:secPr>` in HWPX section XML.
+///
+/// All dimension values use HWP units (1/7200 inch ≈ 0.00353 mm).
+/// An A4 portrait page is approximately 59528 × 84188 HWP units.
+///
+/// This struct is stored on [`Section`] because HWPX allows each section to
+/// have independent page layout settings via its own `<hp:secPr>` element.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PageLayout {
+    /// Page width in HWP units (`<hp:pageSize width="…"/>`).
+    pub width: Option<u32>,
+    /// Page height in HWP units (`<hp:pageSize height="…"/>`).
+    pub height: Option<u32>,
+    /// `true` when the page is in landscape orientation
+    /// (`<hp:pagePr landscape="true"/>`).
+    pub landscape: bool,
+    /// Left margin in HWP units (`<hp:margin left="…"/>`).
+    pub margin_left: Option<u32>,
+    /// Right margin in HWP units (`<hp:margin right="…"/>`).
+    pub margin_right: Option<u32>,
+    /// Top margin in HWP units (`<hp:margin top="…"/>`).
+    pub margin_top: Option<u32>,
+    /// Bottom margin in HWP units (`<hp:margin bottom="…"/>`).
+    pub margin_bottom: Option<u32>,
+}
+
+impl PageLayout {
+    /// Standard A4 portrait page layout with typical HWP margins.
+    ///
+    /// - Size: 210 × 297 mm (59528 × 84188 HWP units, 1 HWP unit = 1/7200 inch)
+    /// - Margins: 20 mm header/footer, 30 mm left/right (5670 / 4252 HWP units)
+    pub fn a4_portrait() -> Self {
+        Self {
+            width: Some(59528),
+            height: Some(84188),
+            landscape: false,
+            margin_left: Some(5670),
+            margin_right: Some(5670),
+            margin_top: Some(4252),
+            margin_bottom: Some(4252),
+        }
+    }
+}
+
 /// A logical section of a document containing an ordered sequence of blocks.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Section {
     /// Content blocks in reading order.
     pub blocks: Vec<Block>,
+    /// Page layout for this section, parsed from `<hp:secPr>` in HWPX.
+    ///
+    /// `None` when the source document did not include section properties
+    /// (e.g. plain Markdown input or very minimal HWPX files).  Writers
+    /// should fall back to [`PageLayout::a4_portrait`] defaults in that case.
+    pub page_layout: Option<PageLayout>,
 }
 
 /// A block-level content element within a section.

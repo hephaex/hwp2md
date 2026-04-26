@@ -419,6 +419,8 @@ fn roundtrip_nested_list_md_to_hwpx_to_md() {
                 start: 1,
                 items: vec![outer_item],
             }],
+
+            page_layout: None,
         }],
         assets: vec![],
     };

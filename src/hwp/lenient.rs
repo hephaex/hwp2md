@@ -67,7 +67,10 @@ pub(crate) fn try_lenient_read(path: &Path) -> Result<ir::Document, Hwp2MdError>
                 inlines: vec![ir::Inline::plain(text)],
             })
             .collect();
-        doc.sections.push(ir::Section { blocks });
+        doc.sections.push(ir::Section {
+            blocks,
+            page_layout: None,
+        });
     }
 
     Ok(doc)

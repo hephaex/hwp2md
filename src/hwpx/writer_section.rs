@@ -5,7 +5,7 @@ use std::io::{Cursor, Write};
 
 use super::header::{NUM_PR_DIGIT, PARA_PR_LIST_D0, PARA_PR_LIST_D1};
 use super::{CharPrKey, ImageAssetMap, RefTables};
-use crate::ir;
+use crate::ir::{self, PageLayout};
 
 /// Maximum nesting depth for lists before further sub-levels are silently
 /// dropped.  Prevents stack overflow on pathologically deep Markdown input.
@@ -42,6 +42,14 @@ pub(super) fn generate_section_xml(
     sec.push_attribute(("xmlns:hs", "http://www.hancom.co.kr/hwpml/2011/section"));
     sec.push_attribute(("xmlns:hp", "http://www.hancom.co.kr/hwpml/2011/paragraph"));
     writer.write_event(Event::Start(sec))?;
+
+    // Emit section properties (<hp:secPr>) before content blocks.
+    // Use the PageLayout from the IR when available, otherwise A4 portrait defaults.
+    let layout = section
+        .page_layout
+        .clone()
+        .unwrap_or_else(PageLayout::a4_portrait);
+    write_sec_pr(&mut writer, &layout)?;
 
     let mut para_id: u32 = 0;
     for block in &section.blocks {
@@ -156,7 +164,12 @@ fn write_block<W: Write>(
             //   <!-- hwp2md:lang: -->       (no language hint)
             //
             // The comment is valid XML and invisible to OWPML validators.
-            let lang_str = language.as_deref().unwrap_or("");
+            // Sanitize the language string so it cannot break the XML comment.
+            // XML comments must not contain `--`; replace every occurrence of
+            // `--` with a single `-` to keep the output well-formed.
+            let raw = language.as_deref().unwrap_or("");
+            let sanitized = raw.replace("--", "-");
+            let lang_str = sanitized.as_str();
             let comment_text = format!(" hwp2md:lang:{lang_str} ");
             writer.write_event(Event::Comment(BytesText::new(&comment_text)))?;
 
@@ -410,6 +423,51 @@ fn write_inlines<W: Write>(
             i += 1;
         }
     }
+    Ok(())
+}
+
+/// Emit the `<hp:secPr>` element with page layout metadata.
+///
+/// In OWPML, `<hp:secPr>` is a direct child of `<hs:sec>` and must appear
+/// before any paragraph content.  The page dimensions and margins are expressed
+/// in HWP units (1/7200 inch).
+fn write_sec_pr<W: Write>(
+    writer: &mut Writer<W>,
+    layout: &PageLayout,
+) -> Result<(), quick_xml::Error> {
+    writer.write_event(Event::Start(BytesStart::new("hp:secPr")))?;
+
+    // <hp:pagePr landscape="…">
+    let landscape_str = if layout.landscape { "true" } else { "false" };
+    let mut page_pr = BytesStart::new("hp:pagePr");
+    page_pr.push_attribute(("landscape", landscape_str));
+    writer.write_event(Event::Start(page_pr))?;
+
+    // <hp:margin left="…" right="…" top="…" bottom="…" header="0" footer="0" gutter="0"/>
+    let left = layout.margin_left.unwrap_or(5670).to_string();
+    let right = layout.margin_right.unwrap_or(5670).to_string();
+    let top = layout.margin_top.unwrap_or(4252).to_string();
+    let bottom = layout.margin_bottom.unwrap_or(4252).to_string();
+    let mut margin = BytesStart::new("hp:margin");
+    margin.push_attribute(("left", left.as_str()));
+    margin.push_attribute(("right", right.as_str()));
+    margin.push_attribute(("top", top.as_str()));
+    margin.push_attribute(("bottom", bottom.as_str()));
+    margin.push_attribute(("header", "0"));
+    margin.push_attribute(("footer", "0"));
+    margin.push_attribute(("gutter", "0"));
+    writer.write_event(Event::Empty(margin))?;
+
+    // <hp:pageSize width="…" height="…"/>
+    let width = layout.width.unwrap_or(59528).to_string();
+    let height = layout.height.unwrap_or(84188).to_string();
+    let mut page_size = BytesStart::new("hp:pageSize");
+    page_size.push_attribute(("width", width.as_str()));
+    page_size.push_attribute(("height", height.as_str()));
+    writer.write_event(Event::Empty(page_size))?;
+
+    writer.write_event(Event::End(BytesEnd::new("hp:pagePr")))?;
+    writer.write_event(Event::End(BytesEnd::new("hp:secPr")))?;
     Ok(())
 }
 

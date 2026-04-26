@@ -30,16 +30,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   XML parsing continues with partial results; missing section files
   skipped with warning; missing attributes use defaults.
 - **Phase C-3**: Code block language preservation — language hint stored
-  as `<!-- language: X -->` XML comment in HWPX; reader parses it back;
-  MD→HWPX→MD roundtrip preserves language info.
+  as `<!-- hwp2md:lang:X -->` XML comment in HWPX; reader parses it back;
+  MD→HWPX→MD roundtrip preserves language info; `-->` injection sanitized.
+- **Phase B-2**: HWP binary list recognition — two-tier detection:
+  `numbering_id` from ParaShape records, then text-prefix heuristics
+  (●■▶•-* bullets, 1./2)/a. ordered); year-like prefix rejection;
+  `StagedBlock` grouping; 32 new HWP list tests.
+- **Phase B-4**: Page layout parsing — `PageLayout` IR struct (width,
+  height, landscape, margins); HWPX reader parses `<hp:secPr>` →
+  `<hp:pagePr>` → `<hp:pageSize>`/`<hp:margin>`; writer emits `<hp:secPr>`
+  with A4 portrait defaults; 11 new page layout tests.
 
 ### Changed
 - `paraPr` table expanded from 2 to 4 entries (normal, blockquote,
   list-depth-0, list-depth-1+).
 - `writer_tests_roundtrip.rs` split: golden tests → `writer_tests_golden.rs`,
   code language tests → `writer_tests_code_lang.rs`.
+- `ir::Section` now carries `page_layout: Option<PageLayout>`.
 
 ### Fixed
+- Image filename collision: counter suffix dedup (`photo_2.png`) instead
+  of silent drop; `unique_entry_name` bounded to 10,000 iterations.
+- XML comment injection: code language `-->` sanitized via `--` collapse.
+- `flush_paragraph` marked `#[cfg(test)]` instead of `#[allow(dead_code)]`.
 - Image filename collision: counter suffix dedup (`photo_2.png`) instead
   of silent drop.
 

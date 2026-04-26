@@ -414,6 +414,11 @@ fn unique_entry_name(preferred: &str, resolved: &[ResolvedAsset]) -> String {
             return candidate;
         }
         n += 1;
+        // Safety valve: prevent unbounded iteration in pathological cases.
+        // In normal usage this limit is never reached.
+        if n > 10_000 {
+            return candidate;
+        }
     }
 }
 
@@ -646,7 +651,10 @@ pub fn write_hwpx(
 
     if doc.sections.is_empty() {
         zip.start_file("Contents/section0.xml", options)?;
-        let empty_section = ir::Section { blocks: Vec::new() };
+        let empty_section = ir::Section {
+            blocks: Vec::new(),
+            page_layout: None,
+        };
         zip.write_all(
             section::generate_section_xml(&empty_section, 0, &tables, &asset_map)?.as_bytes(),
         )?;

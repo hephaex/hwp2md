@@ -185,6 +185,8 @@ fn resolve_bin_refs_inside_footnote() {
                 alt: String::new(),
             }],
         }],
+
+        page_layout: None,
     };
     resolve_bin_refs(&mut section, &bin_map);
     match &section.blocks[0] {
@@ -216,6 +218,8 @@ fn resolve_bin_refs_inside_list() {
                 children: Vec::new(),
             }],
         }],
+
+        page_layout: None,
     };
     resolve_bin_refs(&mut section, &bin_map);
     match &section.blocks[0] {

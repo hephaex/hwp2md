@@ -699,12 +699,13 @@ fn resolve_bin_refs_inside_table_cell() {
         cells: vec![cell],
         is_header: false,
     };
-    let mut section = ir::Section {
+    let mut section = ir::Section{
         blocks: vec![ir::Block::Table {
             rows: vec![row],
             col_count: 1,
         }],
-    };
+    
+        page_layout: None,};
 
     resolve_bin_refs(&mut section, &bin_map);
 
@@ -915,7 +916,7 @@ fn resolve_bin_refs_inside_footnote() {
         [("BIN0002".to_string(), "BinData/BIN0002.jpg".to_string())]
             .into_iter()
             .collect();
-    let mut section = ir::Section {
+    let mut section = ir::Section{
         blocks: vec![ir::Block::Footnote {
             id: "1".to_string(),
             content: vec![ir::Block::Image {
@@ -923,7 +924,8 @@ fn resolve_bin_refs_inside_footnote() {
                 alt: String::new(),
             }],
         }],
-    };
+    
+        page_layout: None,};
     resolve_bin_refs(&mut section, &bin_map);
     match &section.blocks[0] {
         ir::Block::Footnote { content, .. } => match &content[0] {
@@ -942,7 +944,7 @@ fn resolve_bin_refs_inside_list() {
         [("BIN0003".to_string(), "BinData/BIN0003.png".to_string())]
             .into_iter()
             .collect();
-    let mut section = ir::Section {
+    let mut section = ir::Section{
         blocks: vec![ir::Block::List {
             ordered: false,
             start: 1,
@@ -954,7 +956,8 @@ fn resolve_bin_refs_inside_list() {
                 children: Vec::new(),
             }],
         }],
-    };
+    
+        page_layout: None,};
     resolve_bin_refs(&mut section, &bin_map);
     match &section.blocks[0] {
         ir::Block::List { items, .. } => match &items[0].blocks[0] {
@@ -1054,7 +1057,7 @@ fn flush_paragraph_propagates_color_to_inline() {
     ctx.current_text = "colored".to_string();
     ctx.current_color = Some("#00FF00".to_string());
 
-    let mut section = crate::ir::Section { blocks: Vec::new() };
+    let mut section = crate::ir::Section { blocks: Vec::new(), page_layout: None };
     super::context::flush_paragraph(&mut ctx, &mut section);
 
     assert_eq!(section.blocks.len(), 1);
@@ -1072,7 +1075,7 @@ fn flush_paragraph_no_color_propagates_none() {
     ctx.current_text = "plain".to_string();
     ctx.current_color = None;
 
-    let mut section = crate::ir::Section { blocks: Vec::new() };
+    let mut section = crate::ir::Section { blocks: Vec::new(), page_layout: None };
     super::context::flush_paragraph(&mut ctx, &mut section);
 
     if let crate::ir::Block::Paragraph { inlines } = &section.blocks[0] {

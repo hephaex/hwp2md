@@ -11,7 +11,10 @@ fn plain(t: &str) -> ir::Inline {
 
 fn make_doc_with_blocks(blocks: Vec<ir::Block>) -> ir::Document {
     let mut doc = ir::Document::new();
-    doc.sections.push(ir::Section { blocks });
+    doc.sections.push(ir::Section {
+        blocks,
+        page_layout: None,
+    });
     doc
 }
 

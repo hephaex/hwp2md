@@ -12,7 +12,10 @@ fn plain(t: &str) -> ir::Inline {
 
 fn make_doc(blocks: Vec<ir::Block>) -> ir::Document {
     let mut doc = ir::Document::new();
-    doc.sections.push(ir::Section { blocks });
+    doc.sections.push(ir::Section {
+        blocks,
+        page_layout: None,
+    });
     doc
 }
 
@@ -551,6 +554,8 @@ fn roundtrip_ir_to_md_to_ir_frontmatter() {
         blocks: vec![ir::Block::Paragraph {
             inlines: vec![plain("body")],
         }],
+
+        page_layout: None,
     });
 
     let md = write_markdown(&doc, true);

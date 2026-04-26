@@ -11,6 +11,7 @@ fn make_image_section(src: &str) -> ir::Section {
             src: src.to_string(),
             alt: String::new(),
         }],
+        page_layout: None,
     }
 }
 
@@ -77,6 +78,8 @@ fn resolve_bin_refs_inside_table_cell() {
             rows: vec![row],
             col_count: 1,
         }],
+
+        page_layout: None,
     };
 
     resolve_bin_refs(&mut section, &bin_map);

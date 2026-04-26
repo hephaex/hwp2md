@@ -16,7 +16,10 @@ pub fn parse_markdown(input: &str) -> ir::Document {
     let mut doc = ir::Document::new();
     doc.metadata = extract_frontmatter(input);
 
-    let mut section = ir::Section { blocks: Vec::new() };
+    let mut section = ir::Section {
+        blocks: Vec::new(),
+        page_layout: None,
+    };
 
     for child in root.children() {
         if let Some(block) = node_to_block(child) {

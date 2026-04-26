@@ -88,11 +88,15 @@ fn write_hwpx_two_sections_produces_section0_and_section1() {
                 blocks: vec![Block::Paragraph {
                     inlines: vec![inline("s0")],
                 }],
+
+                page_layout: None,
             },
             Section {
                 blocks: vec![Block::Paragraph {
                     inlines: vec![inline("s1")],
                 }],
+
+                page_layout: None,
             },
         ],
         assets: Vec::new(),
@@ -229,6 +233,8 @@ fn write_hwpx_image_block_xml_references_asset_name() {
                 src: "diagram.png".into(),
                 alt: "a diagram".into(),
             }],
+
+            page_layout: None,
         }],
         assets: vec![Asset {
             name: "diagram.png".into(),
@@ -306,6 +312,8 @@ fn content_hpf_with_title_and_author() {
             blocks: vec![Block::Paragraph {
                 inlines: vec![inline("hello")],
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };
@@ -414,6 +422,8 @@ fn write_hwpx_metadata_in_content_hpf() {
             blocks: vec![Block::Paragraph {
                 inlines: vec![inline("body")],
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };

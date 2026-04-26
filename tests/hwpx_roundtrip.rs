@@ -229,6 +229,8 @@ fn hwpx_roundtrip_hyperlink_preserves_url_and_text() {
             blocks: vec![ir::Block::Paragraph {
                 inlines: vec![linked_inline],
             }],
+
+            page_layout: None,
         }],
         assets: Vec::new(),
     };

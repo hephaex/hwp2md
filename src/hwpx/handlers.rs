@@ -145,6 +145,71 @@ pub(super) fn handle_start_element(
             ctx.footnote_inlines.clear();
             ctx.footnote_text.clear();
         }
+        // Section properties: <hp:secPr> marks the presence of layout data.
+        "secPr" | "hp:secPr" => {
+            ctx.has_sec_pr = true;
+        }
+        // Page properties: <hp:pagePr landscape="…"/>
+        "pagePr" | "hp:pagePr" => {
+            for attr in e.attributes().flatten() {
+                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                let val = attr.unescape_value().unwrap_or_default();
+                if key == "landscape" || key == "hp:landscape" {
+                    ctx.page_layout_landscape = val.as_ref() == "true" || val.as_ref() == "1";
+                }
+            }
+        }
+        // <hp:pageSize width="59528" height="84188"/> (self-closing)
+        "pageSize" | "hp:pageSize" => {
+            for attr in e.attributes().flatten() {
+                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                let val = attr.unescape_value().unwrap_or_default();
+                match key {
+                    "width" | "hp:width" => {
+                        if let Ok(n) = val.as_ref().parse::<u32>() {
+                            ctx.page_layout_width = Some(n);
+                        }
+                    }
+                    "height" | "hp:height" => {
+                        if let Ok(n) = val.as_ref().parse::<u32>() {
+                            ctx.page_layout_height = Some(n);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        // <hp:margin left="5670" right="5670" top="4252" bottom="4252"
+        //            header="4252" footer="4252" gutter="0"/> (self-closing)
+        "margin" | "hp:margin" => {
+            for attr in e.attributes().flatten() {
+                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                let val = attr.unescape_value().unwrap_or_default();
+                match key {
+                    "left" | "hp:left" => {
+                        if let Ok(n) = val.as_ref().parse::<u32>() {
+                            ctx.page_layout_margin_left = Some(n);
+                        }
+                    }
+                    "right" | "hp:right" => {
+                        if let Ok(n) = val.as_ref().parse::<u32>() {
+                            ctx.page_layout_margin_right = Some(n);
+                        }
+                    }
+                    "top" | "hp:top" => {
+                        if let Ok(n) = val.as_ref().parse::<u32>() {
+                            ctx.page_layout_margin_top = Some(n);
+                        }
+                    }
+                    "bottom" | "hp:bottom" => {
+                        if let Ok(n) = val.as_ref().parse::<u32>() {
+                            ctx.page_layout_margin_bottom = Some(n);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
         _ => {}
     }
 }
@@ -443,6 +508,57 @@ pub(super) fn handle_empty_element(
             }
             if (ctrl_kind == "fn" || ctrl_kind == "en") && !id_ref.is_empty() {
                 ctx.push_inline(ir::Inline::footnote_ref(id_ref));
+            }
+        }
+        // <hp:pageSize width="59528" height="84188"/> (self-closing child of pagePr)
+        "pageSize" | "hp:pageSize" => {
+            for attr in e.attributes().flatten() {
+                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                let val = attr.unescape_value().unwrap_or_default();
+                match key {
+                    "width" | "hp:width" => {
+                        if let Ok(n) = val.as_ref().parse::<u32>() {
+                            ctx.page_layout_width = Some(n);
+                        }
+                    }
+                    "height" | "hp:height" => {
+                        if let Ok(n) = val.as_ref().parse::<u32>() {
+                            ctx.page_layout_height = Some(n);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        // <hp:margin left="5670" right="5670" top="4252" bottom="4252"
+        //            header="4252" footer="4252" gutter="0"/> (self-closing)
+        "margin" | "hp:margin" => {
+            for attr in e.attributes().flatten() {
+                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                let val = attr.unescape_value().unwrap_or_default();
+                match key {
+                    "left" | "hp:left" => {
+                        if let Ok(n) = val.as_ref().parse::<u32>() {
+                            ctx.page_layout_margin_left = Some(n);
+                        }
+                    }
+                    "right" | "hp:right" => {
+                        if let Ok(n) = val.as_ref().parse::<u32>() {
+                            ctx.page_layout_margin_right = Some(n);
+                        }
+                    }
+                    "top" | "hp:top" => {
+                        if let Ok(n) = val.as_ref().parse::<u32>() {
+                            ctx.page_layout_margin_top = Some(n);
+                        }
+                    }
+                    "bottom" | "hp:bottom" => {
+                        if let Ok(n) = val.as_ref().parse::<u32>() {
+                            ctx.page_layout_margin_bottom = Some(n);
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
         _ => {}

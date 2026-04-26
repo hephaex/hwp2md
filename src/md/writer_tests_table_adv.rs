@@ -41,6 +41,8 @@ fn write_markdown_html_table_second_row_is_header_uses_th() {
     let doc = ir::Document {
         sections: vec![ir::Section {
             blocks: vec![ir::Block::Table { rows, col_count: 2 }],
+
+            page_layout: None,
         }],
         ..ir::Document::new()
     };
@@ -70,6 +72,8 @@ fn write_markdown_html_table_first_row_not_header_uses_td() {
     let doc = ir::Document {
         sections: vec![ir::Section {
             blocks: vec![ir::Block::Table { rows, col_count: 2 }],
+
+            page_layout: None,
         }],
         ..ir::Document::new()
     };
