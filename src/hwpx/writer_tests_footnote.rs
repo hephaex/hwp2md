@@ -36,7 +36,9 @@ fn section_xml_footnote_content_inside_hp_fn() {
 
     // The paragraph content must appear between <hp:fn> and </hp:fn>.
     let fn_open = xml.find("<hp:fn").expect("hp:fn open must exist");
-    let text_pos = xml.find("inside footnote").expect("footnote text must exist");
+    let text_pos = xml
+        .find("inside footnote")
+        .expect("footnote text must exist");
     let fn_close = xml.find("</hp:fn>").expect("hp:fn close must exist");
 
     assert!(
@@ -61,17 +63,13 @@ fn section_xml_footnote_paragraph_wrapped_in_hp_p() {
     // Footnote body paragraphs must be proper <hp:p> inside <hp:fn>.
     let fn_open = xml.find("<hp:fn").expect("hp:fn open");
     let p_open = xml[fn_open..].find("<hp:p").expect("hp:p inside hp:fn");
-    let p_close = xml[fn_open..].find("</hp:p>").expect("hp:p close inside hp:fn");
+    let p_close = xml[fn_open..]
+        .find("</hp:p>")
+        .expect("hp:p close inside hp:fn");
     let fn_close = xml[fn_open..].find("</hp:fn>").expect("hp:fn close");
 
-    assert!(
-        p_open < fn_close,
-        "hp:p must be inside hp:fn: {xml}"
-    );
-    assert!(
-        p_close < fn_close,
-        "hp:p close must be inside hp:fn: {xml}"
-    );
+    assert!(p_open < fn_close, "hp:p must be inside hp:fn: {xml}");
+    assert!(p_close < fn_close, "hp:p close must be inside hp:fn: {xml}");
 }
 
 #[test]
@@ -103,8 +101,14 @@ fn section_xml_footnote_multiple_paragraphs() {
     let first_pos = xml.find("first paragraph").expect("first");
     let second_pos = xml.find("second paragraph").expect("second");
 
-    assert!(fn_open < first_pos && first_pos < fn_close, "first para inside hp:fn: {xml}");
-    assert!(fn_open < second_pos && second_pos < fn_close, "second para inside hp:fn: {xml}");
+    assert!(
+        fn_open < first_pos && first_pos < fn_close,
+        "first para inside hp:fn: {xml}"
+    );
+    assert!(
+        fn_open < second_pos && second_pos < fn_close,
+        "second para inside hp:fn: {xml}"
+    );
 }
 
 #[test]
@@ -119,10 +123,7 @@ fn section_xml_footnote_empty_content_still_emits_hp_fn() {
         xml.contains("<hp:fn"),
         "hp:fn must appear even for empty footnote: {xml}"
     );
-    assert!(
-        xml.contains("</hp:fn>"),
-        "hp:fn close must appear: {xml}"
-    );
+    assert!(xml.contains("</hp:fn>"), "hp:fn close must appear: {xml}");
 }
 
 #[test]
@@ -162,13 +163,20 @@ fn roundtrip_footnote_block_preserved() {
             false
         }
     });
-    assert!(has_noteref, "footnote_ref must survive roundtrip: {section:?}");
+    assert!(
+        has_noteref,
+        "footnote_ref must survive roundtrip: {section:?}"
+    );
 
     // Find the Footnote block.
-    let has_footnote = section.blocks.iter().any(|b| {
-        matches!(b, Block::Footnote { id, content } if id == "1" && !content.is_empty())
-    });
-    assert!(has_footnote, "Footnote block must survive roundtrip: {section:?}");
+    let has_footnote = section
+        .blocks
+        .iter()
+        .any(|b| matches!(b, Block::Footnote { id, content } if id == "1" && !content.is_empty()));
+    assert!(
+        has_footnote,
+        "Footnote block must survive roundtrip: {section:?}"
+    );
 }
 
 #[test]
@@ -190,12 +198,7 @@ fn roundtrip_footnote_body_text_preserved() {
         if let Block::Footnote { content, .. } = b {
             content.iter().find_map(|inner| {
                 if let Block::Paragraph { inlines } = inner {
-                    Some(
-                        inlines
-                            .iter()
-                            .map(|i| i.text.as_str())
-                            .collect::<String>(),
-                    )
+                    Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
                 } else {
                     None
                 }

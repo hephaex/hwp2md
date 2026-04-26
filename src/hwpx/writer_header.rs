@@ -1,5 +1,5 @@
 use crate::error::Hwp2MdError;
-use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, Event};
+use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
 use std::io::{Cursor, Write};
 
@@ -9,6 +9,33 @@ use crate::ir;
 // ---------------------------------------------------------------------------
 // header.xml -- OWPML reference tables
 // ---------------------------------------------------------------------------
+
+/// OWPML numbering definition ID for ordered (digit) lists.
+///
+/// Referenced by `numPrIDRef` on list-item paragraphs in section XML.
+/// Unordered (bullet) list items do **not** use a `numPrIDRef` — their
+/// visual bullet character and indentation are handled by the paragraph
+/// property (`paraPrIDRef`) alone.
+pub(super) const NUM_PR_DIGIT: &str = "1";
+
+/// OWPML paragraph-property ID for top-level list items (depth = 0).
+///
+/// This entry carries the left-indent that visually separates list items
+/// from the enclosing paragraph text.
+pub(super) const PARA_PR_LIST_D0: &str = "2";
+
+/// OWPML paragraph-property ID for nested list items (depth ≥ 1).
+///
+/// Each additional nesting level adds another step of left-indentation.
+pub(super) const PARA_PR_LIST_D1: &str = "3";
+
+/// Left margin (HWP units) applied to top-level list item paragraphs.
+///
+/// One HWP unit = 0.01 mm, so 400 ≈ 4 mm.
+const LIST_D0_MARGIN_LEFT: &str = "400";
+
+/// Left margin (HWP units) applied to nested list item paragraphs (depth ≥ 1).
+const LIST_D1_MARGIN_LEFT: &str = "800";
 
 pub(super) fn generate_header_xml(
     doc: &ir::Document,
@@ -38,7 +65,8 @@ pub(super) fn generate_header_xml(
     begin_num.push_attribute(("equation", "1"));
     w.write_event(Event::Empty(begin_num))?;
 
-    // <hh:refList> -- contains fontfaces, charProperties, paraProperties, styles
+    // <hh:refList> -- contains fontfaces, charProperties, paraProperties, styles,
+    // and numbering definitions.
     w.write_event(Event::Start(BytesStart::new("hh:refList")))?;
 
     write_font_faces(&mut w, tables)?;
@@ -46,6 +74,10 @@ pub(super) fn generate_header_xml(
     write_char_properties(&mut w, tables)?;
     write_para_properties(&mut w)?;
     write_styles(&mut w, tables)?;
+
+    // <hh:numberingList> must be inside <hh:refList> per OWPML schema.
+    // id=1 → unordered (bullet ●), id=2 → ordered (digit %d.)
+    write_numbering_list(&mut w)?;
 
     w.write_event(Event::End(BytesEnd::new("hh:refList")))?;
 
@@ -245,8 +277,13 @@ fn write_char_properties<W: Write>(
 pub(super) const QUOTE_MARGIN_LEFT: &str = "800";
 
 fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::Error> {
+    // Four paraPr entries:
+    //   id=0: default (no left indent)
+    //   id=1: block-quote (left indent = 800)
+    //   id=2: list item depth 0 (left indent = 400)
+    //   id=3: list item depth 1+ (left indent = 800)
     let mut para_properties = BytesStart::new("hh:paraProperties");
-    para_properties.push_attribute(("itemCnt", "2"));
+    para_properties.push_attribute(("itemCnt", "4"));
     w.write_event(Event::Start(para_properties))?;
 
     // ── paraPr id=0: default (no left indent) ──
@@ -254,6 +291,12 @@ fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::E
 
     // ── paraPr id=1: block-quote (left indent) ──
     write_single_para_pr(w, "1", QUOTE_MARGIN_LEFT)?;
+
+    // ── paraPr id=2: top-level list item ──
+    write_single_para_pr(w, PARA_PR_LIST_D0, LIST_D0_MARGIN_LEFT)?;
+
+    // ── paraPr id=3: nested list item (depth ≥ 1) ──
+    write_single_para_pr(w, PARA_PR_LIST_D1, LIST_D1_MARGIN_LEFT)?;
 
     w.write_event(Event::End(BytesEnd::new("hh:paraProperties")))?;
     Ok(())
@@ -359,5 +402,47 @@ fn write_styles<W: Write>(w: &mut Writer<W>, tables: &RefTables) -> Result<(), q
     }
 
     w.write_event(Event::End(BytesEnd::new("hh:styles")))?;
+    Ok(())
+}
+
+/// Emit the OWPML `<hh:numberings>` element containing the ordered-list
+/// numbering definition used by ordered list-item paragraphs in section XML.
+///
+/// Only one entry is emitted (id=1, `NUM_PR_DIGIT`) for ordered (decimal digit)
+/// lists.  Unordered (bullet) lists do **not** reference a `<hh:numbering>`
+/// entry — their indentation is carried entirely by the paragraph property.
+///
+/// The `<hh:paraHead>` child carries the required OWPML attributes and the
+/// numbering format string (`%d.`).
+fn write_numbering_list<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::Error> {
+    let mut num_list = BytesStart::new("hh:numberings");
+    num_list.push_attribute(("itemCnt", "1"));
+    w.write_event(Event::Start(num_list))?;
+
+    // ── id=1: ordered (digit %d.) ────────────────────────────────────────
+    let mut digit_num = BytesStart::new("hh:numbering");
+    digit_num.push_attribute(("id", NUM_PR_DIGIT));
+    digit_num.push_attribute(("start", "1"));
+    w.write_event(Event::Start(digit_num))?;
+
+    let mut digit_head = BytesStart::new("hh:paraHead");
+    digit_head.push_attribute(("level", "1"));
+    digit_head.push_attribute(("align", "LEFT"));
+    digit_head.push_attribute(("useInstWidth", "false"));
+    digit_head.push_attribute(("autoIndent", "true"));
+    digit_head.push_attribute(("widthAdjust", "0"));
+    digit_head.push_attribute(("textOffset", "400"));
+    digit_head.push_attribute(("numFormat", "DIGIT"));
+    digit_head.push_attribute(("charPrIDRef", "0"));
+    digit_head.push_attribute(("checkable", "false"));
+    digit_head.push_attribute(("start", "1"));
+    w.write_event(Event::Start(digit_head))?;
+    // Numbering format string: %d. (HWP uses %d as the counter placeholder)
+    w.write_event(Event::Text(BytesText::new("%d.")))?;
+    w.write_event(Event::End(BytesEnd::new("hh:paraHead")))?;
+
+    w.write_event(Event::End(BytesEnd::new("hh:numbering")))?;
+
+    w.write_event(Event::End(BytesEnd::new("hh:numberings")))?;
     Ok(())
 }

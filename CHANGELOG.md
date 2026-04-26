@@ -8,8 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.0] - Unreleased
 
 ### Added
+- **Phase A-1**: Image embedding pipeline — file path and data URI images
+  are read, base64-decoded or loaded from disk, and embedded as `BinData/`
+  entries in the HWPX ZIP; `binaryItemIDRef` references are emitted on
+  `<hp:pic>` elements; HTTP/HTTPS URLs are preserved as external references.
+- **Phase A-2**: List writer with bullet/numbering — `<hh:numbering>`
+  definitions (BULLET id=1, DIGIT id=2) emitted in header.xml;
+  `numPrIDRef` set on list-item paragraphs; nested list support via
+  `write_list_items()` with depth-based `paraPrIDRef` (id=2 depth-0,
+  id=3 depth-1+); 23 new list tests.
+- **Phase A-3**: BlockQuote visual indentation — `paraPr id=1` with left
+  margin 800 HWP units (~20mm); `quote_depth` parameter threaded through
+  `write_block()`; 6 new blockquote tests.
+- **Phase A-4**: Footnote OWPML structure — `<hp:fn noteId>` wrapping
+  around footnote content blocks; 7 new footnote tests.
 
 ### Changed
+- `paraPr` table expanded from 2 to 4 entries (normal, blockquote,
+  list-depth-0, list-depth-1+).
 
 ### Fixed
 

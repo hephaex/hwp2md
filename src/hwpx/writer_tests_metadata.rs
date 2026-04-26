@@ -281,8 +281,7 @@ fn xml_escape_content_apostrophe() {
 fn xml_escape_content_all_special_chars() {
     let result = xml_escape_content(r#"a & b < c > d " e ' f"#);
     assert_eq!(
-        result,
-        "a &amp; b &lt; c &gt; d &quot; e &apos; f",
+        result, "a &amp; b &lt; c &gt; d &quot; e &apos; f",
         "all XML special characters must be escaped"
     );
 }
@@ -310,7 +309,7 @@ fn content_hpf_with_title_and_author() {
         }],
         assets: Vec::new(),
     };
-    let hpf = generate_content_hpf(&doc);
+    let hpf = generate_content_hpf(&doc, &[]);
 
     assert!(
         hpf.contains("<hp:docInfo>"),
@@ -330,7 +329,7 @@ fn content_hpf_with_title_and_author() {
 #[test]
 fn content_hpf_without_metadata_has_no_docinfo() {
     let doc = Document::new();
-    let hpf = generate_content_hpf(&doc);
+    let hpf = generate_content_hpf(&doc, &[]);
 
     assert!(
         !hpf.contains("<hp:docInfo>"),
@@ -348,7 +347,7 @@ fn content_hpf_title_only() {
         sections: Vec::new(),
         assets: Vec::new(),
     };
-    let hpf = generate_content_hpf(&doc);
+    let hpf = generate_content_hpf(&doc, &[]);
 
     assert!(
         hpf.contains("<hp:title>Only Title</hp:title>"),
@@ -370,7 +369,7 @@ fn content_hpf_author_only() {
         sections: Vec::new(),
         assets: Vec::new(),
     };
-    let hpf = generate_content_hpf(&doc);
+    let hpf = generate_content_hpf(&doc, &[]);
 
     assert!(!hpf.contains("<hp:title>"), "title must NOT appear: {hpf}");
     assert!(
@@ -390,7 +389,7 @@ fn content_hpf_metadata_xml_escaping() {
         sections: Vec::new(),
         assets: Vec::new(),
     };
-    let hpf = generate_content_hpf(&doc);
+    let hpf = generate_content_hpf(&doc, &[]);
 
     assert!(
         hpf.contains("A &amp; B &lt;C&gt;"),

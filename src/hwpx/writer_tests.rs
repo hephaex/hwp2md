@@ -45,7 +45,8 @@ fn section_xml(blocks: Vec<Block>) -> String {
     };
     let tables = RefTables::build(&doc);
     let sec = Section { blocks };
-    generate_section_xml(&sec, 0, &tables).expect("generate_section_xml failed")
+    let empty_asset_map = ImageAssetMap::new();
+    generate_section_xml(&sec, 0, &tables, &empty_asset_map).expect("generate_section_xml failed")
 }
 
 fn zip_entry_names(path: &std::path::Path) -> Vec<String> {
@@ -90,3 +91,9 @@ mod tests_ruby;
 
 #[path = "writer_tests_footnote.rs"]
 mod tests_footnote;
+
+#[path = "writer_tests_image.rs"]
+mod tests_image;
+
+#[path = "writer_tests_list.rs"]
+mod tests_list;

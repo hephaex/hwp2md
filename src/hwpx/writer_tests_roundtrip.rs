@@ -40,7 +40,10 @@ fn roundtrip_bold_text_preserved() {
     let result = roundtrip_inlines(vec![bold_inline("bold text")]);
     assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
     assert_eq!(result[0].text, "bold text");
-    assert!(result[0].bold, "bold flag must survive roundtrip: {result:?}");
+    assert!(
+        result[0].bold,
+        "bold flag must survive roundtrip: {result:?}"
+    );
 }
 
 #[test]
@@ -66,7 +69,10 @@ fn roundtrip_bold_italic_combined_preserved() {
     assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
     assert_eq!(result[0].text, "bold italic");
     assert!(result[0].bold, "bold must survive roundtrip: {result:?}");
-    assert!(result[0].italic, "italic must survive roundtrip: {result:?}");
+    assert!(
+        result[0].italic,
+        "italic must survive roundtrip: {result:?}"
+    );
 }
 
 #[test]
@@ -311,7 +317,8 @@ fn section_xml_font_name_emits_face_name_id_ref() {
     }]);
     let tables = RefTables::build(&doc);
     let sec = &doc.sections[0];
-    let xml = generate_section_xml(sec, 0, &tables).expect("generate_section_xml failed");
+    let xml = generate_section_xml(sec, 0, &tables, &ImageAssetMap::new())
+        .expect("generate_section_xml failed");
 
     assert!(
         xml.contains("faceNameIDRef="),
@@ -420,8 +427,8 @@ fn roundtrip_unknown_font_name_not_in_table() {
             }],
         }],
     };
-    let xml =
-        generate_section_xml(&rogue_section, 0, &tables).expect("generate_section_xml failed");
+    let xml = generate_section_xml(&rogue_section, 0, &tables, &ImageAssetMap::new())
+        .expect("generate_section_xml failed");
 
     // The writer should NOT emit faceNameIDRef for a font not in the table.
     assert!(
@@ -515,10 +522,7 @@ fn golden_comprehensive_document_structure() {
                 },
                 // Paragraph with bold inline
                 Block::Paragraph {
-                    inlines: vec![
-                        inline("Normal text "),
-                        bold_inline("bold text"),
-                    ],
+                    inlines: vec![inline("Normal text "), bold_inline("bold text")],
                 },
                 // Paragraph with italic inline
                 Block::Paragraph {
@@ -863,10 +867,11 @@ fn header_xml_contains_blockquote_para_pr() {
         header.contains(r#"<hh:paraPr id="1">"#),
         "header must contain paraPr id=\"1\":\n{header}"
     );
-    // itemCnt must be "2" for paraProperties.
+    // itemCnt must be "4" for paraProperties (id=0 normal, id=1 blockquote,
+    // id=2 list-depth-0, id=3 list-depth-1+).
     assert!(
-        header.contains(r#"itemCnt="2""#),
-        "paraProperties itemCnt must be 2:\n{header}"
+        header.contains(r#"itemCnt="4""#),
+        "paraProperties itemCnt must be 4:\n{header}"
     );
     // paraPr id="1" must have a left margin value of 800.
     assert!(

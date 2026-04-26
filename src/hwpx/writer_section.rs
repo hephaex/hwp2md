@@ -3,17 +3,26 @@ use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
 use std::io::{Cursor, Write};
 
-use super::{CharPrKey, RefTables};
+use super::header::{NUM_PR_DIGIT, PARA_PR_LIST_D0, PARA_PR_LIST_D1};
+use super::{CharPrKey, ImageAssetMap, RefTables};
 use crate::ir;
 
 // ---------------------------------------------------------------------------
 // section XML
 // ---------------------------------------------------------------------------
 
+/// Generate OWPML section XML for `section`.
+///
+/// `asset_map` maps each `Block::Image { src }` to the bare filename of the
+/// corresponding `BinData/` entry in the HWPX ZIP.  When the src is present in
+/// the map the entry name is used as `binaryItemIDRef`; otherwise the original
+/// `src` string is emitted unchanged (preserving backward compatibility for
+/// remote URLs and unresolved paths).
 pub(super) fn generate_section_xml(
     section: &ir::Section,
     _index: usize,
     tables: &RefTables,
+    asset_map: &ImageAssetMap,
 ) -> Result<String, Hwp2MdError> {
     let mut buf = Cursor::new(Vec::new());
     let mut writer = Writer::new_with_indent(&mut buf, b' ', 2);
@@ -27,7 +36,7 @@ pub(super) fn generate_section_xml(
 
     let mut para_id: u32 = 0;
     for block in &section.blocks {
-        write_block(&mut writer, block, tables, &mut para_id, 0)?;
+        write_block(&mut writer, block, tables, &mut para_id, 0, asset_map)?;
     }
 
     writer.write_event(Event::End(BytesEnd::new("hs:sec")))?;
@@ -47,12 +56,16 @@ pub(super) fn generate_section_xml(
 /// `quote_depth` tracks how many nested `BlockQuote` wrappers surround the
 /// current block.  When > 0 the emitted `<hp:p>` uses `paraPrIDRef="1"`
 /// (the indented paragraph property) instead of `"0"`.
+///
+/// `asset_map` maps image `src` values to the resolved `BinData/` entry name
+/// used as `binaryItemIDRef` in the emitted `<hp:img>` element.
 fn write_block<W: Write>(
     writer: &mut Writer<W>,
     block: &ir::Block,
     tables: &RefTables,
     para_id: &mut u32,
     quote_depth: u32,
+    asset_map: &ImageAssetMap,
 ) -> Result<(), quick_xml::Error> {
     // Select paraPrIDRef based on blockquote nesting depth.
     let para_pr_ref = if quote_depth > 0 { "1" } else { "0" };
@@ -115,7 +128,7 @@ fn write_block<W: Write>(
                         writer.write_event(Event::Empty(addr))?;
                     }
                     for b in &cell.blocks {
-                        write_block(writer, b, tables, para_id, quote_depth)?;
+                        write_block(writer, b, tables, para_id, quote_depth, asset_map)?;
                     }
                     writer.write_event(Event::End(BytesEnd::new("hp:tc")))?;
                 }
@@ -145,17 +158,29 @@ fn write_block<W: Write>(
         }
         ir::Block::BlockQuote { blocks } => {
             for b in blocks {
-                write_block(writer, b, tables, para_id, quote_depth + 1)?;
+                write_block(writer, b, tables, para_id, quote_depth + 1, asset_map)?;
             }
         }
-        ir::Block::List { items, .. } => {
-            for item in items {
-                for b in &item.blocks {
-                    write_block(writer, b, tables, para_id, quote_depth)?;
-                }
-            }
+        ir::Block::List { items, ordered, .. } => {
+            write_list_items(
+                writer,
+                items,
+                *ordered,
+                tables,
+                para_id,
+                quote_depth,
+                0,
+                asset_map,
+            )?;
         }
         ir::Block::Image { src, alt } => {
+            // Resolve the src to the embedded BinData entry name when available.
+            // For remote URLs (not in the map) the original src is used as-is.
+            let bin_ref: &str = asset_map
+                .get(src.as_str())
+                .map(String::as_str)
+                .unwrap_or(src);
+
             let id_str = para_id.to_string();
             *para_id += 1;
             let mut p = BytesStart::new("hp:p");
@@ -167,7 +192,7 @@ fn write_block<W: Write>(
             writer.write_event(Event::Start(run))?;
             writer.write_event(Event::Start(BytesStart::new("hp:pic")))?;
             let mut img = BytesStart::new("hp:img");
-            img.push_attribute(("hp:binaryItemIDRef", src.as_str()));
+            img.push_attribute(("hp:binaryItemIDRef", bin_ref));
             img.push_attribute(("alt", alt.as_str()));
             writer.write_event(Event::Empty(img))?;
             writer.write_event(Event::End(BytesEnd::new("hp:pic")))?;
@@ -213,9 +238,115 @@ fn write_block<W: Write>(
             fn_el.push_attribute(("noteId", id.as_str()));
             writer.write_event(Event::Start(fn_el))?;
             for b in content {
-                write_block(writer, b, tables, para_id, quote_depth)?;
+                write_block(writer, b, tables, para_id, quote_depth, asset_map)?;
             }
             writer.write_event(Event::End(BytesEnd::new("hp:fn")))?;
+        }
+    }
+    Ok(())
+}
+
+/// Emit a sequence of list items as OWPML paragraphs with numbering markup.
+///
+/// Each item in the list is written as a `<hp:p>` paragraph carrying two
+/// numbering-related attributes:
+///
+/// - `numPrIDRef`: references the `<hh:numbering>` definition in the header
+///   (`NUM_PR_BULLET` for unordered, `NUM_PR_DIGIT` for ordered).
+/// - `paraPrIDRef`: references the indented paragraph property (`PARA_PR_LIST_D0`
+///   for depth 0, `PARA_PR_LIST_D1` for depth ≥ 1).
+///
+/// After emitting the item's inline content, any nested child list is recurse
+/// with `depth + 1`.  The `ordered` flag from the parent list is propagated
+/// to child lists unless overridden by a nested `Block::List` inside an item.
+///
+/// `quote_depth` is passed through unchanged — list items can appear inside
+/// block quotes and must still carry the correct `paraPrIDRef` for quoting.
+/// However, the list's own indentation takes priority: when inside a quote,
+/// the list paragraph still uses the list-specific `paraPrIDRef` rather than
+/// the blockquote `paraPrIDRef`.  This matches Hancom's behaviour.
+#[allow(clippy::too_many_arguments)]
+fn write_list_items<W: Write>(
+    writer: &mut Writer<W>,
+    items: &[ir::ListItem],
+    ordered: bool,
+    tables: &RefTables,
+    para_id: &mut u32,
+    quote_depth: u32,
+    list_depth: u32,
+    asset_map: &ImageAssetMap,
+) -> Result<(), quick_xml::Error> {
+    // Deeper nesting uses a larger left margin (paraPr id=3).
+    let para_pr_ref = if list_depth == 0 {
+        PARA_PR_LIST_D0
+    } else {
+        PARA_PR_LIST_D1
+    };
+
+    for item in items {
+        // Emit each top-level block inside the item.  A well-formed Markdown
+        // list item contains exactly one Paragraph, but we handle arbitrary
+        // blocks for correctness.
+        for block in &item.blocks {
+            match block {
+                // The common case: a single paragraph of inline text.
+                // Emit it directly with list-specific attributes.
+                ir::Block::Paragraph { inlines } => {
+                    let id_str = para_id.to_string();
+                    *para_id += 1;
+                    let mut p = BytesStart::new("hp:p");
+                    p.push_attribute(("id", id_str.as_str()));
+                    p.push_attribute(("paraPrIDRef", para_pr_ref));
+                    // Ordered lists reference the DIGIT numbering definition.
+                    // Unordered (bullet) lists omit numPrIDRef — indentation
+                    // is handled by the paragraph property alone.
+                    if ordered {
+                        p.push_attribute(("numPrIDRef", NUM_PR_DIGIT));
+                    }
+                    writer.write_event(Event::Start(p))?;
+                    write_inlines(writer, inlines, tables)?;
+                    writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
+                }
+                // Nested list inside an item: recurse with depth + 1,
+                // preserving the parent ordered flag for the child unless
+                // the child specifies its own ordered flag.
+                ir::Block::List {
+                    items: sub_items,
+                    ordered: sub_ordered,
+                    ..
+                } => {
+                    write_list_items(
+                        writer,
+                        sub_items,
+                        *sub_ordered,
+                        tables,
+                        para_id,
+                        quote_depth,
+                        list_depth + 1,
+                        asset_map,
+                    )?;
+                }
+                // Any other block type (heading, table, code block, …) falls
+                // back to the generic block writer without list attributes.
+                other => {
+                    write_block(writer, other, tables, para_id, quote_depth, asset_map)?;
+                }
+            }
+        }
+
+        // Recurse into direct child list items (sub-lists stored as children
+        // of the ListItem rather than as a nested Block::List).
+        if !item.children.is_empty() {
+            write_list_items(
+                writer,
+                &item.children,
+                ordered,
+                tables,
+                para_id,
+                quote_depth,
+                list_depth + 1,
+                asset_map,
+            )?;
         }
     }
     Ok(())
