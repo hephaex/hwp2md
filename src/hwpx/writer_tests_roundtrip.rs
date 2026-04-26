@@ -828,4 +828,109 @@ fn golden_comprehensive_document_structure() {
         container_xml.contains("content.hpf"),
         "container.xml must reference content.hpf:\n{container_xml}"
     );
+
+    // -- Block quote must use paraPrIDRef="1" (indented paragraph) --
+    assert!(
+        section_xml.contains(r#"paraPrIDRef="1""#),
+        "block quote paragraph must use paraPrIDRef=\"1\":\n{section_xml}"
+    );
+
+    // -- header.xml must have paraPr id="1" with left margin --
+    assert!(
+        header_xml.contains(r#"<hh:paraPr id="1">"#),
+        "header.xml must contain paraPr id=\"1\" for blockquote indent:\n{header_xml}"
+    );
+}
+
+// ── Phase A-3 tests: BlockQuote paraPr header + roundtrip ──────────────
+
+#[test]
+fn header_xml_contains_blockquote_para_pr() {
+    let doc = doc_with_section(vec![Block::Paragraph {
+        inlines: vec![inline("text")],
+    }]);
+    let tables = RefTables::build(&doc);
+    let header =
+        super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
+
+    // paraPr id="0" (normal) must exist.
+    assert!(
+        header.contains(r#"<hh:paraPr id="0">"#),
+        "header must contain paraPr id=\"0\":\n{header}"
+    );
+    // paraPr id="1" (blockquote indent) must exist.
+    assert!(
+        header.contains(r#"<hh:paraPr id="1">"#),
+        "header must contain paraPr id=\"1\":\n{header}"
+    );
+    // itemCnt must be "2" for paraProperties.
+    assert!(
+        header.contains(r#"itemCnt="2""#),
+        "paraProperties itemCnt must be 2:\n{header}"
+    );
+    // paraPr id="1" must have a left margin value of 800.
+    assert!(
+        header.contains(r#"<hh:left value="800"/>"#),
+        "paraPr id=\"1\" must have left margin 800:\n{header}"
+    );
+}
+
+#[test]
+fn header_xml_para_pr_0_has_zero_left_margin() {
+    let doc = doc_with_section(vec![Block::Paragraph {
+        inlines: vec![inline("text")],
+    }]);
+    let tables = RefTables::build(&doc);
+    let header =
+        super::header::generate_header_xml(&doc, &tables).expect("generate_header_xml failed");
+
+    // paraPr id="0" must have left margin = 0.
+    // We verify that the first paraPr (id=0) has <hh:left value="0"/>.
+    // Since id=0 comes first, the first occurrence of <hh:left is from id=0.
+    let first_left_pos = header
+        .find(r#"<hh:left value="#)
+        .expect("hh:left must exist");
+    let first_left_slice = &header[first_left_pos..];
+    assert!(
+        first_left_slice.starts_with(r#"<hh:left value="0"/>"#),
+        "first paraPr (id=0) must have left margin 0:\n{header}"
+    );
+}
+
+#[test]
+fn roundtrip_blockquote_content_preserved() {
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    let doc = Document {
+        metadata: Metadata::default(),
+        sections: vec![Section {
+            blocks: vec![Block::BlockQuote {
+                blocks: vec![Block::Paragraph {
+                    inlines: vec![inline("roundtrip quote")],
+                }],
+            }],
+        }],
+        assets: Vec::new(),
+    };
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+    let read_back = read_hwpx(tmp.path()).expect("read_hwpx");
+
+    // The text must survive the roundtrip.  The reader currently does not
+    // reconstruct BlockQuote from paraPrIDRef, so the content appears as
+    // a plain Paragraph -- that is acceptable for now.
+    let has_quote_text = read_back
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(|b| match b {
+            Block::Paragraph { inlines } => inlines.iter().any(|i| i.text == "roundtrip quote"),
+            Block::BlockQuote { blocks } => blocks.iter().any(|b2| {
+                matches!(b2, Block::Paragraph { inlines } if inlines.iter().any(|i| i.text == "roundtrip quote"))
+            }),
+            _ => false,
+        });
+    assert!(
+        has_quote_text,
+        "blockquote text must survive HWPX roundtrip; sections: {:?}",
+        read_back.sections
+    );
 }

@@ -27,7 +27,7 @@ pub(super) fn generate_section_xml(
 
     let mut para_id: u32 = 0;
     for block in &section.blocks {
-        write_block(&mut writer, block, tables, &mut para_id)?;
+        write_block(&mut writer, block, tables, &mut para_id, 0)?;
     }
 
     writer.write_event(Event::End(BytesEnd::new("hs:sec")))?;
@@ -43,12 +43,20 @@ pub(super) fn generate_section_xml(
 /// consumes one ID and increments the counter.  Paragraph IDs inside table
 /// cells share the same counter so that all IDs remain globally unique within
 /// the section.
+///
+/// `quote_depth` tracks how many nested `BlockQuote` wrappers surround the
+/// current block.  When > 0 the emitted `<hp:p>` uses `paraPrIDRef="1"`
+/// (the indented paragraph property) instead of `"0"`.
 fn write_block<W: Write>(
     writer: &mut Writer<W>,
     block: &ir::Block,
     tables: &RefTables,
     para_id: &mut u32,
+    quote_depth: u32,
 ) -> Result<(), quick_xml::Error> {
+    // Select paraPrIDRef based on blockquote nesting depth.
+    let para_pr_ref = if quote_depth > 0 { "1" } else { "0" };
+
     match block {
         ir::Block::Heading { level, inlines } => {
             // Style IDs match the hh:styles table: 1=Heading1 ... 6=Heading6.
@@ -60,7 +68,7 @@ fn write_block<W: Write>(
             let mut p = BytesStart::new("hp:p");
             p.push_attribute(("id", id_str.as_str()));
             p.push_attribute(("hp:styleIDRef", style_id_str.as_str()));
-            p.push_attribute(("paraPrIDRef", "0"));
+            p.push_attribute(("paraPrIDRef", para_pr_ref));
             writer.write_event(Event::Start(p))?;
             write_inlines(writer, inlines, tables)?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
@@ -70,7 +78,7 @@ fn write_block<W: Write>(
             *para_id += 1;
             let mut p = BytesStart::new("hp:p");
             p.push_attribute(("id", id_str.as_str()));
-            p.push_attribute(("paraPrIDRef", "0"));
+            p.push_attribute(("paraPrIDRef", para_pr_ref));
             writer.write_event(Event::Start(p))?;
             write_inlines(writer, inlines, tables)?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
@@ -84,7 +92,7 @@ fn write_block<W: Write>(
             *para_id += 1;
             let mut p = BytesStart::new("hp:p");
             p.push_attribute(("id", id_str.as_str()));
-            p.push_attribute(("paraPrIDRef", "0"));
+            p.push_attribute(("paraPrIDRef", para_pr_ref));
             writer.write_event(Event::Start(p))?;
 
             let mut run = BytesStart::new("hp:run");
@@ -107,7 +115,7 @@ fn write_block<W: Write>(
                         writer.write_event(Event::Empty(addr))?;
                     }
                     for b in &cell.blocks {
-                        write_block(writer, b, tables, para_id)?;
+                        write_block(writer, b, tables, para_id, quote_depth)?;
                     }
                     writer.write_event(Event::End(BytesEnd::new("hp:tc")))?;
                 }
@@ -124,7 +132,7 @@ fn write_block<W: Write>(
             *para_id += 1;
             let mut p = BytesStart::new("hp:p");
             p.push_attribute(("id", id_str.as_str()));
-            p.push_attribute(("paraPrIDRef", "0"));
+            p.push_attribute(("paraPrIDRef", para_pr_ref));
             writer.write_event(Event::Start(p))?;
             let mut run = BytesStart::new("hp:run");
             run.push_attribute(("charPrIDRef", code_id.as_str()));
@@ -137,13 +145,13 @@ fn write_block<W: Write>(
         }
         ir::Block::BlockQuote { blocks } => {
             for b in blocks {
-                write_block(writer, b, tables, para_id)?;
+                write_block(writer, b, tables, para_id, quote_depth + 1)?;
             }
         }
         ir::Block::List { items, .. } => {
             for item in items {
                 for b in &item.blocks {
-                    write_block(writer, b, tables, para_id)?;
+                    write_block(writer, b, tables, para_id, quote_depth)?;
                 }
             }
         }
@@ -152,7 +160,7 @@ fn write_block<W: Write>(
             *para_id += 1;
             let mut p = BytesStart::new("hp:p");
             p.push_attribute(("id", id_str.as_str()));
-            p.push_attribute(("paraPrIDRef", "0"));
+            p.push_attribute(("paraPrIDRef", para_pr_ref));
             writer.write_event(Event::Start(p))?;
             let mut run = BytesStart::new("hp:run");
             run.push_attribute(("charPrIDRef", "0"));
@@ -171,7 +179,7 @@ fn write_block<W: Write>(
             *para_id += 1;
             let mut p = BytesStart::new("hp:p");
             p.push_attribute(("id", id_str.as_str()));
-            p.push_attribute(("paraPrIDRef", "0"));
+            p.push_attribute(("paraPrIDRef", para_pr_ref));
             writer.write_event(Event::Start(p))?;
             let mut run = BytesStart::new("hp:run");
             run.push_attribute(("charPrIDRef", "0"));
@@ -189,7 +197,7 @@ fn write_block<W: Write>(
             *para_id += 1;
             let mut p = BytesStart::new("hp:p");
             p.push_attribute(("id", id_str.as_str()));
-            p.push_attribute(("paraPrIDRef", "0"));
+            p.push_attribute(("paraPrIDRef", para_pr_ref));
             writer.write_event(Event::Start(p))?;
             let mut run = BytesStart::new("hp:run");
             run.push_attribute(("charPrIDRef", "0"));
@@ -200,10 +208,14 @@ fn write_block<W: Write>(
             writer.write_event(Event::End(BytesEnd::new("hp:run")))?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
-        ir::Block::Footnote { content, .. } => {
+        ir::Block::Footnote { id, content } => {
+            let mut fn_el = BytesStart::new("hp:fn");
+            fn_el.push_attribute(("noteId", id.as_str()));
+            writer.write_event(Event::Start(fn_el))?;
             for b in content {
-                write_block(writer, b, tables, para_id)?;
+                write_block(writer, b, tables, para_id, quote_depth)?;
             }
+            writer.write_event(Event::End(BytesEnd::new("hp:fn")))?;
         }
     }
     Ok(())

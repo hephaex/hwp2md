@@ -241,13 +241,35 @@ fn write_char_properties<W: Write>(
     Ok(())
 }
 
+/// Left margin value for block-quote paragraphs (HWP units; 800 ≈ 20 mm).
+pub(super) const QUOTE_MARGIN_LEFT: &str = "800";
+
 fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::Error> {
     let mut para_properties = BytesStart::new("hh:paraProperties");
-    para_properties.push_attribute(("itemCnt", "1"));
+    para_properties.push_attribute(("itemCnt", "2"));
     w.write_event(Event::Start(para_properties))?;
 
+    // ── paraPr id=0: default (no left indent) ──
+    write_single_para_pr(w, "0", "0")?;
+
+    // ── paraPr id=1: block-quote (left indent) ──
+    write_single_para_pr(w, "1", QUOTE_MARGIN_LEFT)?;
+
+    w.write_event(Event::End(BytesEnd::new("hh:paraProperties")))?;
+    Ok(())
+}
+
+/// Emit a single `<hh:paraPr>` element with all required OWPML children.
+///
+/// `left_margin` is the HWP-unit value for the `<hh:left>` child inside
+/// `<hh:margin>`.  All other margin children are emitted as `"0"`.
+fn write_single_para_pr<W: Write>(
+    w: &mut Writer<W>,
+    id: &str,
+    left_margin: &str,
+) -> Result<(), quick_xml::Error> {
     let mut para_pr = BytesStart::new("hh:paraPr");
-    para_pr.push_attribute(("id", "0"));
+    para_pr.push_attribute(("id", id));
     w.write_event(Event::Start(para_pr))?;
 
     // <align> requires both horizontal and vertical attributes.
@@ -283,7 +305,12 @@ fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::E
     w.write_event(Event::Start(BytesStart::new("hh:margin")))?;
     for child_name in &["hh:intent", "hh:left", "hh:right", "hh:prev", "hh:next"] {
         let mut child = BytesStart::new(*child_name);
-        child.push_attribute(("value", "0"));
+        let value = if *child_name == "hh:left" {
+            left_margin
+        } else {
+            "0"
+        };
+        child.push_attribute(("value", value));
         w.write_event(Event::Empty(child))?;
     }
     w.write_event(Event::End(BytesEnd::new("hh:margin")))?;
@@ -298,8 +325,6 @@ fn write_para_properties<W: Write>(w: &mut Writer<W>) -> Result<(), quick_xml::E
     w.write_event(Event::Empty(auto_spacing))?;
 
     w.write_event(Event::End(BytesEnd::new("hh:paraPr")))?;
-
-    w.write_event(Event::End(BytesEnd::new("hh:paraProperties")))?;
     Ok(())
 }
 

@@ -361,6 +361,16 @@ fn section_xml_blockquote() {
     }]);
     assert!(xml.contains("quoted"), "{xml}");
     assert!(xml.contains("<hp:p "), "{xml}");
+    // Block-quote paragraphs must reference paraPrIDRef="1" (indented style).
+    assert!(
+        xml.contains(r#"paraPrIDRef="1""#),
+        "blockquote paragraph must use paraPrIDRef=\"1\": {xml}"
+    );
+    // Must NOT use paraPrIDRef="0" for the quoted paragraph.
+    assert!(
+        !xml.contains(r#"paraPrIDRef="0""#),
+        "blockquote paragraph must NOT use paraPrIDRef=\"0\": {xml}"
+    );
 }
 
 #[test]
@@ -617,5 +627,135 @@ fn section_xml_inline_code_has_monospace_charpr_id_ref() {
     assert!(
         has_nonzero,
         "inline code must produce a non-zero charPrIDRef: {ids:?}"
+    );
+}
+
+// ── Phase A-3 tests: BlockQuote paraPrIDRef indentation ─────────────────
+
+#[test]
+fn section_xml_blockquote_uses_para_pr_id_ref_1() {
+    // A paragraph inside a BlockQuote must use paraPrIDRef="1" (indented).
+    let xml = section_xml(vec![Block::BlockQuote {
+        blocks: vec![Block::Paragraph {
+            inlines: vec![inline("indented text")],
+        }],
+    }]);
+    assert!(
+        xml.contains(r#"paraPrIDRef="1""#),
+        "blockquote paragraph must use paraPrIDRef=\"1\": {xml}"
+    );
+    assert!(
+        xml.contains("indented text"),
+        "blockquote content must be preserved: {xml}"
+    );
+}
+
+#[test]
+fn section_xml_normal_paragraph_uses_para_pr_id_ref_0() {
+    // A normal paragraph (not inside BlockQuote) must use paraPrIDRef="0".
+    let xml = section_xml(vec![Block::Paragraph {
+        inlines: vec![inline("normal")],
+    }]);
+    assert!(
+        xml.contains(r#"paraPrIDRef="0""#),
+        "normal paragraph must use paraPrIDRef=\"0\": {xml}"
+    );
+}
+
+#[test]
+fn section_xml_blockquote_and_normal_mixed() {
+    // When a normal paragraph precedes a BlockQuote, both must use the correct
+    // paraPrIDRef values.
+    let xml = section_xml(vec![
+        Block::Paragraph {
+            inlines: vec![inline("before")],
+        },
+        Block::BlockQuote {
+            blocks: vec![Block::Paragraph {
+                inlines: vec![inline("quoted")],
+            }],
+        },
+        Block::Paragraph {
+            inlines: vec![inline("after")],
+        },
+    ]);
+    assert!(
+        xml.contains(r#"paraPrIDRef="0""#),
+        "normal paragraphs must use paraPrIDRef=\"0\": {xml}"
+    );
+    assert!(
+        xml.contains(r#"paraPrIDRef="1""#),
+        "blockquote paragraph must use paraPrIDRef=\"1\": {xml}"
+    );
+    // Verify ordering: "before" appears first, then "quoted", then "after".
+    let before_pos = xml.find("before").expect("before text");
+    let quoted_pos = xml.find("quoted").expect("quoted text");
+    let after_pos = xml.find("after").expect("after text");
+    assert!(before_pos < quoted_pos, "before must precede quoted: {xml}");
+    assert!(quoted_pos < after_pos, "quoted must precede after: {xml}");
+}
+
+#[test]
+fn section_xml_blockquote_multiple_children() {
+    // All child paragraphs inside a BlockQuote must get paraPrIDRef="1".
+    let xml = section_xml(vec![Block::BlockQuote {
+        blocks: vec![
+            Block::Paragraph {
+                inlines: vec![inline("first quoted")],
+            },
+            Block::Paragraph {
+                inlines: vec![inline("second quoted")],
+            },
+        ],
+    }]);
+    // Count occurrences of paraPrIDRef="1" -- should be exactly 2.
+    let count = xml.matches(r#"paraPrIDRef="1""#).count();
+    assert_eq!(
+        count, 2,
+        "both paragraphs in blockquote must use paraPrIDRef=\"1\", found {count}: {xml}"
+    );
+    assert!(
+        !xml.contains(r#"paraPrIDRef="0""#),
+        "no paragraph should use paraPrIDRef=\"0\" when all are quoted: {xml}"
+    );
+}
+
+#[test]
+fn section_xml_blockquote_heading_uses_para_pr_id_ref_1() {
+    // A heading inside a BlockQuote must also use paraPrIDRef="1".
+    let xml = section_xml(vec![Block::BlockQuote {
+        blocks: vec![Block::Heading {
+            level: 2,
+            inlines: vec![inline("Quoted Heading")],
+        }],
+    }]);
+    assert!(
+        xml.contains(r#"paraPrIDRef="1""#),
+        "heading inside blockquote must use paraPrIDRef=\"1\": {xml}"
+    );
+    assert!(
+        xml.contains(r#"hp:styleIDRef="2""#),
+        "heading must still have its styleIDRef: {xml}"
+    );
+}
+
+#[test]
+fn section_xml_nested_blockquote_still_uses_para_pr_id_ref_1() {
+    // Nested BlockQuotes still produce paraPrIDRef="1" (we only have two
+    // paraPr entries: 0=normal, 1=indented).
+    let xml = section_xml(vec![Block::BlockQuote {
+        blocks: vec![Block::BlockQuote {
+            blocks: vec![Block::Paragraph {
+                inlines: vec![inline("deeply quoted")],
+            }],
+        }],
+    }]);
+    assert!(
+        xml.contains(r#"paraPrIDRef="1""#),
+        "nested blockquote must use paraPrIDRef=\"1\": {xml}"
+    );
+    assert!(
+        xml.contains("deeply quoted"),
+        "nested blockquote content must be preserved: {xml}"
     );
 }
