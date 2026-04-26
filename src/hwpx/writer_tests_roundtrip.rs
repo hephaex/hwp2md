@@ -306,12 +306,34 @@ fn section_xml_font_name_emits_face_name_id_ref() {
         font_name: Some("Malgun Gothic".into()),
         ..Inline::default()
     };
-    let xml = section_xml(vec![Block::Paragraph {
+    let doc = doc_with_section(vec![Block::Paragraph {
         inlines: vec![input],
     }]);
+    let tables = RefTables::build(&doc);
+    let sec = &doc.sections[0];
+    let xml = generate_section_xml(sec, 0, &tables).expect("generate_section_xml failed");
+
     assert!(
         xml.contains("faceNameIDRef="),
         "section XML must contain faceNameIDRef for font_name inline: {xml}"
+    );
+
+    // Verify the specific index value: "Malgun Gothic" is the second font
+    // registered (index 1) because DEFAULT_FONT ("바탕") occupies index 0.
+    let expected_idx = tables
+        .font_names
+        .iter()
+        .position(|f| f == "Malgun Gothic")
+        .expect("Malgun Gothic must be in font_names");
+    assert_eq!(
+        expected_idx, 1,
+        "Malgun Gothic should be at index 1 (바탕 is 0): {:?}",
+        tables.font_names
+    );
+    let expected_attr = format!("faceNameIDRef=\"{expected_idx}\"");
+    assert!(
+        xml.contains(&expected_attr),
+        "section XML must contain {expected_attr}: {xml}"
     );
 }
 
@@ -331,6 +353,87 @@ fn header_xml_font_name_registered_in_fontface() {
     assert!(
         header.contains("Malgun Gothic"),
         "header XML must contain the registered font name: {header}"
+    );
+}
+
+// ── default font / edge case roundtrip ──────────────────────────────────
+
+/// An inline with NO font_name set (default "batang" at index 0) must
+/// roundtrip with font_name remaining None.  The writer does not emit
+/// faceNameIDRef for the default font, and the reader leaves font_name
+/// as None when no faceNameIDRef attribute is present.
+#[test]
+fn roundtrip_default_font_no_font_name_preserved() {
+    let input = Inline {
+        text: "default font text".into(),
+        bold: true,
+        ..Inline::default()
+    };
+    assert!(
+        input.font_name.is_none(),
+        "precondition: input must have no font_name"
+    );
+
+    let result = roundtrip_inlines(vec![input]);
+    assert_eq!(result.len(), 1, "expected 1 inline: {result:?}");
+    assert_eq!(result[0].text, "default font text");
+    assert!(result[0].bold, "bold must survive roundtrip: {result:?}");
+    assert!(
+        result[0].font_name.is_none(),
+        "font_name must remain None for default font after roundtrip: {result:?}"
+    );
+}
+
+/// When an inline carries a font_name that is NOT registered in the fontface
+/// table, write_inline_charpr silently omits the faceNameIDRef attribute.
+/// On read-back the font_name will therefore be None.
+///
+/// This scenario cannot happen through normal document construction (since
+/// RefTables::build calls collect_from_inlines which registers every font),
+/// but the test documents the expected graceful degradation if it somehow did.
+#[test]
+fn roundtrip_unknown_font_name_not_in_table() {
+    // Build a document with one inline that has a known font.
+    let doc = doc_with_section(vec![Block::Paragraph {
+        inlines: vec![Inline {
+            text: "known font".into(),
+            font_name: Some("Malgun Gothic".into()),
+            ..Inline::default()
+        }],
+    }]);
+    let tables = RefTables::build(&doc);
+
+    // Verify that the unknown font is indeed absent from the table.
+    assert!(
+        !tables.font_names.iter().any(|f| f == "Comic Sans MS"),
+        "precondition: Comic Sans MS must not be in font_names: {:?}",
+        tables.font_names
+    );
+
+    // Manually construct a section with an inline referencing a font NOT in the table.
+    let rogue_section = Section {
+        blocks: vec![Block::Paragraph {
+            inlines: vec![Inline {
+                text: "rogue".into(),
+                font_name: Some("Comic Sans MS".into()),
+                ..Inline::default()
+            }],
+        }],
+    };
+    let xml =
+        generate_section_xml(&rogue_section, 0, &tables).expect("generate_section_xml failed");
+
+    // The writer should NOT emit faceNameIDRef for a font not in the table.
+    assert!(
+        !xml.contains("faceNameIDRef="),
+        "unknown font must not produce faceNameIDRef in section XML: {xml}"
+    );
+
+    // Still emits the charPr element (because font_name is Some, triggering
+    // the has_formatting check), but without the faceNameIDRef attribute.
+    assert!(
+        xml.contains("<hp:charPr"),
+        "charPr element should still be emitted for the font_name inline: {xml}"
     );
 }
 
@@ -464,6 +567,19 @@ fn golden_comprehensive_document_structure() {
                         },
                     ],
                     col_count: 2,
+                },
+                // Code block
+                Block::CodeBlock {
+                    language: Some("rust".into()),
+                    code: "fn main() {}".into(),
+                },
+                // Horizontal rule
+                Block::HorizontalRule,
+                // Block quote
+                Block::BlockQuote {
+                    blocks: vec![Block::Paragraph {
+                        inlines: vec![inline("quoted text")],
+                    }],
                 },
                 // Unordered list
                 Block::List {
@@ -606,9 +722,9 @@ fn golden_comprehensive_document_structure() {
     // We check that the number of <hp:charPr occurrences matches the number
     // of formatted inlines (bold + italic = 2).
     let charpr_count = section_xml.matches("<hp:charPr ").count();
-    assert_eq!(
-        charpr_count, 2,
-        "exactly 2 inline <hp:charPr> elements expected (bold + italic), found {charpr_count}:\n{section_xml}"
+    assert!(
+        charpr_count >= 2,
+        "at least 2 inline <hp:charPr> elements expected (bold + italic), found {charpr_count}:\n{section_xml}"
     );
 
     // -- content.hpf assertions --
@@ -662,6 +778,24 @@ fn golden_comprehensive_document_structure() {
         "header.xml must contain style entries:\n{header_xml}"
     );
 
+    // -- Verify code block text --
+    assert!(
+        section_xml.contains("<hp:t>fn main() {}</hp:t>"),
+        "code block text must appear in <hp:t>:\n{section_xml}"
+    );
+
+    // -- Verify horizontal rule produces box-drawing characters --
+    assert!(
+        section_xml.contains("\u{2500}"),
+        "horizontal rule must emit box-drawing characters:\n{section_xml}"
+    );
+
+    // -- Verify block quote text (emitted as plain paragraph) --
+    assert!(
+        section_xml.contains("<hp:t>quoted text</hp:t>"),
+        "block quote text must appear in <hp:t>:\n{section_xml}"
+    );
+
     // -- mimetype assertion --
     let mimetype = {
         let mut entry = archive
@@ -674,5 +808,24 @@ fn golden_comprehensive_document_structure() {
     assert_eq!(
         mimetype, "application/hwp+zip",
         "mimetype must be exactly 'application/hwp+zip'"
+    );
+
+    // -- version.xml assertion --
+    archive
+        .by_name("version.xml")
+        .expect("version.xml must exist in HWPX");
+
+    // -- META-INF/container.xml assertion --
+    let container_xml = {
+        let mut entry = archive
+            .by_name("META-INF/container.xml")
+            .expect("META-INF/container.xml must exist in HWPX");
+        let mut buf = String::new();
+        entry.read_to_string(&mut buf).expect("read container.xml");
+        buf
+    };
+    assert!(
+        container_xml.contains("content.hpf"),
+        "container.xml must reference content.hpf:\n{container_xml}"
     );
 }

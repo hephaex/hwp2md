@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.1] - 2026-04-26
 
 ### Added
+- **Phase 16**: Golden file test (`golden_comprehensive_document_structure`):
+  validates internal ZIP XML structure (section0.xml, header.xml, content.hpf,
+  mimetype) of generated HWPX archives; OWPML schema validation re-verified
+  with polaris DVC after inline charPr changes.
+- **Phase 15**: `faceNameIDRef` attribute emitted on section-level inline
+  `<hp:charPr>` when the inline carries a `font_name`, completing the font
+  name write-to-read roundtrip; 4 new font name roundtrip tests.
 - **Phase 14**: Section-level inline `<hp:charPr>` emission in
   `write_inline_charpr()`: bold, italic, underline, strikeout, superscript,
   subscript, and color attributes are now written inside `<hp:run>` elements
@@ -32,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explicitly.
 
 ### Fixed
+- `trim_start_matches('#')` replaced with `strip_prefix('#')` in color
+  attribute emission to prevent stripping multiple `#` characters.
 - Font name propagation in flush paths (`flush_paragraph`,
   `flush_cell_paragraph`, `flush_list_item_paragraph`,
   `flush_footnote_paragraph`) now chains `.with_font_name()`.
