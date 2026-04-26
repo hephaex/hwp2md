@@ -208,7 +208,7 @@ println!("{} sections", doc.sections.len());
 
 ```
 HWP 5.0 (.hwp)  ──── hwp::read_hwp()   ──┐
-                                           ├──> ir::Document ──> md::write_markdown() ──> Markdown
+                                         ├──> ir::Document ──> md::write_markdown() ──> Markdown
 HWPX (.hwpx)    ──── hwpx::read_hwpx() ──┘
                                            ┌── ir::Document <── md::parse_markdown() <── Markdown
                                            └──> hwpx::write_hwpx() ──> HWPX (.hwpx)
