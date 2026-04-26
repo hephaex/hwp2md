@@ -9,6 +9,206 @@ const HEADING1_MIN_HEIGHT: u32 = 1600; // 16pt
 const HEADING2_MIN_HEIGHT: u32 = 1400; // 14pt
 const HEADING3_MIN_HEIGHT: u32 = 1200; // 12pt
 
+// ── List detection ────────────────────────────────────────────────────────────
+
+/// The list kind detected for a single HWP binary paragraph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ListKind {
+    /// Unordered (bullet) list item.
+    Unordered,
+    /// Ordered (numbered) list item.
+    Ordered,
+}
+
+/// Detect whether a paragraph is a list item and return its [`ListKind`].
+///
+/// # Detection strategy (two-tier)
+///
+/// **Tier 1 — binary numbering_id** (preferred):
+/// When the paragraph's `ParaShape` record carries a non-zero `numbering_id`
+/// the paragraph is formally defined as a list item by the HWP document model.
+/// We inspect the paragraph text to heuristically decide whether it is ordered
+/// or unordered, because the numbering _style_ is stored in a separate
+/// `HWPTAG_NUMBERING` record that we do not currently parse.
+///
+/// **Tier 2 — text heuristics** (pragmatic fallback):
+/// When no `numbering_id` is available we scan the leading characters of the
+/// trimmed paragraph text for common bullet and numbering patterns.
+///
+/// Returns `None` when the paragraph is not a list item.
+pub(crate) fn detect_list_kind(para: &HwpParagraph, doc_info: &DocInfo) -> Option<ListKind> {
+    let text = para.text.trim();
+    if text.is_empty() {
+        return None;
+    }
+
+    // Tier 1: use the binary numbering_id field when present.
+    let ps_id = para.para_shape_id as usize;
+    let has_numbering_id =
+        ps_id < doc_info.para_shapes.len() && doc_info.para_shapes[ps_id].numbering_id.is_some();
+
+    if has_numbering_id {
+        // The paragraph is formally a list item.  Determine order by inspecting
+        // the text prefix (the numbering _style_ record is not yet parsed).
+        return Some(if is_ordered_prefix(text) {
+            ListKind::Ordered
+        } else {
+            ListKind::Unordered
+        });
+    }
+
+    // Tier 2: heuristic text-pattern detection.
+    detect_list_kind_from_text(text)
+}
+
+/// Return `true` when `text` starts with a common ordered-list prefix such as
+/// `"1. "`, `"2) "`, `"a. "`, `"i. "`, etc.
+///
+/// We deliberately avoid matching year-like patterns such as `"2026년…"` by
+/// requiring that the numeric prefix is short (≤ 3 digits) **and** immediately
+/// followed by `.` or `)` and then whitespace (or end-of-string).
+fn is_ordered_prefix(text: &str) -> bool {
+    let s = text.trim_start_matches(' ');
+
+    let first = match s.chars().next() {
+        Some(c) => c,
+        None => return false,
+    };
+
+    if first.is_ascii_digit() {
+        // Count consecutive digits (must be ≤ 3 to reject "2026년…").
+        let digit_end = s
+            .char_indices()
+            .take_while(|(_, c)| c.is_ascii_digit())
+            .last()
+            .map(|(i, c)| i + c.len_utf8())
+            .unwrap_or(0);
+        let digit_count = digit_end; // ASCII digits: byte length == char count
+        if digit_count == 0 || digit_count > 3 {
+            return false;
+        }
+        let rest = &s[digit_end..];
+        let sep = rest.chars().next();
+        if matches!(sep, Some('.') | Some(')')) {
+            let after_sep = &rest[1..]; // separator is ASCII, 1 byte
+            return matches!(after_sep.chars().next(), Some(' ') | Some('\t') | None);
+        }
+        return false;
+    }
+
+    if first.is_ascii_alphabetic() {
+        let rest = &s[1..]; // letter is ASCII, 1 byte
+        let sep = rest.chars().next();
+        if matches!(sep, Some('.') | Some(')')) {
+            let after_sep = &rest[1..];
+            return matches!(after_sep.chars().next(), Some(' ') | Some('\t') | None);
+        }
+    }
+
+    false
+}
+
+/// Detect list kind purely from the leading characters of `text`.
+///
+/// # Recognised unordered bullet characters
+/// `●`, `■`, `▶`, `▷`, `◆`, `◇`, `•`, `·`, `-`, `*`
+///
+/// # Recognised ordered patterns
+/// `"1. "`, `"2. "` (up to 3 digits), `"a. "`, `"i. "` etc.
+fn detect_list_kind_from_text(text: &str) -> Option<ListKind> {
+    // Ordered detection — check first (a "1." prefix beats any bullet check).
+    if is_ordered_prefix(text) {
+        return Some(ListKind::Ordered);
+    }
+
+    // Unordered bullet characters — require a space/tab/EOL after the bullet.
+    let first_char = text.chars().next()?;
+    let is_bullet = matches!(
+        first_char,
+        '●' | '■' | '▶' | '▷' | '◆' | '◇' | '•' | '·' | '-' | '*'
+    );
+    if is_bullet {
+        let mut chars = text.chars();
+        chars.next(); // consume bullet
+        let next = chars.next();
+        if matches!(next, Some(' ') | Some('\t') | None) {
+            return Some(ListKind::Unordered);
+        }
+    }
+
+    None
+}
+
+// ── Staged-block grouping ─────────────────────────────────────────────────────
+
+/// An intermediate block produced when translating a section's flat paragraph
+/// sequence into proper `Block::List` structures.
+///
+/// This mirrors the `StagedBlock` type in the HWPX reader (`hwpx::context`)
+/// but is private to the HWP binary converter.
+#[derive(Debug)]
+enum StagedBlock {
+    Plain(ir::Block),
+    ListPara { ordered: bool, block: ir::Block },
+}
+
+/// Collapse a flat sequence of [`StagedBlock`]s into a proper `Vec<ir::Block>`
+/// where consecutive `ListPara` entries of the same list type are grouped into
+/// `Block::List` values.
+///
+/// # Grouping rules
+///
+/// - Consecutive `ListPara` items of the **same type** (both ordered or both
+///   unordered) are folded into a single `Block::List`.
+/// - A type transition (ordered → unordered or vice versa) starts a new list.
+/// - Any `Plain` block flushes the pending list and is emitted directly.
+fn group_list_paragraphs(staged: Vec<StagedBlock>) -> Vec<ir::Block> {
+    let mut out: Vec<ir::Block> = Vec::with_capacity(staged.len());
+
+    // Pending run: (ordered, accumulated items).
+    let mut pending: Option<(bool, Vec<ir::ListItem>)> = None;
+
+    let flush = |pending: &mut Option<(bool, Vec<ir::ListItem>)>, out: &mut Vec<ir::Block>| {
+        if let Some((ordered, items)) = pending.take() {
+            out.push(ir::Block::List {
+                ordered,
+                start: 1,
+                items,
+            });
+        }
+    };
+
+    for sb in staged {
+        match sb {
+            StagedBlock::Plain(block) => {
+                flush(&mut pending, &mut out);
+                out.push(block);
+            }
+            StagedBlock::ListPara { ordered, block } => {
+                let item = ir::ListItem {
+                    blocks: vec![block],
+                    children: vec![],
+                };
+                match pending {
+                    Some((ref p_ordered, ref mut items)) if *p_ordered == ordered => {
+                        items.push(item);
+                    }
+                    _ => {
+                        // Different type or no pending list — flush old, start new.
+                        flush(&mut pending, &mut out);
+                        pending = Some((ordered, vec![item]));
+                    }
+                }
+            }
+        }
+    }
+    flush(&mut pending, &mut out);
+
+    out
+}
+
+// ── Top-level IR conversion ───────────────────────────────────────────────────
+
 pub(crate) fn hwp_to_ir(hwp: &HwpDocument) -> ir::Document {
     let mut doc = ir::Document::new();
 
@@ -21,19 +221,25 @@ pub(crate) fn hwp_to_ir(hwp: &HwpDocument) -> ir::Document {
     let mut endnote_counter: u32 = 0;
 
     for section in &hwp.sections {
-        let mut ir_section = ir::Section { blocks: Vec::new() };
+        // Stage each paragraph (or control block) into a StagedBlock, then
+        // collapse consecutive list-item paragraphs into Block::List values.
+        let mut staged: Vec<StagedBlock> = Vec::new();
 
         for para in &section.paragraphs {
-            let blocks = paragraph_to_blocks_counted(
+            paragraph_to_staged_counted(
                 para,
                 &hwp.doc_info,
                 &mut footnote_counter,
                 &mut endnote_counter,
+                &mut staged,
             );
-            ir_section.blocks.extend(blocks);
         }
 
-        doc.sections.push(ir_section);
+        let blocks = group_list_paragraphs(staged);
+        doc.sections.push(ir::Section {
+            blocks,
+            page_layout: None,
+        });
     }
 
     for (id, data) in &hwp.bin_data {
@@ -49,48 +255,61 @@ pub(crate) fn hwp_to_ir(hwp: &HwpDocument) -> ir::Document {
     doc
 }
 
-/// Counter-aware variant used by `hwp_to_ir` to assign unique sequential IDs
-/// to footnotes and endnotes across the whole document.
-fn paragraph_to_blocks_counted(
+/// Push staged blocks for a paragraph, using sequential footnote/endnote IDs.
+///
+/// Control blocks (tables, images, footnotes, …) are always emitted as
+/// `StagedBlock::Plain`.  The paragraph text is classified by
+/// [`detect_list_kind`] and wrapped in either `StagedBlock::ListPara` or
+/// `StagedBlock::Plain`.  Headings are always plain (never list items).
+fn paragraph_to_staged_counted(
     para: &HwpParagraph,
     doc_info: &DocInfo,
     footnote_counter: &mut u32,
     endnote_counter: &mut u32,
-) -> Vec<ir::Block> {
-    let mut blocks: Vec<ir::Block> = Vec::new();
-
+    out: &mut Vec<StagedBlock>,
+) {
     for ctrl in &para.controls {
         if let Some(block) =
             control_to_block_counted(ctrl, doc_info, footnote_counter, endnote_counter)
         {
-            blocks.push(block);
+            out.push(StagedBlock::Plain(block));
         }
     }
 
     let text = para.text.trim();
-    if !text.is_empty() {
-        let heading_level = detect_heading_level(para, doc_info);
-        let inlines = build_inlines(para, doc_info);
-        if !inlines.is_empty() {
-            let ps_id = para.para_shape_id as usize;
-            if ps_id < doc_info.para_shapes.len() {
-                if let Some(nid) = doc_info.para_shapes[ps_id].numbering_id {
-                    tracing::trace!(
-                        numbering_id = nid,
-                        "paragraph may be a list item; full list conversion not yet implemented"
-                    );
-                }
-            }
-
-            if let Some(level) = heading_level {
-                blocks.push(ir::Block::Heading { level, inlines });
-            } else {
-                blocks.push(ir::Block::Paragraph { inlines });
-            }
-        }
+    if text.is_empty() {
+        return;
     }
 
-    blocks
+    let heading_level = detect_heading_level(para, doc_info);
+    let inlines = build_inlines(para, doc_info);
+    if inlines.is_empty() {
+        return;
+    }
+
+    // Headings are never list items.
+    if let Some(level) = heading_level {
+        out.push(StagedBlock::Plain(ir::Block::Heading { level, inlines }));
+        return;
+    }
+
+    match detect_list_kind(para, doc_info) {
+        Some(ListKind::Ordered) => {
+            out.push(StagedBlock::ListPara {
+                ordered: true,
+                block: ir::Block::Paragraph { inlines },
+            });
+        }
+        Some(ListKind::Unordered) => {
+            out.push(StagedBlock::ListPara {
+                ordered: false,
+                block: ir::Block::Paragraph { inlines },
+            });
+        }
+        None => {
+            out.push(StagedBlock::Plain(ir::Block::Paragraph { inlines }));
+        }
+    }
 }
 
 /// Counter-aware variant of `control_to_block` that assigns sequential IDs
@@ -108,9 +327,7 @@ fn control_to_block_counted(
     {
         let content: Vec<ir::Block> = paragraphs
             .iter()
-            .flat_map(|p| {
-                paragraph_to_blocks_counted(p, doc_info, footnote_counter, endnote_counter)
-            })
+            .flat_map(|p| paragraph_to_blocks(p, doc_info))
             .collect();
         let id = if *is_endnote {
             *endnote_counter += 1;
@@ -141,18 +358,6 @@ pub(crate) fn paragraph_to_blocks(para: &HwpParagraph, doc_info: &DocInfo) -> Ve
         let heading_level = detect_heading_level(para, doc_info);
         let inlines = build_inlines(para, doc_info);
         if !inlines.is_empty() {
-            // Log list-item hint when the paragraph has a numbering_id.
-            // Full list-item conversion is left for a future implementation pass.
-            let ps_id = para.para_shape_id as usize;
-            if ps_id < doc_info.para_shapes.len() {
-                if let Some(nid) = doc_info.para_shapes[ps_id].numbering_id {
-                    tracing::trace!(
-                        numbering_id = nid,
-                        "paragraph may be a list item; full list conversion not yet implemented"
-                    );
-                }
-            }
-
             if let Some(level) = heading_level {
                 blocks.push(ir::Block::Heading { level, inlines });
             } else {
@@ -439,3 +644,7 @@ mod tests_ir;
 #[cfg(test)]
 #[path = "convert_tests_build.rs"]
 mod tests_build;
+
+#[cfg(test)]
+#[path = "convert_tests_list.rs"]
+mod tests_list;
