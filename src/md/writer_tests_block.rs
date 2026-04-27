@@ -389,3 +389,33 @@ fn write_markdown_task_list_roundtrip() {
         "roundtrip normal; got: {output:?}"
     );
 }
+
+#[test]
+fn ordered_task_list_items() {
+    let doc = make_doc_with_blocks(vec![ir::Block::List {
+        ordered: true,
+        start: 1,
+        items: vec![
+            task_item("완료된 작업", Some(true)),
+            task_item("미완료 작업", Some(false)),
+            task_item("일반 항목", None),
+        ],
+    }]);
+    let md = write_markdown(&doc, false);
+    assert!(
+        md.contains("1. [x] 완료된 작업"),
+        "ordered checked item must emit '1. [x] '; got: {md:?}"
+    );
+    assert!(
+        md.contains("2. [ ] 미완료 작업"),
+        "ordered unchecked item must emit '2. [ ] '; got: {md:?}"
+    );
+    assert!(
+        md.contains("3. 일반 항목"),
+        "ordered normal item must emit '3. '; got: {md:?}"
+    );
+    assert!(
+        !md.contains("3. [x]") && !md.contains("3. [ ]"),
+        "ordered normal item must not emit checkbox; got: {md:?}"
+    );
+}

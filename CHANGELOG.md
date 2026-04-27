@@ -13,7 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   spacing; `RefTables` carries resolved `code_font` and optional template;
   `CharPrKey` parameterized with `code_font`; `writer_section` applies style
   page layout; `writer_header` reads heading `line_spacing` from template;
-  `serde_yaml` dependency added; 4 integration tests + 5 unit tests.
+  `serde_yml` dependency added; 4 integration tests + 5 unit tests.
+- **Phase B-2**: GitHub-style task list support — `ListItem.checked: Option<bool>`
+  field in IR; comrak `tasklist` extension enabled in MD parser; `NodeValue::TaskItem`
+  mapped to checked state; MD writer emits `[x]`/`[ ]` prefixes; HWPX writer
+  renders ☑ (U+2611) / ☐ (U+2610) checkbox characters; 15 new tests
+  (6 parser + 5 writer + 4 HWPX).
+- **Phase C-1**: `--check` subcommand — validates `.hwp`, `.hwpx`, `.md`, and
+  `.markdown` files by parsing into IR without producing output; `check()` function
+  in `convert.rs` dispatches on file extension; 14 new tests (8 unit + 6 CLI).
 
 ### Changed
 - **Phase A-1**: `ParseContext` god object (37 flat fields) refactored into 5
@@ -28,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (clippy `if_same_then_else` fix).
 
 ### Fixed
+- `serde_yaml` (deprecated) replaced with `serde_yml 0.0.12`.
+- `PageLayout` now derives `Copy` (all fields are `Option<u32>` or `bool`).
+- `StyleTemplate::validate()` rejects zero `width`, `height`, and `line_spacing`.
 
 ## [0.4.0] - 2026-04-26
 

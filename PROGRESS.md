@@ -147,6 +147,16 @@
   - 6 신규 테스트 (superscript/subscript/heading_type)
   - 510 테스트 (448 unit + 11 CLI + 24 integration + 27 roundtrip, 0 failures)
 
+- [x] v0.5.0 Sprint 1 — A-1/A-2 + B-1 + B-2 + C-1 (139ab22):
+  - Phase A-1: ParseContext 37필드 → 5 sub-structs 리팩토링
+  - Phase A-2: PageLayout 파싱 50행 중복 제거
+  - Phase B-1: YAML StyleTemplate (`--style`) — 페이지/폰트/행간 커스텀
+  - Phase B-2: Task list 지원 (`- [x]` / `- [ ]`) — IR + parser + writer
+  - Phase C-1: `--check` 서브커맨드 — 파일 유효성 검증 (출력 없이 파싱)
+  - serde_yaml → serde_yml 0.0.12 마이그레이션
+  - PageLayout `Copy` derive + StyleTemplate validation
+  - 997 테스트 (868 unit + 17 CLI + 46 integration + 27 roundtrip + 기타, 0 failures)
+
 ### 진행 중
 
 없음
@@ -223,6 +233,40 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-04-27 — v0.5.0 Sprint 1: 리팩토링 + 스타일 + Task List + Check (139ab22)
+
+**Phase A-1: ParseContext 리팩토링**:
+- 37 flat fields → 5 sub-structs (FormattingState, TableState, ListState, FootnoteState, PageLayoutState)
+- flush_inlines_to_blocks: 11 params → 4 (buffers + &FormattingState)
+- make_inline() 헬퍼 추출
+
+**Phase A-2: PageLayout 파싱 중복 제거**:
+- pageSize/margin/pagePr 파싱을 PageLayoutState 메서드로 추출
+- handle_start_element/handle_empty_element 50행 중복 제거
+
+**Phase B-1: YAML 스타일 템플릿**:
+- StyleTemplate (serde_yml 0.0.12): page dimensions/margins, font overrides, heading line_spacing
+- RefTables에 code_font + style 통합, CharPrKey 코드 폰트 파라미터화
+- validate(): zero width/height/line_spacing 거부
+- 6 page layout + 3 validation + 5 style integration 테스트
+
+**Phase B-2: Task List 지원**:
+- ListItem.checked: Option<bool> (None=일반, Some(false)=☐, Some(true)=☑)
+- comrak tasklist extension 활성화, NodeValue::TaskItem 매핑
+- MD writer: `[x]`/`[ ]` 접두사, HWPX writer: ☑/☐ 유니코드
+- 6 parser + 5 writer + 4 HWPX 테스트
+
+**Phase C-1: --check 서브커맨드**:
+- convert::check(): 확장자 디스패치 → reader 호출 (출력 없이 파싱 검증)
+- CLI Commands::Check 변형 추가
+- 8 unit + 6 CLI 통합 테스트
+
+**기타 수정**:
+- serde_yaml (deprecated) → serde_yml 0.0.12
+- PageLayout: Copy derive 추가 (clippy clone-on-copy 해결)
+
+**검증**: cargo check 0 에러, clippy 0 경고, 997 테스트 (0 failures)
 
 ### 2026-04-23 — Phase 9a: rhwp 비교 분석 + MUST 버그 수정 (d1cab3d + d108d62)
 

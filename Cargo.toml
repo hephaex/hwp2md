@@ -68,8 +68,13 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 [dev-dependencies]
 tempfile = "3"
 pretty_assertions = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
 polaris-dvc-core = { git = "https://github.com/PolarisOffice/polaris_dvc.git", rev = "d635741946253b08c08556dfeb7637eecb3e571c" }
 polaris-dvc-hwpx = { git = "https://github.com/PolarisOffice/polaris_dvc.git", rev = "d635741946253b08c08556dfeb7637eecb3e571c" }
+
+[[bench]]
+name = "conversion"
+harness = false
 
 [profile.release]
 lto = true
