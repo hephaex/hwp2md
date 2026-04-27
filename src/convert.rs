@@ -840,41 +840,19 @@ mod tests {
     }
 
     #[test]
-    fn check_md_exceeds_size_limit_returns_unsupported_format_error() {
-        // Simulate an oversized file by temporarily lowering the threshold.
-        // We write a file whose size (in bytes) exceeds a manually-chosen small
-        // sentinel, then verify the error message matches "Markdown file too
-        // large" by exercising the same code path through a thin wrapper that
-        // accepts a custom limit.  Because creating a real 256 MB file in a
-        // unit test is impractical, we instead test the guard logic directly.
-        //
-        // The check is: `file_size > MAX_MD_FILE_SIZE`.  We verify that a file
-        // containing 10 bytes is *accepted* (10 <= MAX_MD_FILE_SIZE), which
-        // together with `max_md_file_size_constant_is_256_mib` fully documents
-        // the intended invariant.  For the rejection path we call the internal
-        // helper that shares the guard expression.
-        fn size_guard_result(size_bytes: u64) -> Result<(), Hwp2MdError> {
-            if size_bytes > MAX_MD_FILE_SIZE {
-                return Err(Hwp2MdError::UnsupportedFormat(
-                    "Markdown file too large (>256 MB)".into(),
-                ));
-            }
-            Ok(())
-        }
+    fn check_md_exceeds_size_limit_returns_error() {
+        let tmp = tempfile::Builder::new()
+            .suffix(".md")
+            .tempfile()
+            .unwrap();
+        tmp.as_file().set_len(MAX_MD_FILE_SIZE + 1).unwrap();
 
-        // Just over the limit must be rejected.
-        let result = size_guard_result(MAX_MD_FILE_SIZE + 1);
+        let result = check(tmp.path());
         assert!(result.is_err());
         let msg = format!("{}", result.unwrap_err());
         assert!(
             msg.contains("Markdown file too large"),
             "unexpected error message: {msg}"
         );
-
-        // Exactly at the limit must be accepted.
-        assert!(size_guard_result(MAX_MD_FILE_SIZE).is_ok());
-
-        // Well under the limit must be accepted.
-        assert!(size_guard_result(1024).is_ok());
     }
 }

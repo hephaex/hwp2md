@@ -52,9 +52,9 @@ fn bench_ir_to_md(c: &mut Criterion) {
 
 fn bench_ir_to_hwpx(c: &mut Criterion) {
     let doc = hwp2md::md::parse_markdown(SAMPLE_MD);
+    let tmp = NamedTempFile::new().expect("tempfile");
     c.bench_function("ir_to_hwpx", |b| {
         b.iter(|| {
-            let tmp = NamedTempFile::new().expect("tempfile");
             hwp2md::hwpx::write_hwpx(black_box(&doc), tmp.path(), None)
                 .expect("write_hwpx failed");
         })
@@ -73,16 +73,12 @@ fn bench_hwpx_to_ir(c: &mut Criterion) {
 }
 
 fn bench_roundtrip(c: &mut Criterion) {
+    let tmp = NamedTempFile::new().expect("tempfile");
     c.bench_function("md_hwpx_md_roundtrip", |b| {
         b.iter(|| {
-            // MD → IR
             let doc = hwp2md::md::parse_markdown(black_box(SAMPLE_MD));
-            // IR → HWPX (temporary file)
-            let tmp = NamedTempFile::new().expect("tempfile");
             hwp2md::hwpx::write_hwpx(&doc, tmp.path(), None).expect("write_hwpx failed");
-            // HWPX → IR
             let doc2 = hwp2md::hwpx::read_hwpx(tmp.path()).expect("read_hwpx failed");
-            // IR → MD
             hwp2md::md::write_markdown(black_box(&doc2), false)
         })
     });
