@@ -33,6 +33,22 @@ pub enum Hwp2MdError {
     #[error("decompression bomb: output exceeded {0} bytes")]
     DecompressionBomb(u64),
 
+    /// An input file was rejected because it exceeded a hard size limit.
+    ///
+    /// Carries the file path, observed size, and configured limit so callers
+    /// can render a precise message and so the error type cleanly distinguishes
+    /// resource-limit violations from genuine format-detection failures
+    /// ([`Hwp2MdError::UnsupportedFormat`]).
+    #[error("file too large: {path} ({size} bytes > {limit} bytes limit)")]
+    FileTooLarge {
+        /// Path of the offending input file (display form, lossy on non-UTF-8).
+        path: String,
+        /// Observed size of the file in bytes.
+        size: u64,
+        /// Configured maximum size in bytes for this code path.
+        limit: u64,
+    },
+
     /// A binary record in the HWP stream has an invalid or inconsistent header.
     #[error("invalid record: {0}")]
     InvalidRecord(String),

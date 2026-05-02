@@ -385,6 +385,28 @@ fn section_xml_horizontal_rule() {
 }
 
 #[test]
+fn section_xml_page_break_emits_newpage_ctrl() {
+    let xml = section_xml(vec![Block::PageBreak]);
+    assert!(
+        xml.contains("<hp:p "),
+        "page break wrapped in paragraph: {xml}"
+    );
+    assert!(
+        xml.contains("<hp:run"),
+        "page break ctrl must live inside a run: {xml}"
+    );
+    assert!(
+        xml.contains(r#"id="newPage""#),
+        "page break must emit hp:ctrl id=newPage: {xml}"
+    );
+    // Must not emit any text run.
+    assert!(
+        !xml.contains("<hp:t>"),
+        "page break paragraph must contain no text node: {xml}"
+    );
+}
+
+#[test]
 fn section_xml_code_block() {
     let xml = section_xml(vec![Block::CodeBlock {
         language: Some("rust".into()),

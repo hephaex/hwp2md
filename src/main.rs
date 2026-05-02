@@ -51,6 +51,18 @@ enum Commands {
         /// Input file (.hwp, .hwpx, .md, or .markdown)
         input: PathBuf,
     },
+    /// Convert between supported formats by inferring the direction from
+    /// the input and output file extensions.
+    ///
+    /// Supported pairs:
+    ///   .hwp / .hwpx  →  .md / .markdown
+    ///   .md / .markdown  →  .hwpx
+    Convert {
+        /// Input file (.hwp, .hwpx, .md, or .markdown)
+        input: PathBuf,
+        /// Output file (.md, .markdown, or .hwpx)
+        output: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -87,6 +99,9 @@ fn main() -> Result<()> {
         Commands::Check { input } => {
             hwp2md::convert::check(&input)?;
             println!("OK: {}", input.display());
+        }
+        Commands::Convert { input, output } => {
+            hwp2md::convert::convert_auto(&input, &output)?;
         }
     }
 

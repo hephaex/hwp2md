@@ -1186,3 +1186,62 @@ fn ruby_inline_renders_to_html_ruby_tags_in_markdown() {
         "markdown output must contain HTML ruby tags; got: {md}"
     );
 }
+
+// -----------------------------------------------------------------------
+// Page break (B-3) — `<hp:ctrl id="newPage"/>` produces Block::PageBreak
+// -----------------------------------------------------------------------
+
+#[test]
+fn ctrl_newpage_produces_page_break_block() {
+    let xml = r#"<root>
+        <hp:p><hp:run><hp:t>before</hp:t></hp:run></hp:p>
+        <hp:p><hp:run><hp:ctrl id="newPage"/></hp:run></hp:p>
+        <hp:p><hp:run><hp:t>after</hp:t></hp:run></hp:p>
+    </root>"#;
+    let s = section(xml);
+    let kinds: Vec<&'static str> = s
+        .blocks
+        .iter()
+        .map(|b| match b {
+            ir::Block::Paragraph { .. } => "para",
+            ir::Block::PageBreak => "pb",
+            _ => "other",
+        })
+        .collect();
+    // The "before" paragraph, then PageBreak, then "after" paragraph.
+    assert!(kinds.contains(&"pb"), "expected PageBreak block: {kinds:?}");
+    let pb_idx = kinds.iter().position(|k| *k == "pb").unwrap();
+    assert!(
+        kinds[..pb_idx].iter().any(|k| *k == "para")
+            && kinds[pb_idx + 1..].iter().any(|k| *k == "para"),
+        "PageBreak must sit between the two paragraphs: {kinds:?}"
+    );
+}
+
+#[test]
+fn ctrl_pagebreak_id_alias_also_recognised() {
+    let xml = r#"<root>
+        <hp:p><hp:run><hp:ctrl id="pageBreak"/></hp:run></hp:p>
+    </root>"#;
+    let s = section(xml);
+    assert!(
+        s.blocks.iter().any(|b| matches!(b, ir::Block::PageBreak)),
+        "id=pageBreak must produce PageBreak: {:?}",
+        s.blocks
+    );
+}
+
+#[test]
+fn ctrl_unknown_id_does_not_produce_page_break() {
+    // A ctrl with an unknown id (e.g. column break we don't model) must not
+    // be silently treated as a page break.
+    let xml = r#"<root>
+        <hp:p><hp:run><hp:ctrl id="someOtherCtrl"/></hp:run></hp:p>
+    </root>"#;
+    let s = section(xml);
+    assert!(
+        !s.blocks.iter().any(|b| matches!(b, ir::Block::PageBreak)),
+        "unknown ctrl id must not yield PageBreak: {:?}",
+        s.blocks
+    );
+}

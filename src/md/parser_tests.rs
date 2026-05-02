@@ -773,6 +773,45 @@ fn parse_markdown_horizontal_rule() {
     );
 }
 
+#[test]
+fn parse_markdown_pagebreak_html_comment_yields_page_break_block() {
+    let doc = parse_markdown("before\n\n<!-- pagebreak -->\n\nafter\n");
+    let blocks = first_section_blocks(&doc);
+    let positions: Vec<usize> = blocks
+        .iter()
+        .enumerate()
+        .filter_map(|(i, b)| matches!(b, ir::Block::PageBreak).then_some(i))
+        .collect();
+    assert_eq!(
+        positions.len(),
+        1,
+        "exactly one PageBreak expected: {blocks:?}"
+    );
+    // PageBreak must sit between the two paragraphs.
+    let pb_idx = positions[0];
+    assert!(pb_idx > 0 && pb_idx < blocks.len() - 1, "{blocks:?}");
+}
+
+#[test]
+fn parse_markdown_pagebreak_marker_is_case_insensitive() {
+    let doc = parse_markdown("text\n\n<!-- PageBreak -->\n\nmore\n");
+    let blocks = first_section_blocks(&doc);
+    assert!(
+        blocks.iter().any(|b| matches!(b, ir::Block::PageBreak)),
+        "case-insensitive marker should yield PageBreak: {blocks:?}"
+    );
+}
+
+#[test]
+fn parse_markdown_unrelated_html_comment_is_not_pagebreak() {
+    let doc = parse_markdown("text\n\n<!-- not a page break -->\n\nmore\n");
+    let blocks = first_section_blocks(&doc);
+    assert!(
+        !blocks.iter().any(|b| matches!(b, ir::Block::PageBreak)),
+        "non-pagebreak HTML comment must not yield PageBreak: {blocks:?}"
+    );
+}
+
 // -----------------------------------------------------------------------
 // parse_markdown — strikethrough via ~~…~~
 // -----------------------------------------------------------------------

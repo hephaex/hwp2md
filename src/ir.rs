@@ -158,6 +158,13 @@ pub enum Block {
     },
     /// Thematic break (`---`).
     HorizontalRule,
+    /// Forced page break.
+    ///
+    /// Maps to OWPML `<hp:ctrl id="newPage"/>` on the HWPX side and to a
+    /// `<!-- pagebreak -->` HTML comment on the Markdown side so that the
+    /// Markdown renders as plain content while the marker survives a
+    /// MD → HWPX → MD round-trip.
+    PageBreak,
     /// Footnote definition collected from the source document.
     Footnote {
         /// Unique identifier matching the `footnote_ref` on the call-out inline.

@@ -55,8 +55,7 @@ fn bench_ir_to_hwpx(c: &mut Criterion) {
     let tmp = NamedTempFile::new().expect("tempfile");
     c.bench_function("ir_to_hwpx", |b| {
         b.iter(|| {
-            hwp2md::hwpx::write_hwpx(black_box(&doc), tmp.path(), None)
-                .expect("write_hwpx failed");
+            hwp2md::hwpx::write_hwpx(black_box(&doc), tmp.path(), None).expect("write_hwpx failed");
         })
     });
 }

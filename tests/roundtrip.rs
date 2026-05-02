@@ -117,6 +117,40 @@ fn roundtrip_ir_to_md_to_ir_horizontal_rule() {
 }
 
 #[test]
+fn roundtrip_ir_to_md_to_ir_page_break_preserves_block_and_position() {
+    let original = make_doc(vec![
+        ir::Block::Paragraph {
+            inlines: vec![plain("page one")],
+        },
+        ir::Block::PageBreak,
+        ir::Block::Paragraph {
+            inlines: vec![plain("page two")],
+        },
+    ]);
+
+    let md = write_markdown(&original, false);
+    assert!(
+        md.contains("<!-- pagebreak -->"),
+        "page break marker missing in markdown output: {md:?}"
+    );
+
+    let parsed = parse_markdown(&md);
+    let kinds: Vec<&'static str> = first_blocks(&parsed)
+        .iter()
+        .map(|b| match b {
+            ir::Block::Paragraph { .. } => "para",
+            ir::Block::PageBreak => "pb",
+            _ => "other",
+        })
+        .collect();
+    assert_eq!(
+        kinds,
+        vec!["para", "pb", "para"],
+        "block sequence lost across roundtrip; md: {md:?}; kinds: {kinds:?}"
+    );
+}
+
+#[test]
 fn roundtrip_ir_to_md_to_ir_unordered_list() {
     let original = make_doc(vec![ir::Block::List {
         ordered: false,

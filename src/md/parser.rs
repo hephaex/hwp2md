@@ -176,6 +176,13 @@ fn node_to_block<'a>(node: &'a AstNode<'a>) -> Option<ir::Block> {
             Some(ir::Block::Table { rows, col_count })
         }
         NodeValue::ThematicBreak => Some(ir::Block::HorizontalRule),
+        NodeValue::HtmlBlock(html) => {
+            if is_pagebreak_marker(&html.literal) {
+                Some(ir::Block::PageBreak)
+            } else {
+                None
+            }
+        }
         NodeValue::Image(link) => {
             let alt = collect_alt_text(node);
             Some(ir::Block::Image {
@@ -195,6 +202,21 @@ fn node_to_block<'a>(node: &'a AstNode<'a>) -> Option<ir::Block> {
             tex: math.literal.clone(),
         }),
         _ => None,
+    }
+}
+
+/// Return `true` when an HTML block contains exactly a `<!-- pagebreak -->`
+/// (or `<!--pagebreak-->`) marker, ignoring surrounding whitespace and
+/// comparing the keyword case-insensitively.  This is the round-trip marker
+/// emitted by [`crate::md::write_markdown`] for [`ir::Block::PageBreak`].
+fn is_pagebreak_marker(html: &str) -> bool {
+    let trimmed = html.trim();
+    let inner = trimmed
+        .strip_prefix("<!--")
+        .and_then(|s| s.strip_suffix("-->"));
+    match inner {
+        Some(content) => content.trim().eq_ignore_ascii_case("pagebreak"),
+        None => false,
     }
 }
 

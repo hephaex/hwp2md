@@ -130,6 +130,7 @@ fn resolve_block_bin_refs(block: &mut ir::Block, bin_map: &HashMap<String, Strin
         | ir::Block::Paragraph { .. }
         | ir::Block::CodeBlock { .. }
         | ir::Block::HorizontalRule
+        | ir::Block::PageBreak
         | ir::Block::Math { .. } => {}
     }
 }

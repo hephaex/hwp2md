@@ -274,6 +274,25 @@ fn write_block<W: Write>(
             writer.write_event(Event::End(BytesEnd::new("hp:run")))?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
+        ir::Block::PageBreak => {
+            // Emit `<hp:p>` containing an empty `<hp:ctrl id="newPage"/>`
+            // inside an `<hp:run>`.  Hancom Office and the OWPML reference
+            // recognise this as a forced page break.
+            let id_str = para_id.to_string();
+            *para_id += 1;
+            let mut p = BytesStart::new("hp:p");
+            p.push_attribute(("id", id_str.as_str()));
+            p.push_attribute(("paraPrIDRef", para_pr_ref));
+            writer.write_event(Event::Start(p))?;
+            let mut run = BytesStart::new("hp:run");
+            run.push_attribute(("charPrIDRef", "0"));
+            writer.write_event(Event::Start(run))?;
+            let mut ctrl = BytesStart::new("hp:ctrl");
+            ctrl.push_attribute(("id", "newPage"));
+            writer.write_event(Event::Empty(ctrl))?;
+            writer.write_event(Event::End(BytesEnd::new("hp:run")))?;
+            writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
+        }
         ir::Block::Math { tex, .. } => {
             let id_str = para_id.to_string();
             *para_id += 1;

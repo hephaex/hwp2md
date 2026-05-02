@@ -280,6 +280,7 @@ fn collect_from_blocks(
             ir::Block::CodeBlock { .. }
             | ir::Block::Image { .. }
             | ir::Block::HorizontalRule
+            | ir::Block::PageBreak
             | ir::Block::Math { .. } => {}
         }
     }
@@ -550,6 +551,7 @@ fn collect_images_from_blocks(
             | ir::Block::Paragraph { .. }
             | ir::Block::CodeBlock { .. }
             | ir::Block::HorizontalRule
+            | ir::Block::PageBreak
             | ir::Block::Math { .. } => {}
         }
     }

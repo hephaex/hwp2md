@@ -488,3 +488,91 @@ fn cli_check_corrupt_hwpx_exits_nonzero() {
         "expected error message on stderr, got empty"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 3 — `convert` subcommand: extension-based auto-detection
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cli_convert_help_lists_supported_pairs() {
+    let output = cargo_bin()
+        .args(["convert", "--help"])
+        .output()
+        .expect("failed to execute hwp2md convert --help");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains(".hwp") && stdout.contains(".md"),
+        "convert help must mention supported extensions: {stdout}"
+    );
+}
+
+#[test]
+fn cli_convert_md_to_hwpx_creates_output_and_exits_zero() {
+    let dir = tempdir().expect("tempdir");
+    let input = dir.path().join("note.md");
+    std::fs::write(&input, "# Heading\n\nContent.\n").expect("write");
+    let output = dir.path().join("note.hwpx");
+
+    let result = cargo_bin()
+        .args(["convert", input.to_str().unwrap(), output.to_str().unwrap()])
+        .output()
+        .expect("execute convert");
+    assert!(
+        result.status.success(),
+        "convert failed; stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(output.exists(), "output hwpx not created");
+}
+
+#[test]
+fn cli_convert_hwpx_to_md_creates_output_and_exits_zero() {
+    let dir = tempdir().expect("tempdir");
+    // Build an HWPX from a markdown source first.
+    let md_in = dir.path().join("source.md");
+    std::fs::write(&md_in, "# Hello\n").expect("write");
+    let hwpx = dir.path().join("source.hwpx");
+    let _ = cargo_bin()
+        .args([
+            "to-hwpx",
+            md_in.to_str().unwrap(),
+            "-o",
+            hwpx.to_str().unwrap(),
+        ])
+        .output()
+        .expect("seed hwpx");
+    assert!(hwpx.exists(), "seed hwpx not produced");
+
+    let md_out = dir.path().join("converted.md");
+    let result = cargo_bin()
+        .args(["convert", hwpx.to_str().unwrap(), md_out.to_str().unwrap()])
+        .output()
+        .expect("execute convert");
+    assert!(
+        result.status.success(),
+        "convert failed; stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let body = std::fs::read_to_string(&md_out).expect("read md_out");
+    assert!(body.contains("Hello"), "heading lost: {body:?}");
+}
+
+#[test]
+fn cli_convert_md_to_md_rejected_with_clear_error() {
+    let dir = tempdir().expect("tempdir");
+    let input = dir.path().join("a.md");
+    let output = dir.path().join("b.md");
+    std::fs::write(&input, "# x\n").expect("write");
+
+    let result = cargo_bin()
+        .args(["convert", input.to_str().unwrap(), output.to_str().unwrap()])
+        .output()
+        .expect("execute convert");
+    assert!(!result.status.success(), "same-format conversion must fail");
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert!(
+        stderr.contains("cannot infer conversion direction"),
+        "stderr should explain the rejection: {stderr}"
+    );
+}

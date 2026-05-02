@@ -245,6 +245,42 @@ fn write_markdown_horizontal_rule() {
 }
 
 #[test]
+fn write_markdown_page_break_emits_html_comment_marker() {
+    let doc = make_doc_with_blocks(vec![ir::Block::PageBreak]);
+    let md = write_markdown(&doc, false);
+    assert!(
+        md.contains("<!-- pagebreak -->"),
+        "PageBreak must render as an HTML-comment marker: {md}"
+    );
+    // The marker must NOT be confused with a thematic break.
+    assert!(
+        !md.lines().any(|l| l.trim() == "---"),
+        "PageBreak must not emit a thematic break: {md}"
+    );
+}
+
+#[test]
+fn write_markdown_page_break_between_paragraphs_preserves_order() {
+    let doc = make_doc_with_blocks(vec![
+        ir::Block::Paragraph {
+            inlines: vec![ir::Inline::plain("before")],
+        },
+        ir::Block::PageBreak,
+        ir::Block::Paragraph {
+            inlines: vec![ir::Inline::plain("after")],
+        },
+    ]);
+    let md = write_markdown(&doc, false);
+    let before_pos = md.find("before").expect("before missing");
+    let marker_pos = md.find("<!-- pagebreak -->").expect("marker missing");
+    let after_pos = md.find("after").expect("after missing");
+    assert!(
+        before_pos < marker_pos && marker_pos < after_pos,
+        "block order lost: {md}"
+    );
+}
+
+#[test]
 fn write_markdown_math_display() {
     let doc = make_doc_with_blocks(vec![ir::Block::Math {
         display: true,

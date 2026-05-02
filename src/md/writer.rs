@@ -116,6 +116,13 @@ fn write_block(out: &mut String, block: &ir::Block, indent: usize) {
         ir::Block::HorizontalRule => {
             out.push_str(&format!("{prefix}---\n\n"));
         }
+        ir::Block::PageBreak => {
+            // HTML comment is invisible in rendered Markdown but survives a
+            // round-trip through the parser, which preserves the marker as a
+            // `Block::PageBreak`.  See `md::parser::node_to_block` for the
+            // matching detection.
+            out.push_str(&format!("{prefix}<!-- pagebreak -->\n\n"));
+        }
         ir::Block::Footnote { id, content } => {
             out.push_str(&format!("{prefix}[^{id}]: "));
             for (i, b) in content.iter().enumerate() {
@@ -337,6 +344,7 @@ fn cell_to_text(cell: &ir::TableCell) -> String {
             | ir::Block::List { .. }
             | ir::Block::Image { .. }
             | ir::Block::HorizontalRule
+            | ir::Block::PageBreak
             | ir::Block::Footnote { .. }
             | ir::Block::Math { .. } => {
                 let mut s = String::new();

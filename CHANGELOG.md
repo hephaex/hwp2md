@@ -22,6 +22,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Phase C-1**: `--check` subcommand — validates `.hwp`, `.hwpx`, `.md`, and
   `.markdown` files by parsing into IR without producing output; `check()` function
   in `convert.rs` dispatches on file extension; 14 new tests (8 unit + 6 CLI).
+- **Phase D-1**: Criterion benchmarks — 5 conversion benchmarks (MD→IR, IR→MD,
+  IR→HWPX, HWPX→IR, full roundtrip) with representative Korean document input;
+  HTML reports via `criterion 0.5`.
+- **Phase B-3**: Page break round-trip — new `Block::PageBreak` IR variant
+  emitted by HWPX reader for `<hp:ctrl id="newPage|pageBreak|cnpb"/>`,
+  serialised as `<!-- pagebreak -->` HTML comment in Markdown (invisible when
+  rendered), recognised by the Markdown parser, and written back to HWPX as
+  `<hp:p><hp:run><hp:ctrl id="newPage"/></hp:run></hp:p>`. Survives
+  MD → HWPX → MD and HWPX → IR → MD round-trips.
+- **Phase C-2**: `convert` subcommand — extension-driven format
+  auto-detection. `hwp2md convert <input> <output>` infers direction from
+  file extensions (`.hwp`/`.hwpx` ↔ `.md`/`.markdown`) and dispatches to
+  the appropriate reader/writer; ambiguous or same-format pairs are rejected
+  with a descriptive error.
 
 ### Changed
 - **Phase A-1**: `ParseContext` god object (37 flat fields) refactored into 5
@@ -39,6 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `serde_yaml` (deprecated) replaced with `serde_yml 0.0.12`.
 - `PageLayout` now derives `Copy` (all fields are `Option<u32>` or `bool`).
 - `StyleTemplate::validate()` rejects zero `width`, `height`, and `line_spacing`.
+- `check()` now rejects Markdown files >256 MB (`MAX_MD_FILE_SIZE`) before reading.
+- **Sprint 3 / M1**: dedicated `Hwp2MdError::FileTooLarge { path, size, limit }`
+  variant replaces the misleading `UnsupportedFormat` reuse for the Markdown
+  size guard, distinguishing resource-limit violations from extension errors.
 
 ## [0.4.0] - 2026-04-26
 

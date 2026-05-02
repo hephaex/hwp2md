@@ -155,6 +155,65 @@ pub fn show_info(input: &Path) -> Result<(), Hwp2MdError> {
     Ok(())
 }
 
+/// Auto-detect the conversion direction from the input/output file extensions
+/// and dispatch to [`to_markdown`] or [`to_hwpx`].
+///
+/// Supported extension pairs (case-insensitive):
+///
+/// | Input ext            | Output ext           | Action       |
+/// | -------------------- | -------------------- | ------------ |
+/// | `.hwp`, `.hwpx`      | `.md`, `.markdown`   | [`to_markdown`] |
+/// | `.md`, `.markdown`   | `.hwpx`              | [`to_hwpx`]  |
+///
+/// Any other combination — including same-format pairs or unknown
+/// extensions — returns [`Hwp2MdError::UnsupportedFormat`] with a message
+/// describing the offending pair.  The function never asks the network and
+/// never inspects file contents to determine the direction; only the file
+/// extensions are consulted.
+pub fn convert_auto(input: &Path, output: &Path) -> Result<(), Hwp2MdError> {
+    let in_ext = input
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let out_ext = output
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    let in_kind = classify_format(&in_ext);
+    let out_kind = classify_format(&out_ext);
+
+    match (in_kind, out_kind) {
+        (FormatKind::Hwp | FormatKind::Hwpx, FormatKind::Markdown) => {
+            to_markdown(input, Some(output), None, false)
+        }
+        (FormatKind::Markdown, FormatKind::Hwpx) => to_hwpx(input, Some(output), None),
+        _ => Err(Hwp2MdError::UnsupportedFormat(format!(
+            "cannot infer conversion direction from .{in_ext} -> .{out_ext}; \
+             expected .hwp/.hwpx -> .md/.markdown or .md/.markdown -> .hwpx"
+        ))),
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum FormatKind {
+    Hwp,
+    Hwpx,
+    Markdown,
+    Unknown,
+}
+
+fn classify_format(ext: &str) -> FormatKind {
+    match ext {
+        "hwp" => FormatKind::Hwp,
+        "hwpx" => FormatKind::Hwpx,
+        "md" | "markdown" => FormatKind::Markdown,
+        _ => FormatKind::Unknown,
+    }
+}
+
 /// Validate a file by parsing it into the IR without producing any output.
 ///
 /// Detects the format from the file extension, reads the file, and attempts
@@ -182,9 +241,11 @@ pub fn check(input: &Path) -> Result<(), Hwp2MdError> {
             tracing::info!("Checking Markdown: {:?}", input);
             let file_size = fs::metadata(input)?.len();
             if file_size > MAX_MD_FILE_SIZE {
-                return Err(Hwp2MdError::UnsupportedFormat(
-                    "Markdown file too large (>256 MB)".into(),
-                ));
+                return Err(Hwp2MdError::FileTooLarge {
+                    path: input.display().to_string(),
+                    size: file_size,
+                    limit: MAX_MD_FILE_SIZE,
+                });
             }
             let content = fs::read_to_string(input)?;
             let _doc = md::parse_markdown(&content);
@@ -248,7 +309,7 @@ fn count_chars(block: &ir::Block) -> usize {
             .sum(),
         ir::Block::Math { tex, .. } => tex.chars().count(),
         ir::Block::Footnote { content, .. } => content.iter().map(count_chars).sum(),
-        ir::Block::Image { .. } | ir::Block::HorizontalRule => 0,
+        ir::Block::Image { .. } | ir::Block::HorizontalRule | ir::Block::PageBreak => 0,
     }
 }
 
@@ -840,19 +901,140 @@ mod tests {
     }
 
     #[test]
-    fn check_md_exceeds_size_limit_returns_error() {
-        let tmp = tempfile::Builder::new()
-            .suffix(".md")
-            .tempfile()
-            .unwrap();
+    fn check_md_exceeds_size_limit_returns_file_too_large_variant() {
+        let tmp = tempfile::Builder::new().suffix(".md").tempfile().unwrap();
         tmp.as_file().set_len(MAX_MD_FILE_SIZE + 1).unwrap();
 
-        let result = check(tmp.path());
+        let err = check(tmp.path()).expect_err("oversized md must fail check()");
+        match err {
+            Hwp2MdError::FileTooLarge { size, limit, path } => {
+                assert_eq!(limit, MAX_MD_FILE_SIZE);
+                assert_eq!(size, MAX_MD_FILE_SIZE + 1);
+                assert!(
+                    path.ends_with(".md"),
+                    "expected .md path in error, got {path:?}"
+                );
+            }
+            other => panic!("expected FileTooLarge variant, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn file_too_large_display_includes_path_size_and_limit() {
+        let err = Hwp2MdError::FileTooLarge {
+            path: "/tmp/big.md".into(),
+            size: 300_000_000,
+            limit: 268_435_456,
+        };
+        let msg = format!("{err}");
+        assert!(msg.contains("/tmp/big.md"), "missing path: {msg}");
+        assert!(msg.contains("300000000"), "missing size: {msg}");
+        assert!(msg.contains("268435456"), "missing limit: {msg}");
+    }
+
+    // -----------------------------------------------------------------------
+    // convert_auto — extension-based format detection (Sprint 3, C-2)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn classify_format_recognises_known_extensions() {
+        assert_eq!(classify_format("hwp"), FormatKind::Hwp);
+        assert_eq!(classify_format("hwpx"), FormatKind::Hwpx);
+        assert_eq!(classify_format("md"), FormatKind::Markdown);
+        assert_eq!(classify_format("markdown"), FormatKind::Markdown);
+        assert_eq!(classify_format("txt"), FormatKind::Unknown);
+        assert_eq!(classify_format(""), FormatKind::Unknown);
+    }
+
+    #[test]
+    fn convert_auto_md_to_hwpx_writes_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("doc.md");
+        let output = dir.path().join("out.hwpx");
+        std::fs::write(&input, "# Hello\n\nBody.\n").unwrap();
+        convert_auto(&input, &output).unwrap();
+        assert!(output.exists(), "convert_auto must create the output file");
+        // The result must be a valid HWPX, accepted by check().
+        check(&output).unwrap();
+    }
+
+    #[test]
+    fn convert_auto_hwpx_to_md_writes_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let md_in = dir.path().join("source.md");
+        std::fs::write(&md_in, "# Title\n\nContent.\n").unwrap();
+        let hwpx = dir.path().join("intermediate.hwpx");
+        to_hwpx(&md_in, Some(&hwpx), None).unwrap();
+
+        let md_out = dir.path().join("converted.md");
+        convert_auto(&hwpx, &md_out).unwrap();
+        let content = std::fs::read_to_string(&md_out).unwrap();
+        assert!(
+            content.contains("Title"),
+            "heading lost in convert_auto: {content:?}"
+        );
+    }
+
+    #[test]
+    fn convert_auto_markdown_extension_alias_accepted() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("doc.markdown");
+        let output = dir.path().join("out.hwpx");
+        std::fs::write(&input, "# A\n").unwrap();
+        convert_auto(&input, &output).unwrap();
+        assert!(output.exists());
+    }
+
+    #[test]
+    fn convert_auto_md_to_md_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("a.md");
+        let output = dir.path().join("b.md");
+        std::fs::write(&input, "# Hello\n").unwrap();
+        let result = convert_auto(&input, &output);
+        assert!(result.is_err(), "same-format conversion must be rejected");
+        let msg = format!("{}", result.unwrap_err());
+        assert!(
+            msg.contains("cannot infer conversion direction"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn convert_auto_hwp_to_hwpx_is_rejected() {
+        // .hwp → .hwpx is currently unsupported (writer only emits HWPX from
+        // Markdown).  Auto-detect must surface this as an extension-pair
+        // error rather than attempting a partial conversion.
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("source.hwp");
+        let output = dir.path().join("dest.hwpx");
+        std::fs::write(&input, b"placeholder").unwrap();
+        let result = convert_auto(&input, &output);
         assert!(result.is_err());
         let msg = format!("{}", result.unwrap_err());
         assert!(
-            msg.contains("Markdown file too large"),
-            "unexpected error message: {msg}"
+            msg.contains("cannot infer conversion direction"),
+            "unexpected error: {msg}"
         );
+    }
+
+    #[test]
+    fn convert_auto_unknown_extension_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("doc.docx");
+        let output = dir.path().join("out.md");
+        std::fs::write(&input, b"x").unwrap();
+        let result = convert_auto(&input, &output);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn convert_auto_extension_check_is_case_insensitive() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("DOC.MD");
+        let output = dir.path().join("OUT.HWPX");
+        std::fs::write(&input, "# Upper\n").unwrap();
+        convert_auto(&input, &output).unwrap();
+        assert!(output.exists());
     }
 }

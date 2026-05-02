@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: Phase 9a 완료 (rhwp 비교 분석 + MUST 버그 수정)
+## 현재 상태: v0.5.0 Sprint 3 완료 (B-3 page break + C-2 auto-detect + M1 FileTooLarge)
 
 ### 완료
 
@@ -157,11 +157,28 @@
   - PageLayout `Copy` derive + StyleTemplate validation
   - 997 테스트 (868 unit + 17 CLI + 46 integration + 27 roundtrip + 기타, 0 failures)
 
+- [x] v0.5.0 Sprint 2 — D-1 + check guard + test (c616de1):
+  - Phase D-1: Criterion 벤치마크 5종 (MD→IR 107µs, IR→MD 30µs, IR→HWPX 527µs, HWPX→IR 139µs, roundtrip 781µs)
+  - check() MD 파일 크기 가드 (MAX_MD_FILE_SIZE 256MB)
+  - 순서 있는 task list 테스트 추가 (ordered_task_list_items)
+  - 1001 테스트 (872 unit + 17 CLI + 46 integration + 27 roundtrip + 기타, 0 failures)
+
+- [x] v0.5.0 Sprint 3 — B-3 + C-2 + M1 (이번 스프린트):
+  - Phase B-3: `Block::PageBreak` IR 변형 + HWPX `<hp:ctrl id="newPage|pageBreak|cnpb"/>` 인식 + `<hp:p><hp:run><hp:ctrl id="newPage"/></hp:run></hp:p>` 작성 + MD `<!-- pagebreak -->` 마커 양방향 지원
+  - Phase C-2: `convert <input> <output>` 서브커맨드 — 확장자 기반 변환 방향 자동 감지 (`hwp/hwpx ↔ md/markdown`), 동일 포맷/미지원 조합은 명확한 에러
+  - Sprint 2 리뷰 M1 수정: 전용 `Hwp2MdError::FileTooLarge { path, size, limit }` 변형으로 256MB 가드 분리
+  - 1021 테스트 (887 unit + 21 CLI + 46 integration + 27 roundtrip + 기타, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
+- [ ] Phase B-4: Header/footer 읽기 (`<hp:headerFooter>` → Section.header/footer)
+- [ ] Phase C-3: ConvertOptions builder (4-parameter → builder struct)
+- [ ] Phase C-4: 구조화된 에러 페이로드 (String → (file_path, line, element))
+- [ ] Phase D-2: Cross-platform CI (Windows/macOS + MSRV 1.75 검증)
+- [ ] Phase D-3: Coverage reporting (cargo-llvm-cov → Codecov badge)
 - [ ] Phase 9b: 배포문서 복호화 (AES-128 ECB, LCG+XOR, ViewText 스트림)
 - [ ] Phase 9c: Lenient CFB 폴백 + Ruby 텍스트 컨트롤
 - [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성 + 배포 (cargo publish)
@@ -233,6 +250,50 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-05-02 — v0.5.0 Sprint 3: Page Break + Auto-detect + FileTooLarge
+
+**Phase B-3: Page break round-trip**:
+- `ir::Block::PageBreak` 신규 변형 추가
+- HWPX 리더: `<hp:ctrl id="newPage|pageBreak|cnpb"/>` → `Block::PageBreak` (footnote/list/cell scope 모두 지원)
+- HWPX 라이터: `<hp:p><hp:run><hp:ctrl id="newPage"/></hp:run></hp:p>` 출력 (hp:t 텍스트 노드 없음)
+- MD 라이터: `<!-- pagebreak -->` HTML 코멘트 마커 (렌더링 시 비가시)
+- MD 파서: `<!-- pagebreak -->` HTML 블록 → `Block::PageBreak` (대소문자 무관)
+- Block enum 모든 exhaustive match 부지에 PageBreak 추가 (count_chars/resolve_block_bin_refs/collect_*/cell_to_text)
+- 12 신규 테스트: writer 2 + parser 3 + hwpx writer 1 + hwpx reader 3 + roundtrip 1 + IR/dispatch
+
+**Phase C-2: Format auto-detection**:
+- `convert <input> <output>` 신규 CLI 서브커맨드
+- `convert::convert_auto()` + `FormatKind { Hwp, Hwpx, Markdown, Unknown }` 분류기
+- 지원 매핑: `.hwp/.hwpx → .md/.markdown`, `.md/.markdown → .hwpx`
+- 동일 포맷 / 알 수 없는 확장자 → "cannot infer conversion direction" 에러 메시지
+- 8 신규 테스트: 단위 7 (분류기 + 정상 + 거부 + 대소문자) + CLI 4
+
+**Sprint 2 리뷰 수정 (M1)**:
+- 전용 `Hwp2MdError::FileTooLarge { path: String, size: u64, limit: u64 }` 추가
+- `check()`의 256MB 가드가 `UnsupportedFormat` 대신 `FileTooLarge` 반환
+- 기존 oversize 테스트 → variant 패턴 매칭으로 강화 + Display 포맷 검증 1건 추가
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1021 테스트 (0 failures)
+
+### 2026-04-27 — v0.5.0 Sprint 2: Benchmarks + Check Guard + Tests (c616de1)
+
+**Phase D-1: Criterion 벤치마크**:
+- benches/conversion.rs: 5 벤치마크 (MD→IR, IR→MD, IR→HWPX, HWPX→IR, 풀 라운드트립)
+- 대표 입력: 한국어 제목+단락 3개+테이블 3×3+코드블록+목록 5개+서식
+- 결과: MD→IR 107µs, IR→MD 30µs, IR→HWPX 527µs, HWPX→IR 139µs, roundtrip 781µs
+- criterion 0.5 dev-dependency 추가, HTML 리포트 활성화
+
+**Sprint 1 리뷰 MEDIUM 수정**:
+- M3 수정: check() MD 파일 크기 가드 (MAX_MD_FILE_SIZE = 256MB)
+- fs::metadata().len() 사전 검사, 초과 시 UnsupportedFormat 에러
+- 3 새 테스트: 상수 값 검증, 정상 파일 통과, 초과 거부 경계값
+
+**Sprint 1 리뷰 LOW 수정**:
+- ordered task list writer 테스트 추가 (ordered_task_list_items)
+- ordered: true + mixed checked/unchecked/normal 항목 검증
+
+**검증**: cargo check 0 에러, clippy 0 경고, 1001 테스트 (0 failures)
 
 ### 2026-04-27 — v0.5.0 Sprint 1: 리팩토링 + 스타일 + Task List + Check (139ab22)
 

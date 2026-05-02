@@ -424,6 +424,14 @@ pub(super) fn handle_empty_element(
             }
             if (ctrl_kind == "fn" || ctrl_kind == "en") && !id_ref.is_empty() {
                 ctx.push_inline(ir::Inline::footnote_ref(id_ref));
+            } else if is_page_break_ctrl(&ctrl_kind) {
+                // Forced page break — flush any pending inline run, then
+                // emit a `Block::PageBreak` honouring the active scope
+                // (footnote / list-item / table-cell / top-level).
+                let pb = ir::Block::PageBreak;
+                if let Some(block) = ctx.push_block_scoped(pb) {
+                    staged.push(StagedBlock::Plain(block));
+                }
             }
         }
         "pageSize" | "hp:pageSize" => {
@@ -434,6 +442,17 @@ pub(super) fn handle_empty_element(
         }
         _ => {}
     }
+}
+
+/// Recognise the `id` attribute of an `<hp:ctrl/>` element that signals a
+/// forced page break.
+///
+/// Hancom Office and the OWPML reference accept several spellings depending
+/// on the producing tool; we treat any of `newPage`, `pageBreak`, or `cnpb`
+/// (column / new-paragraph break) as equivalent so that documents originating
+/// from third-party converters round-trip correctly.
+fn is_page_break_ctrl(id: &str) -> bool {
+    matches!(id, "newPage" | "pageBreak" | "cnpb")
 }
 
 /// Parse a HWP style ID reference and return the heading level (1–6).
