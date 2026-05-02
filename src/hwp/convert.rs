@@ -489,7 +489,11 @@ pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<
                 inlines: vec![ir::Inline::plain(base_text.clone()).with_ruby(ruby)],
             })
         }
-        HwpControl::PageBreak | HwpControl::ColumnBreak => None,
+        // Forced page break in the legacy HWP 5.0 binary stream.  Mapped to
+        // `Block::PageBreak` to keep parity with the HWPX reader (Sprint 3
+        // B-3).  Column breaks remain unmodelled and are silently dropped.
+        HwpControl::PageBreak => Some(ir::Block::PageBreak),
+        HwpControl::ColumnBreak => None,
     }
 }
 

@@ -615,3 +615,40 @@ pub(crate) fn flush_footnote_paragraph(ctx: &mut ParseContext) {
         &ctx.fmt,
     );
 }
+
+/// Flush whichever scope is currently active (footnote → list-item → cell →
+/// top-level paragraph) so that any buffered inline run becomes a finished
+/// block before the caller stages a sibling block.
+///
+/// Used immediately before pushing a block-level event (e.g. a page break
+/// `<hp:ctrl id="newPage"/>`) that appears between text runs inside a single
+/// `<hp:p>`.  Without this, the buffered text would be merged across the
+/// block boundary and the new block would emit out of order.
+///
+/// At top level the accumulated `current_text`/`current_inlines` is wrapped
+/// in a `Paragraph` and returned via `Option<StagedBlock>` for the caller to
+/// append to its staging vector — mirroring the contract used by
+/// [`flush_paragraph_staged`].  In every nested scope the flush stays
+/// in-context and `None` is returned.
+#[must_use = "top-level paragraph must be appended to the section staging vector"]
+pub(crate) fn flush_active_paragraph_scope(ctx: &mut ParseContext) -> Option<StagedBlock> {
+    if ctx.footnote.active {
+        flush_footnote_paragraph(ctx);
+        None
+    } else if ctx.list.in_item {
+        flush_list_item_paragraph(ctx);
+        None
+    } else if ctx.table.in_cell {
+        flush_cell_paragraph(ctx);
+        None
+    } else {
+        let mut top: Vec<ir::Block> = Vec::new();
+        flush_inlines_to_blocks(
+            &mut ctx.current_text,
+            &mut ctx.current_inlines,
+            &mut top,
+            &ctx.fmt,
+        );
+        top.pop().map(StagedBlock::Plain)
+    }
+}

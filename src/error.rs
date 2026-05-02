@@ -1,5 +1,6 @@
 //! Error types for the `hwp2md` crate.
 
+use std::path::PathBuf;
 use thiserror::Error;
 
 /// All errors that can be returned by this crate.
@@ -39,10 +40,15 @@ pub enum Hwp2MdError {
     /// can render a precise message and so the error type cleanly distinguishes
     /// resource-limit violations from genuine format-detection failures
     /// ([`Hwp2MdError::UnsupportedFormat`]).
-    #[error("file too large: {path} ({size} bytes > {limit} bytes limit)")]
+    ///
+    /// `path` is stored as a [`PathBuf`] so callers can re-use it
+    /// programmatically (logging, structured error reporting); the
+    /// [`std::fmt::Display`] implementation renders the path lossy via
+    /// `Path::display`.
+    #[error("file too large: {} ({size} bytes > {limit} bytes limit)", path.display())]
     FileTooLarge {
-        /// Path of the offending input file (display form, lossy on non-UTF-8).
-        path: String,
+        /// Path of the offending input file.
+        path: PathBuf,
         /// Observed size of the file in bytes.
         size: u64,
         /// Configured maximum size in bytes for this code path.

@@ -165,11 +165,21 @@ pub fn show_info(input: &Path) -> Result<(), Hwp2MdError> {
 /// | `.hwp`, `.hwpx`      | `.md`, `.markdown`   | [`to_markdown`] |
 /// | `.md`, `.markdown`   | `.hwpx`              | [`to_hwpx`]  |
 ///
-/// Any other combination — including same-format pairs or unknown
-/// extensions — returns [`Hwp2MdError::UnsupportedFormat`] with a message
-/// describing the offending pair.  The function never asks the network and
-/// never inspects file contents to determine the direction; only the file
+/// `.hwp` is a **read-only** format here — Markdown can never be written to
+/// a `.hwp` output, only `.hwpx`.  The legacy binary HWP writer is out of
+/// scope for this crate.
+///
+/// Any other combination — including same-format pairs, `.hwp` as the
+/// output extension, or unknown extensions — returns
+/// [`Hwp2MdError::UnsupportedFormat`] with a message describing the
+/// offending pair.  The function never queries the network and never
+/// inspects file contents to determine the direction; only the file
 /// extensions are consulted.
+///
+/// The destination file is silently overwritten when it already exists.
+/// A future `--force`/`--no-clobber` knob may add an explicit guard
+/// (Sprint 4 follow-up); callers that need overwrite protection should
+/// check the destination themselves before calling this function.
 pub fn convert_auto(input: &Path, output: &Path) -> Result<(), Hwp2MdError> {
     let in_ext = input
         .extension()
@@ -242,7 +252,7 @@ pub fn check(input: &Path) -> Result<(), Hwp2MdError> {
             let file_size = fs::metadata(input)?.len();
             if file_size > MAX_MD_FILE_SIZE {
                 return Err(Hwp2MdError::FileTooLarge {
-                    path: input.display().to_string(),
+                    path: input.to_path_buf(),
                     size: file_size,
                     limit: MAX_MD_FILE_SIZE,
                 });
@@ -904,15 +914,18 @@ mod tests {
     fn check_md_exceeds_size_limit_returns_file_too_large_variant() {
         let tmp = tempfile::Builder::new().suffix(".md").tempfile().unwrap();
         tmp.as_file().set_len(MAX_MD_FILE_SIZE + 1).unwrap();
+        let expected_path = tmp.path().to_path_buf();
 
         let err = check(tmp.path()).expect_err("oversized md must fail check()");
         match err {
             Hwp2MdError::FileTooLarge { size, limit, path } => {
                 assert_eq!(limit, MAX_MD_FILE_SIZE);
                 assert_eq!(size, MAX_MD_FILE_SIZE + 1);
-                assert!(
-                    path.ends_with(".md"),
-                    "expected .md path in error, got {path:?}"
+                assert_eq!(path, expected_path, "path payload must match input");
+                assert_eq!(
+                    path.extension().and_then(|e| e.to_str()),
+                    Some("md"),
+                    "expected .md extension in error path, got {path:?}"
                 );
             }
             other => panic!("expected FileTooLarge variant, got {other:?}"),
@@ -922,7 +935,7 @@ mod tests {
     #[test]
     fn file_too_large_display_includes_path_size_and_limit() {
         let err = Hwp2MdError::FileTooLarge {
-            path: "/tmp/big.md".into(),
+            path: std::path::PathBuf::from("/tmp/big.md"),
             size: 300_000_000,
             limit: 268_435_456,
         };

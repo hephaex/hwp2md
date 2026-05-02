@@ -1,8 +1,9 @@
 use crate::ir;
 
 use super::context::{
-    apply_charpr_attrs, flush_cell_paragraph, flush_footnote_paragraph, flush_list_item_paragraph,
-    flush_paragraph_staged, ParseContext, RubyPart, StagedBlock,
+    apply_charpr_attrs, flush_active_paragraph_scope, flush_cell_paragraph,
+    flush_footnote_paragraph, flush_list_item_paragraph, flush_paragraph_staged, ParseContext,
+    RubyPart, StagedBlock,
 };
 
 pub(super) fn handle_start_element(
@@ -425,9 +426,15 @@ pub(super) fn handle_empty_element(
             if (ctrl_kind == "fn" || ctrl_kind == "en") && !id_ref.is_empty() {
                 ctx.push_inline(ir::Inline::footnote_ref(id_ref));
             } else if is_page_break_ctrl(&ctrl_kind) {
-                // Forced page break — flush any pending inline run, then
-                // emit a `Block::PageBreak` honouring the active scope
-                // (footnote / list-item / table-cell / top-level).
+                // Forced page break.  First flush whatever inline run is
+                // pending in the active scope (top-level / footnote /
+                // list-item / table-cell) so that mid-paragraph ordering
+                // `text · ctrl · text` survives as
+                // `Paragraph(text), PageBreak, Paragraph(text)` rather
+                // than being merged into a single paragraph.
+                if let Some(pending) = flush_active_paragraph_scope(ctx) {
+                    staged.push(pending);
+                }
                 let pb = ir::Block::PageBreak;
                 if let Some(block) = ctx.push_block_scoped(pb) {
                     staged.push(StagedBlock::Plain(block));

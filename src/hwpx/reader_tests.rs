@@ -1245,3 +1245,52 @@ fn ctrl_unknown_id_does_not_produce_page_break() {
         s.blocks
     );
 }
+
+#[test]
+fn ctrl_newpage_mid_paragraph_splits_into_three_ordered_blocks() {
+    // Sprint 3 review HIGH: when the page-break ctrl appears between text
+    // runs inside a single <hp:p>, the buffered "before" text must be
+    // flushed as its own paragraph BEFORE the PageBreak block, and the
+    // "after" text must end up in a separate paragraph after the break.
+    let xml = r#"<root>
+        <hp:p><hp:run>
+            <hp:t>before</hp:t>
+            <hp:ctrl id="newPage"/>
+            <hp:t>after</hp:t>
+        </hp:run></hp:p>
+    </root>"#;
+    let s = section(xml);
+    let kinds: Vec<&'static str> = s
+        .blocks
+        .iter()
+        .map(|b| match b {
+            ir::Block::Paragraph { .. } => "para",
+            ir::Block::PageBreak => "pb",
+            _ => "other",
+        })
+        .collect();
+    assert_eq!(
+        kinds,
+        vec!["para", "pb", "para"],
+        "mid-paragraph page break must split into ordered [para, pb, para]; \
+         got blocks: {:?}",
+        s.blocks
+    );
+
+    // Verify the text on each side ended up in the correct paragraph.
+    let texts: Vec<String> = s
+        .blocks
+        .iter()
+        .filter_map(|b| match b {
+            ir::Block::Paragraph { inlines } => {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        texts,
+        vec!["before".to_string(), "after".to_string()],
+        "paragraph text must not cross the page-break boundary"
+    );
+}

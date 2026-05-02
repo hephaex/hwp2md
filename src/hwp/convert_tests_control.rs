@@ -43,8 +43,20 @@ fn control_to_block_footnote_produces_footnote_block() {
 }
 
 #[test]
-fn control_to_block_page_break_returns_none() {
+fn control_to_block_page_break_returns_page_break() {
     let ctrl = HwpControl::PageBreak;
+    let doc_info = DocInfo::default();
+    let block = control_to_block(&ctrl, &doc_info).expect("PageBreak control must yield a block");
+    assert!(
+        matches!(block, ir::Block::PageBreak),
+        "expected Block::PageBreak, got {block:?}"
+    );
+}
+
+#[test]
+fn control_to_block_column_break_still_returns_none() {
+    // Column breaks remain unmodelled for now; document the intentional drop.
+    let ctrl = HwpControl::ColumnBreak;
     let doc_info = DocInfo::default();
     assert!(control_to_block(&ctrl, &doc_info).is_none());
 }

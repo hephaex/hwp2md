@@ -777,19 +777,21 @@ fn parse_markdown_horizontal_rule() {
 fn parse_markdown_pagebreak_html_comment_yields_page_break_block() {
     let doc = parse_markdown("before\n\n<!-- pagebreak -->\n\nafter\n");
     let blocks = first_section_blocks(&doc);
-    let positions: Vec<usize> = blocks
+    // Tighten: assert the exact block sequence, not just position bounds, so
+    // that any silent re-ordering or extra blocks fail the test.
+    let kinds: Vec<&'static str> = blocks
         .iter()
-        .enumerate()
-        .filter_map(|(i, b)| matches!(b, ir::Block::PageBreak).then_some(i))
+        .map(|b| match b {
+            ir::Block::Paragraph { .. } => "para",
+            ir::Block::PageBreak => "pb",
+            _ => "other",
+        })
         .collect();
     assert_eq!(
-        positions.len(),
-        1,
-        "exactly one PageBreak expected: {blocks:?}"
+        kinds,
+        vec!["para", "pb", "para"],
+        "expected exact [para, pb, para] sequence: {blocks:?}"
     );
-    // PageBreak must sit between the two paragraphs.
-    let pb_idx = positions[0];
-    assert!(pb_idx > 0 && pb_idx < blocks.len() - 1, "{blocks:?}");
 }
 
 #[test]
@@ -809,6 +811,32 @@ fn parse_markdown_unrelated_html_comment_is_not_pagebreak() {
     assert!(
         !blocks.iter().any(|b| matches!(b, ir::Block::PageBreak)),
         "non-pagebreak HTML comment must not yield PageBreak: {blocks:?}"
+    );
+}
+
+#[test]
+fn parse_markdown_pagebreak_lookalike_substring_is_rejected() {
+    // The `pagebreakish` keyword contains `pagebreak` as a substring.  The
+    // marker detector must require an EXACT match (after trimming), not a
+    // substring search.
+    let doc = parse_markdown("a\n\n<!-- pagebreakish -->\n\nb\n");
+    let blocks = first_section_blocks(&doc);
+    assert!(
+        !blocks.iter().any(|b| matches!(b, ir::Block::PageBreak)),
+        "lookalike `pagebreakish` must not match: {blocks:?}"
+    );
+}
+
+#[test]
+fn parse_markdown_pagebreak_marker_with_trailing_text_is_rejected() {
+    // Comrak feeds the entire HTML block including any text after the
+    // closing `-->`.  The detector must refuse to match in that case so
+    // that the trailing text is preserved rather than swallowed.
+    let doc = parse_markdown("a\n\n<!-- pagebreak --> trailing\n\nb\n");
+    let blocks = first_section_blocks(&doc);
+    assert!(
+        !blocks.iter().any(|b| matches!(b, ir::Block::PageBreak)),
+        "marker with trailing text must not match: {blocks:?}"
     );
 }
 
