@@ -141,6 +141,8 @@ pub(super) fn handle_start_element(
             ctx.header_footer.in_footer = false;
             ctx.header_footer.text.clear();
             ctx.header_footer.inlines.clear();
+            ctx.header_footer.header_blocks.clear();
+            ctx.header_footer.footer_blocks.clear();
         }
         "header" | "hp:header" if ctx.header_footer.active => {
             ctx.header_footer.in_header = true;

@@ -177,3 +177,53 @@ fn header_footer_without_hp_prefix_also_parsed() {
         other => panic!("expected Paragraph in header (bare prefix), got {other:?}"),
     }
 }
+
+#[test]
+fn image_in_header_stays_in_header() {
+    let xml = r#"<root>
+        <hp:p><hp:run><hp:t>body</hp:t></hp:run></hp:p>
+        <hp:headerFooter>
+            <hp:header>
+                <hp:p><hp:run><hp:t>hdr text</hp:t></hp:run></hp:p>
+                <hp:p>
+                    <hp:run>
+                        <hp:img binaryItemIDRef="logo.png" width="100" height="50"/>
+                    </hp:run>
+                </hp:p>
+            </hp:header>
+        </hp:headerFooter>
+    </root>"#;
+    let s = section(xml);
+
+    assert_eq!(s.blocks.len(), 1, "body must have only one paragraph");
+    let header = s.header.as_ref().expect("header must be Some");
+    assert!(
+        header.len() >= 2,
+        "header must have at least 2 blocks (text + image), got {}",
+        header.len()
+    );
+    let has_image = header
+        .iter()
+        .any(|b| matches!(b, ir::Block::Image { .. }));
+    assert!(has_image, "image block must stay in header, not leak to body");
+}
+
+#[test]
+fn page_break_in_footer_stays_in_footer() {
+    let xml = r#"<root>
+        <hp:headerFooter>
+            <hp:footer>
+                <hp:p><hp:run><hp:t>ftr text</hp:t></hp:run></hp:p>
+                <hp:p><hp:run><hp:ctrl id="newPage"/></hp:run></hp:p>
+            </hp:footer>
+        </hp:headerFooter>
+    </root>"#;
+    let s = section(xml);
+
+    assert!(s.blocks.is_empty(), "body must be empty");
+    let footer = s.footer.as_ref().expect("footer must be Some");
+    let has_pb = footer
+        .iter()
+        .any(|b| matches!(b, ir::Block::PageBreak));
+    assert!(has_pb, "page break must stay in footer, not leak to body");
+}

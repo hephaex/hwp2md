@@ -350,7 +350,13 @@ impl ParseContext {
     ///
     /// Returns `Some(block)` when at top level (caller routes through staging).
     pub(crate) fn push_block_scoped(&mut self, block: ir::Block) -> Option<ir::Block> {
-        if self.footnote.active {
+        if self.header_footer.in_header {
+            self.header_footer.header_blocks.push(block);
+            None
+        } else if self.header_footer.in_footer {
+            self.header_footer.footer_blocks.push(block);
+            None
+        } else if self.footnote.active {
             self.footnote.blocks.push(block);
             None
         } else if self.list.in_item {
@@ -687,7 +693,13 @@ pub(crate) fn flush_footer_paragraph(ctx: &mut ParseContext) {
 /// in-context and `None` is returned.
 #[must_use = "top-level paragraph must be appended to the section staging vector"]
 pub(crate) fn flush_active_paragraph_scope(ctx: &mut ParseContext) -> Option<StagedBlock> {
-    if ctx.footnote.active {
+    if ctx.header_footer.in_header {
+        flush_header_paragraph(ctx);
+        None
+    } else if ctx.header_footer.in_footer {
+        flush_footer_paragraph(ctx);
+        None
+    } else if ctx.footnote.active {
         flush_footnote_paragraph(ctx);
         None
     } else if ctx.list.in_item {
