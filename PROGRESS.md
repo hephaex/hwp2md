@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 3 완료 (B-3 page break + C-2 auto-detect + M1 FileTooLarge)
+## 현재 상태: v0.5.0 Sprint 4 완료 (B-4 header/footer + --force + ConvertOptions)
 
 ### 완료
 
@@ -163,19 +163,24 @@
   - 순서 있는 task list 테스트 추가 (ordered_task_list_items)
   - 1001 테스트 (872 unit + 17 CLI + 46 integration + 27 roundtrip + 기타, 0 failures)
 
-- [x] v0.5.0 Sprint 3 — B-3 + C-2 + M1 (이번 스프린트):
+- [x] v0.5.0 Sprint 3 — B-3 + C-2 + M1 (2a12107):
   - Phase B-3: `Block::PageBreak` IR 변형 + HWPX `<hp:ctrl id="newPage|pageBreak|cnpb"/>` 인식 + `<hp:p><hp:run><hp:ctrl id="newPage"/></hp:run></hp:p>` 작성 + MD `<!-- pagebreak -->` 마커 양방향 지원
   - Phase C-2: `convert <input> <output>` 서브커맨드 — 확장자 기반 변환 방향 자동 감지 (`hwp/hwpx ↔ md/markdown`), 동일 포맷/미지원 조합은 명확한 에러
   - Sprint 2 리뷰 M1 수정: 전용 `Hwp2MdError::FileTooLarge { path, size, limit }` 변형으로 256MB 가드 분리
   - 1021 테스트 (887 unit + 21 CLI + 46 integration + 27 roundtrip + 기타, 0 failures)
+
+- [x] v0.5.0 Sprint 4 — B-4 + M3 + C-3 (이번 스프린트):
+  - Phase B-4: Header/footer 읽기 — `ir::Section`에 `header`/`footer` `Option<Vec<Block>>` 추가, HWPX `<hp:headerFooter>` → `<hp:header>`/`<hp:footer>` 파싱, MD `<!-- header -->` / `<!-- footer -->` 마커 출력, HWPX writer round-trip
+  - Phase M3 (Sprint 3 리뷰): `convert` 서브커맨드 `--force` 플래그 — 기존 출력 파일 덮어쓰기 보호
+  - Phase C-3: `ConvertOptions<'a>` builder 패턴 — `assets_dir`, `frontmatter`, `style`, `force` 통합 fluent API, `lib.rs`에서 re-export
+  - 리뷰 수정: `push_block_scoped`/`flush_active_paragraph_scope`에 header/footer scope 분기 추가, `headerFooter` 시작 시 블록 버퍼 초기화
+  - 1062 테스트 (923 unit + 23 CLI + 46 integration + 29 roundtrip + 기타, 0 failures)
 
 ### 진행 중
 
 없음
 
 ### 미착수
-- [ ] Phase B-4: Header/footer 읽기 (`<hp:headerFooter>` → Section.header/footer)
-- [ ] Phase C-3: ConvertOptions builder (4-parameter → builder struct)
 - [ ] Phase C-4: 구조화된 에러 페이로드 (String → (file_path, line, element))
 - [ ] Phase D-2: Cross-platform CI (Windows/macOS + MSRV 1.75 검증)
 - [ ] Phase D-3: Coverage reporting (cargo-llvm-cov → Codecov badge)
@@ -250,6 +255,34 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-05-02 — v0.5.0 Sprint 4: Header/Footer + --force + ConvertOptions
+
+**Phase B-4: Header/footer reading**:
+- `ir::Section`에 `header: Option<Vec<Block>>`, `footer: Option<Vec<Block>>` 추가 (`#[serde(default, skip_serializing_if)]`)
+- HWPX reader: `<hp:headerFooter>` → `<hp:header>`/`<hp:footer>` 파싱, `HeaderFooterState` sub-struct
+- HWPX writer: `<hp:headerFooter>` 요소 `<hp:secPr>` 앞에 출력 (header/footer가 존재할 때만)
+- MD writer: `<!-- header -->` / `<!-- /header -->`, `<!-- footer -->` / `<!-- /footer -->` HTML 코멘트 마커
+- `push_block_scoped`, `flush_active_paragraph_scope`에 header/footer scope 라우팅 추가
+- 8 reader + 5 writer + 3 md + 2 roundtrip 테스트
+
+**Sprint 3 리뷰 M3: --force 플래그**:
+- `convert` 서브커맨드에 `--force` 플래그 추가
+- `convert_auto(input, output, force: bool)` — 기존 출력 파일 존재 시 `force=false`면 에러 반환
+- 3 단위 + 2 CLI 통합 테스트
+
+**Phase C-3: ConvertOptions builder**:
+- `ConvertOptions<'a>` fluent builder: `new()` → `.assets_dir()` → `.frontmatter()` → `.style()` → `.force()` → `.execute()`
+- `hwp2md::ConvertOptions` 크레이트 루트 re-export + `lib.rs` 독스트링 업데이트
+- 14 builder 단위 테스트
+
+**리뷰 수정** (3 HIGH):
+- H1: `push_block_scoped` — header/footer 분기를 footnote 앞에 추가 (이미지 누출 방지)
+- H2: `flush_active_paragraph_scope` — header/footer 분기 추가 (page break 누출 방지)
+- H3: `headerFooter` 시작 시 `header_blocks`/`footer_blocks` 초기화 (stale 블록 방지)
+- 회귀 테스트: `image_in_header_stays_in_header`, `page_break_in_footer_stays_in_footer`
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1062 테스트 (0 failures)
 
 ### 2026-05-02 — v0.5.0 Sprint 3: Page Break + Auto-detect + FileTooLarge
 
