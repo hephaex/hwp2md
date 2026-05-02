@@ -363,6 +363,8 @@ pub(crate) fn parse_section_xml_with_face_names(
     let mut section = ir::Section {
         blocks: Vec::new(),
         page_layout: None,
+        header: None,
+        footer: None,
     };
     let mut reader = Reader::from_str(xml);
     let mut buf = Vec::new();
@@ -429,6 +431,18 @@ pub(crate) fn parse_section_xml_with_face_names(
 
     // Transfer accumulated page layout metadata from context to the section.
     section.page_layout = context.take_page_layout();
+
+    // Transfer header/footer blocks accumulated during parsing.
+    section.header = if context.header_footer.header_blocks.is_empty() {
+        None
+    } else {
+        Some(std::mem::take(&mut context.header_footer.header_blocks))
+    };
+    section.footer = if context.header_footer.footer_blocks.is_empty() {
+        None
+    } else {
+        Some(std::mem::take(&mut context.header_footer.footer_blocks))
+    };
 
     Ok(section)
 }
@@ -535,3 +549,7 @@ mod tests_list;
 #[cfg(test)]
 #[path = "reader_tests_page_layout.rs"]
 mod tests_page_layout;
+
+#[cfg(test)]
+#[path = "reader_tests_header_footer.rs"]
+mod tests_header_footer;

@@ -15,6 +15,7 @@ fn make_doc(blocks: Vec<ir::Block>) -> ir::Document {
     doc.sections.push(ir::Section {
         blocks,
         page_layout: None,
+        ..Default::default()
     });
     doc
 }
@@ -597,6 +598,7 @@ fn roundtrip_ir_to_md_to_ir_frontmatter() {
         }],
 
         page_layout: None,
+        ..Default::default()
     });
 
     let md = write_markdown(&doc, true);
@@ -883,4 +885,100 @@ fn roundtrip_code_block_two_pass_content_identical() {
         "code content changed after pass 2\npass2 md:\n{md2}"
     );
     assert_eq!(md1, md2, "markdown output not stable across two passes");
+}
+
+// -----------------------------------------------------------------------
+// B-4: header/footer IR → HWPX → IR roundtrip
+// -----------------------------------------------------------------------
+
+#[test]
+fn header_footer_ir_to_hwpx_to_ir() {
+    use hwp2md::hwpx::{read_hwpx, write_hwpx};
+
+    let header_text = "My Page Header";
+    let footer_text = "My Page Footer";
+    let body_text = "Body content";
+
+    let mut original = ir::Document::new();
+    original.sections.push(ir::Section {
+        blocks: vec![ir::Block::Paragraph {
+            inlines: vec![plain(body_text)],
+        }],
+        page_layout: None,
+        header: Some(vec![ir::Block::Paragraph {
+            inlines: vec![plain(header_text)],
+        }]),
+        footer: Some(vec![ir::Block::Paragraph {
+            inlines: vec![plain(footer_text)],
+        }]),
+    });
+
+    // Write to a temp file and read back.
+    let tmp = tempfile::NamedTempFile::new().expect("tempfile");
+    write_hwpx(&original, tmp.path(), None).expect("write_hwpx must succeed");
+    let parsed = read_hwpx(tmp.path()).expect("read_hwpx must succeed");
+
+    assert!(
+        !parsed.sections.is_empty(),
+        "parsed document must have sections"
+    );
+
+    let section = &parsed.sections[0];
+
+    // Body text preserved.
+    let body: String = section
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        body.contains(body_text),
+        "body text not found after HWPX roundtrip; got: {body:?}"
+    );
+
+    // Header preserved.
+    let header_blocks = section
+        .header
+        .as_ref()
+        .expect("section.header must be Some after HWPX roundtrip");
+    let header_text_found: String = header_blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        header_text_found.contains(header_text),
+        "header text not preserved after HWPX roundtrip; got: {header_text_found:?}"
+    );
+
+    // Footer preserved.
+    let footer_blocks = section
+        .footer
+        .as_ref()
+        .expect("section.footer must be Some after HWPX roundtrip");
+    let footer_text_found: String = footer_blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        footer_text_found.contains(footer_text),
+        "footer text not preserved after HWPX roundtrip; got: {footer_text_found:?}"
+    );
 }

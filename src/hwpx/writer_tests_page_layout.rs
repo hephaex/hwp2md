@@ -14,6 +14,7 @@ fn section_xml_with_layout(layout: Option<PageLayout>) -> String {
         sections: vec![Section {
             blocks: blocks.clone(),
             page_layout: layout,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -149,6 +150,7 @@ fn section_xml_with_style(style_yaml: &str) -> String {
         sections: vec![Section {
             blocks: blocks.clone(),
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -217,6 +219,7 @@ fn style_template_custom_code_font_in_header() {
                 }],
             }],
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -250,6 +253,7 @@ fn style_template_heading_line_spacing_in_header() {
                 inlines: vec![Inline::plain("Title")],
             }],
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -282,6 +286,7 @@ fn style_template_default_font_in_header() {
                 inlines: vec![Inline::plain("text")],
             }],
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -323,6 +328,7 @@ fn section_page_layout_takes_precedence_over_style() {
         sections: vec![Section {
             blocks,
             page_layout: Some(custom_layout),
+            ..Default::default()
         }],
         assets: Vec::new(),
     };

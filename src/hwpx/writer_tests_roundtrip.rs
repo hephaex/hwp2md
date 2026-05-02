@@ -16,6 +16,7 @@ fn roundtrip_doc(inlines: Vec<Inline>) -> Document {
             blocks: vec![Block::Paragraph { inlines }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     }
@@ -434,6 +435,7 @@ fn roundtrip_unknown_font_name_not_in_table() {
         }],
 
         page_layout: None,
+        ..Default::default()
     };
     let xml = generate_section_xml(&rogue_section, 0, &tables, &ImageAssetMap::new())
         .expect("generate_section_xml failed");
@@ -468,6 +470,7 @@ fn write_hwpx_image_roundtrip_preserves_asset() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: vec![Asset {
             name: "photo.png".into(),
@@ -529,6 +532,7 @@ fn page_layout_survives_hwpx_roundtrip() {
                 inlines: vec![Inline::plain("roundtrip text")],
             }],
             page_layout: Some(layout),
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -585,6 +589,7 @@ fn default_page_layout_roundtrip_produces_a4_values() {
                 inlines: vec![Inline::plain("default layout")],
             }],
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };

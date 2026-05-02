@@ -252,6 +252,7 @@ fn hwpx_roundtrip_hyperlink_preserves_url_and_text() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -549,6 +550,7 @@ fn full_roundtrip_nested_list_ir_children_text_preserved() {
                 }],
             }],
             page_layout: None,
+            ..Default::default()
         });
         d
     };
@@ -611,6 +613,7 @@ fn full_roundtrip_table_ir_2x2_cell_text_preserved() {
                 ],
             }],
             page_layout: None,
+            ..Default::default()
         });
         d
     };
@@ -651,6 +654,7 @@ fn full_roundtrip_table_ir_block_type_preserved() {
                 ],
             }],
             page_layout: None,
+            ..Default::default()
         });
         d
     };
@@ -768,6 +772,7 @@ fn full_roundtrip_horizontal_rule_ir_block_type_preserved() {
                 },
             ],
             page_layout: None,
+            ..Default::default()
         });
         d
     };
@@ -815,6 +820,7 @@ fn full_roundtrip_blockquote_ir_text_preserved() {
                 }],
             }],
             page_layout: None,
+            ..Default::default()
         });
         d
     };
@@ -838,6 +844,7 @@ fn full_roundtrip_blockquote_ir_block_type_preserved() {
                 }],
             }],
             page_layout: None,
+            ..Default::default()
         });
         d
     };
@@ -887,6 +894,7 @@ fn full_roundtrip_image_ir_src_preserved_via_hwpx() {
                 alt: "A bar chart".into(),
             }],
             page_layout: None,
+            ..Default::default()
         });
         d
     };
@@ -920,6 +928,7 @@ fn full_roundtrip_image_with_asset_alt_preserved() {
                 alt: "figure caption text".into(),
             }],
             page_layout: None,
+            ..Default::default()
         }],
         assets: vec![ir::Asset {
             name: "figure.png".into(),
@@ -962,6 +971,7 @@ fn full_roundtrip_footnote_body_text_preserved() {
                 },
             ],
             page_layout: None,
+            ..Default::default()
         });
         d
     };
@@ -994,6 +1004,7 @@ fn full_roundtrip_footnote_ir_block_type_preserved() {
                 },
             ],
             page_layout: None,
+            ..Default::default()
         });
         d
     };
@@ -1079,6 +1090,7 @@ fn full_roundtrip_metadata_document_body_survives_with_metadata_set() {
                 },
             ],
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -1240,6 +1252,7 @@ fn full_roundtrip_combined_all_block_types_text_preserved() {
                 },
             ],
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };

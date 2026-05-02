@@ -187,6 +187,7 @@ fn resolve_bin_refs_inside_footnote() {
         }],
 
         page_layout: None,
+        ..Default::default()
     };
     resolve_bin_refs(&mut section, &bin_map);
     match &section.blocks[0] {
@@ -221,6 +222,7 @@ fn resolve_bin_refs_inside_list() {
         }],
 
         page_layout: None,
+        ..Default::default()
     };
     resolve_bin_refs(&mut section, &bin_map);
     match &section.blocks[0] {

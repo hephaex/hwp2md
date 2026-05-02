@@ -42,6 +42,7 @@ fn section_xml(blocks: Vec<Block>) -> String {
             blocks: blocks.clone(),
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -49,6 +50,7 @@ fn section_xml(blocks: Vec<Block>) -> String {
     let sec = Section {
         blocks,
         page_layout: None,
+        ..Default::default()
     };
     let empty_asset_map = ImageAssetMap::new();
     generate_section_xml(&sec, 0, &tables, &empty_asset_map).expect("generate_section_xml failed")
@@ -72,6 +74,7 @@ fn doc_with_section(blocks: Vec<Block>) -> Document {
         sections: vec![Section {
             blocks,
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     }
@@ -117,3 +120,6 @@ mod tests_page_layout;
 
 #[path = "writer_tests_para_pr.rs"]
 mod tests_para_pr;
+
+#[path = "writer_tests_header_footer.rs"]
+mod tests_header_footer;

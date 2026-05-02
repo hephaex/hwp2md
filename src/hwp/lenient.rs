@@ -70,6 +70,7 @@ pub(crate) fn try_lenient_read(path: &Path) -> Result<ir::Document, Hwp2MdError>
         doc.sections.push(ir::Section {
             blocks,
             page_layout: None,
+            ..Default::default()
         });
     }
 

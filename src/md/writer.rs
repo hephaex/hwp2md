@@ -26,12 +26,38 @@ pub fn write_markdown(doc: &ir::Document, frontmatter: bool) -> String {
         if si > 0 {
             out.push_str("\n---\n\n");
         }
-        for block in &section.blocks {
-            write_block(&mut out, block, 0);
-        }
+        write_section(&mut out, section);
     }
 
     out
+}
+
+fn write_section(out: &mut String, section: &ir::Section) {
+    // Emit header blocks wrapped in HTML comment markers before main content.
+    if let Some(header_blocks) = &section.header {
+        if !header_blocks.is_empty() {
+            out.push_str("<!-- header -->\n");
+            for block in header_blocks {
+                write_block(out, block, 0);
+            }
+            out.push_str("<!-- /header -->\n\n");
+        }
+    }
+
+    // Emit footer blocks wrapped in HTML comment markers before main content.
+    if let Some(footer_blocks) = &section.footer {
+        if !footer_blocks.is_empty() {
+            out.push_str("<!-- footer -->\n");
+            for block in footer_blocks {
+                write_block(out, block, 0);
+            }
+            out.push_str("<!-- /footer -->\n\n");
+        }
+    }
+
+    for block in &section.blocks {
+        write_block(out, block, 0);
+    }
 }
 
 fn write_frontmatter(out: &mut String, meta: &ir::Metadata) {

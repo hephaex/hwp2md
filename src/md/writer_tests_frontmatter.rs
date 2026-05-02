@@ -21,6 +21,7 @@ fn write_markdown_frontmatter() {
     doc.sections.push(ir::Section {
         blocks: Vec::new(),
         page_layout: None,
+        ..Default::default()
     });
     let md = write_markdown(&doc, true);
     assert!(md.starts_with("---\n"), "got: {md}");
@@ -37,6 +38,7 @@ fn write_markdown_multi_section_separator() {
         }],
 
         page_layout: None,
+        ..Default::default()
     });
     doc.sections.push(ir::Section {
         blocks: vec![ir::Block::Paragraph {
@@ -44,6 +46,7 @@ fn write_markdown_multi_section_separator() {
         }],
 
         page_layout: None,
+        ..Default::default()
     });
     let md = write_markdown(&doc, false);
     assert!(md.contains("\n---\n"), "got: {md}");
@@ -59,6 +62,7 @@ fn write_markdown_frontmatter_with_created_date() {
     doc.sections.push(ir::Section {
         blocks: Vec::new(),
         page_layout: None,
+        ..Default::default()
     });
     let md = write_markdown(&doc, true);
     assert!(md.contains("date: \"2026-04-22\""), "got: {md}");
@@ -71,6 +75,7 @@ fn write_markdown_frontmatter_with_subject() {
     doc.sections.push(ir::Section {
         blocks: Vec::new(),
         page_layout: None,
+        ..Default::default()
     });
     let md = write_markdown(&doc, true);
     assert!(md.contains("subject: \"The subject\""), "got: {md}");
@@ -83,6 +88,7 @@ fn write_markdown_frontmatter_with_description() {
     doc.sections.push(ir::Section {
         blocks: Vec::new(),
         page_layout: None,
+        ..Default::default()
     });
     let md = write_markdown(&doc, true);
     assert!(md.contains("description: \"A description\""), "got: {md}");
@@ -95,6 +101,7 @@ fn write_markdown_frontmatter_with_keywords() {
     doc.sections.push(ir::Section {
         blocks: Vec::new(),
         page_layout: None,
+        ..Default::default()
     });
     let md = write_markdown(&doc, true);
     assert!(md.contains("keywords:"), "got: {md}");
@@ -115,6 +122,7 @@ fn write_markdown_frontmatter_all_fields() {
     doc.sections.push(ir::Section {
         blocks: Vec::new(),
         page_layout: None,
+        ..Default::default()
     });
     let md = write_markdown(&doc, true);
     assert!(md.starts_with("---\n"), "got: {md}");
@@ -133,6 +141,7 @@ fn write_markdown_frontmatter_no_fields_emits_empty_block() {
     doc.sections.push(ir::Section {
         blocks: Vec::new(),
         page_layout: None,
+        ..Default::default()
     });
     let md = write_markdown(&doc, true);
     // Should start with ---\n and end with ---\n\n even with no fields.
@@ -153,6 +162,7 @@ fn write_markdown_inline_math_has_trailing_blank_line() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         ..ir::Document::new()
     };
@@ -179,6 +189,7 @@ fn write_markdown_inline_math_followed_by_paragraph_has_blank_line() {
             ],
 
             page_layout: None,
+            ..Default::default()
         }],
         ..ir::Document::new()
     };

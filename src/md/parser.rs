@@ -20,6 +20,7 @@ pub fn parse_markdown(input: &str) -> ir::Document {
     let mut section = ir::Section {
         blocks: Vec::new(),
         page_layout: None,
+        ..Default::default()
     };
 
     for child in root.children() {

@@ -56,6 +56,7 @@ fn collect_image_assets_local_file_reads_bytes_and_maps_src() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -99,6 +100,7 @@ fn collect_image_assets_data_uri_decodes_base64() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -136,6 +138,7 @@ fn collect_image_assets_http_url_not_embedded() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -164,6 +167,7 @@ fn collect_image_assets_missing_file_graceful() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -194,6 +198,7 @@ fn collect_image_assets_pre_existing_assets_included() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: vec![Asset {
             name: "photo.png".into(),
@@ -234,6 +239,7 @@ fn write_hwpx_local_image_creates_bindata_entry() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -264,6 +270,7 @@ fn write_hwpx_local_image_bytes_preserved_in_bindata() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -286,6 +293,7 @@ fn write_hwpx_data_uri_image_creates_bindata_entry() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -312,6 +320,7 @@ fn write_hwpx_http_url_no_bindata_entry() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -340,6 +349,7 @@ fn write_hwpx_content_hpf_has_bindata_manifest_entry() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -375,6 +385,7 @@ fn write_hwpx_section_xml_uses_entry_name_as_binary_item_id_ref() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -400,6 +411,7 @@ fn write_hwpx_http_url_src_used_verbatim_as_binary_item_id_ref() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -424,6 +436,7 @@ fn write_hwpx_missing_file_does_not_panic() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -464,6 +477,7 @@ fn image_file_path_roundtrip_md_to_hwpx_embeds_bytes() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -506,6 +520,7 @@ fn image_jpeg_extension_gets_correct_mime_type() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -624,6 +639,7 @@ fn collect_image_assets_filename_collision_dedup_counter_suffix() {
             ],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -722,6 +738,7 @@ fn collect_image_assets_three_way_collision_increments_counter() {
                 .collect(),
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };

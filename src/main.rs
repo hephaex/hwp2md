@@ -62,6 +62,9 @@ enum Commands {
         input: PathBuf,
         /// Output file (.md, .markdown, or .hwpx)
         output: PathBuf,
+        /// Overwrite the output file if it already exists
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -100,8 +103,12 @@ fn main() -> Result<()> {
             hwp2md::convert::check(&input)?;
             println!("OK: {}", input.display());
         }
-        Commands::Convert { input, output } => {
-            hwp2md::convert::convert_auto(&input, &output)?;
+        Commands::Convert {
+            input,
+            output,
+            force,
+        } => {
+            hwp2md::convert::convert_auto(&input, &output, force)?;
         }
     }
 

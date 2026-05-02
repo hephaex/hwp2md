@@ -109,6 +109,7 @@ fn flush_paragraph_propagates_color_to_inline() {
     let mut section = crate::ir::Section {
         blocks: Vec::new(),
         page_layout: None,
+        ..Default::default()
     };
     super::context::flush_paragraph(&mut ctx, &mut section);
 
@@ -131,6 +132,7 @@ fn flush_paragraph_no_color_propagates_none() {
     let mut section = crate::ir::Section {
         blocks: Vec::new(),
         page_layout: None,
+        ..Default::default()
     };
     super::context::flush_paragraph(&mut ctx, &mut section);
 

@@ -6,6 +6,27 @@
 //!
 //! # Quick start
 //!
+//! ## Using the builder API (recommended for library users)
+//!
+//! ```no_run
+//! use std::path::Path;
+//! use hwp2md::convert::ConvertOptions;
+//!
+//! // HWP/HWPX → Markdown (direction inferred from extensions)
+//! ConvertOptions::new(Path::new("document.hwpx"), Path::new("document.md"))
+//!     .frontmatter(true)
+//!     .execute()
+//!     .expect("conversion failed");
+//!
+//! // Markdown → HWPX, overwrite if output exists
+//! ConvertOptions::new(Path::new("document.md"), Path::new("document.hwpx"))
+//!     .force(true)
+//!     .execute()
+//!     .expect("conversion failed");
+//! ```
+//!
+//! ## Using the low-level functions
+//!
 //! ```no_run
 //! use std::path::Path;
 //!
@@ -49,4 +70,5 @@ pub mod md;
 pub mod style;
 pub(crate) mod url_util;
 
+pub use convert::ConvertOptions;
 pub use error::Hwp2MdError;

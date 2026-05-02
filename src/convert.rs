@@ -176,11 +176,17 @@ pub fn show_info(input: &Path) -> Result<(), Hwp2MdError> {
 /// inspects file contents to determine the direction; only the file
 /// extensions are consulted.
 ///
-/// The destination file is silently overwritten when it already exists.
-/// A future `--force`/`--no-clobber` knob may add an explicit guard
-/// (Sprint 4 follow-up); callers that need overwrite protection should
-/// check the destination themselves before calling this function.
-pub fn convert_auto(input: &Path, output: &Path) -> Result<(), Hwp2MdError> {
+/// When `force` is `false` and `output` already exists the function
+/// returns an error instead of silently overwriting.  Pass `true` to
+/// permit overwriting.
+pub fn convert_auto(input: &Path, output: &Path, force: bool) -> Result<(), Hwp2MdError> {
+    if !force && output.exists() {
+        return Err(Hwp2MdError::UnsupportedFormat(format!(
+            "output file '{}' already exists; use --force to overwrite",
+            output.display()
+        )));
+    }
+
     let in_ext = input
         .extension()
         .and_then(|e| e.to_str())
@@ -340,6 +346,159 @@ fn write_assets(doc: &ir::Document, dir: &Path) -> Result<(), Hwp2MdError> {
     }
 
     Ok(())
+}
+
+// ── ConvertOptions builder ────────────────────────────────────────────────────
+
+/// A builder for configuring and executing a single HWP/HWPX ↔ Markdown
+/// conversion.
+///
+/// `ConvertOptions` provides a fluent API that is easier to use than the
+/// individual [`to_markdown`] / [`to_hwpx`] functions when several optional
+/// parameters are needed.  The conversion direction is inferred automatically
+/// from the `input` and `output` file extensions, identical to
+/// [`convert_auto`].
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::path::Path;
+/// use hwp2md::convert::ConvertOptions;
+///
+/// // HWPX → Markdown with frontmatter and image extraction
+/// ConvertOptions::new(Path::new("doc.hwpx"), Path::new("doc.md"))
+///     .frontmatter(true)
+///     .assets_dir(Path::new("images"))
+///     .execute()
+///     .expect("conversion failed");
+///
+/// // Markdown → HWPX, overwrite if output already exists
+/// ConvertOptions::new(Path::new("doc.md"), Path::new("doc.hwpx"))
+///     .force(true)
+///     .execute()
+///     .expect("conversion failed");
+/// ```
+#[derive(Debug)]
+pub struct ConvertOptions<'a> {
+    input: &'a Path,
+    output: &'a Path,
+    assets_dir: Option<&'a Path>,
+    frontmatter: bool,
+    style: Option<&'a Path>,
+    force: bool,
+}
+
+impl<'a> ConvertOptions<'a> {
+    /// Create a new builder for the given `input` → `output` conversion.
+    ///
+    /// The conversion direction is inferred from the file extensions:
+    ///
+    /// | `input` extension     | `output` extension    | Action           |
+    /// | --------------------- | --------------------- | ---------------- |
+    /// | `.hwp`, `.hwpx`       | `.md`, `.markdown`    | → Markdown       |
+    /// | `.md`, `.markdown`    | `.hwpx`               | → HWPX           |
+    ///
+    /// All optional settings default to their "off" value; call the builder
+    /// methods to customise them before calling [`execute`](Self::execute).
+    #[must_use]
+    pub fn new(input: &'a Path, output: &'a Path) -> Self {
+        Self {
+            input,
+            output,
+            assets_dir: None,
+            frontmatter: false,
+            style: None,
+            force: false,
+        }
+    }
+
+    /// Set the directory into which embedded images are extracted.
+    ///
+    /// Only used when converting HWP/HWPX → Markdown.  Ignored for the
+    /// reverse direction.
+    #[must_use]
+    pub fn assets_dir(mut self, dir: &'a Path) -> Self {
+        self.assets_dir = Some(dir);
+        self
+    }
+
+    /// Prepend a YAML front-matter block with document metadata.
+    ///
+    /// Only used when converting HWP/HWPX → Markdown.  Defaults to `false`.
+    #[must_use]
+    pub fn frontmatter(mut self, enabled: bool) -> Self {
+        self.frontmatter = enabled;
+        self
+    }
+
+    /// Use `path` as the YAML style template for the generated HWPX.
+    ///
+    /// Only used when converting Markdown → HWPX.  Ignored for the reverse
+    /// direction.
+    #[must_use]
+    pub fn style(mut self, path: &'a Path) -> Self {
+        self.style = Some(path);
+        self
+    }
+
+    /// Allow overwriting an existing output file.
+    ///
+    /// When `false` (the default) [`execute`](Self::execute) returns
+    /// [`Hwp2MdError::UnsupportedFormat`] if the output path already exists.
+    /// Set to `true` to permit overwriting.
+    #[must_use]
+    pub fn force(mut self, enabled: bool) -> Self {
+        self.force = enabled;
+        self
+    }
+
+    /// Execute the conversion described by this builder.
+    ///
+    /// # Errors
+    ///
+    /// - [`Hwp2MdError::UnsupportedFormat`] — unknown extension pair or output
+    ///   exists and `force` is `false`.
+    /// - [`Hwp2MdError::Io`] — file read/write failure.
+    /// - [`Hwp2MdError::HwpParse`] / [`Hwp2MdError::HwpxParse`] — parse error
+    ///   in the input document.
+    /// - [`Hwp2MdError::HwpxWrite`] — error while generating the HWPX output.
+    pub fn execute(self) -> Result<(), Hwp2MdError> {
+        if !self.force && self.output.exists() {
+            return Err(Hwp2MdError::UnsupportedFormat(format!(
+                "output file '{}' already exists; use --force to overwrite",
+                self.output.display()
+            )));
+        }
+
+        let in_ext = self
+            .input
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        let out_ext = self
+            .output
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        match (classify_format(&in_ext), classify_format(&out_ext)) {
+            (FormatKind::Hwp | FormatKind::Hwpx, FormatKind::Markdown) => to_markdown(
+                self.input,
+                Some(self.output),
+                self.assets_dir,
+                self.frontmatter,
+            ),
+            (FormatKind::Markdown, FormatKind::Hwpx) => {
+                to_hwpx(self.input, Some(self.output), self.style)
+            }
+            _ => Err(Hwp2MdError::UnsupportedFormat(format!(
+                "cannot infer conversion direction from .{in_ext} -> .{out_ext}; \
+                 expected .hwp/.hwpx -> .md/.markdown or .md/.markdown -> .hwpx"
+            ))),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -965,7 +1124,7 @@ mod tests {
         let input = dir.path().join("doc.md");
         let output = dir.path().join("out.hwpx");
         std::fs::write(&input, "# Hello\n\nBody.\n").unwrap();
-        convert_auto(&input, &output).unwrap();
+        convert_auto(&input, &output, true).unwrap();
         assert!(output.exists(), "convert_auto must create the output file");
         // The result must be a valid HWPX, accepted by check().
         check(&output).unwrap();
@@ -980,7 +1139,7 @@ mod tests {
         to_hwpx(&md_in, Some(&hwpx), None).unwrap();
 
         let md_out = dir.path().join("converted.md");
-        convert_auto(&hwpx, &md_out).unwrap();
+        convert_auto(&hwpx, &md_out, true).unwrap();
         let content = std::fs::read_to_string(&md_out).unwrap();
         assert!(
             content.contains("Title"),
@@ -994,7 +1153,7 @@ mod tests {
         let input = dir.path().join("doc.markdown");
         let output = dir.path().join("out.hwpx");
         std::fs::write(&input, "# A\n").unwrap();
-        convert_auto(&input, &output).unwrap();
+        convert_auto(&input, &output, true).unwrap();
         assert!(output.exists());
     }
 
@@ -1004,7 +1163,7 @@ mod tests {
         let input = dir.path().join("a.md");
         let output = dir.path().join("b.md");
         std::fs::write(&input, "# Hello\n").unwrap();
-        let result = convert_auto(&input, &output);
+        let result = convert_auto(&input, &output, true);
         assert!(result.is_err(), "same-format conversion must be rejected");
         let msg = format!("{}", result.unwrap_err());
         assert!(
@@ -1022,7 +1181,7 @@ mod tests {
         let input = dir.path().join("source.hwp");
         let output = dir.path().join("dest.hwpx");
         std::fs::write(&input, b"placeholder").unwrap();
-        let result = convert_auto(&input, &output);
+        let result = convert_auto(&input, &output, true);
         assert!(result.is_err());
         let msg = format!("{}", result.unwrap_err());
         assert!(
@@ -1037,7 +1196,7 @@ mod tests {
         let input = dir.path().join("doc.docx");
         let output = dir.path().join("out.md");
         std::fs::write(&input, b"x").unwrap();
-        let result = convert_auto(&input, &output);
+        let result = convert_auto(&input, &output, true);
         assert!(result.is_err());
     }
 
@@ -1047,7 +1206,62 @@ mod tests {
         let input = dir.path().join("DOC.MD");
         let output = dir.path().join("OUT.HWPX");
         std::fs::write(&input, "# Upper\n").unwrap();
-        convert_auto(&input, &output).unwrap();
+        convert_auto(&input, &output, true).unwrap();
+        assert!(output.exists());
+    }
+
+    // -----------------------------------------------------------------------
+    // convert_auto — --force / overwrite behaviour (Sprint 4, M-3)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn convert_auto_refuses_overwrite_without_force() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("doc.md");
+        let output = dir.path().join("doc.hwpx");
+        std::fs::write(&input, "# Hello").unwrap();
+        std::fs::write(&output, "existing").unwrap();
+
+        let result = convert_auto(&input, &output, false);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("already exists"),
+            "error must mention 'already exists': {msg}"
+        );
+    }
+
+    #[test]
+    fn convert_auto_overwrites_with_force() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("doc.md");
+        let output = dir.path().join("doc.hwpx");
+        std::fs::write(&input, "# Hello").unwrap();
+        std::fs::write(&output, "existing").unwrap();
+
+        convert_auto(&input, &output, true).unwrap();
+        // The output should now be a valid HWPX, not "existing".
+        assert!(output.exists());
+        let content = std::fs::read(&output).unwrap();
+        assert_ne!(
+            content, b"existing",
+            "file must be overwritten with force=true"
+        );
+    }
+
+    #[test]
+    fn convert_auto_no_force_needed_when_output_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("doc.md");
+        let output = dir.path().join("doc.hwpx");
+        std::fs::write(&input, "# Hello").unwrap();
+        // output doesn't exist — force=false must still succeed
+
+        convert_auto(&input, &output, false).unwrap();
         assert!(output.exists());
     }
 }
+
+#[cfg(test)]
+#[path = "convert_tests_builder.rs"]
+mod tests_builder;

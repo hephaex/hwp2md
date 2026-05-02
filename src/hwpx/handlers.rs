@@ -1,9 +1,9 @@
 use crate::ir;
 
 use super::context::{
-    apply_charpr_attrs, flush_active_paragraph_scope, flush_cell_paragraph,
-    flush_footnote_paragraph, flush_list_item_paragraph, flush_paragraph_staged, ParseContext,
-    RubyPart, StagedBlock,
+    apply_charpr_attrs, flush_active_paragraph_scope, flush_cell_paragraph, flush_footer_paragraph,
+    flush_footnote_paragraph, flush_header_paragraph, flush_list_item_paragraph,
+    flush_paragraph_staged, ParseContext, RubyPart, StagedBlock,
 };
 
 pub(super) fn handle_start_element(
@@ -135,6 +135,19 @@ pub(super) fn handle_start_element(
             ctx.footnote.inlines.clear();
             ctx.footnote.text.clear();
         }
+        "headerFooter" | "hp:headerFooter" => {
+            ctx.header_footer.active = true;
+            ctx.header_footer.in_header = false;
+            ctx.header_footer.in_footer = false;
+            ctx.header_footer.text.clear();
+            ctx.header_footer.inlines.clear();
+        }
+        "header" | "hp:header" if ctx.header_footer.active => {
+            ctx.header_footer.in_header = true;
+        }
+        "footer" | "hp:footer" if ctx.header_footer.active => {
+            ctx.header_footer.in_footer = true;
+        }
         "secPr" | "hp:secPr" => {
             ctx.page_layout.has_sec_pr = true;
         }
@@ -158,7 +171,11 @@ pub(super) fn handle_end_element(
 ) {
     match local {
         "p" | "hp:p" => {
-            if ctx.footnote.active {
+            if ctx.header_footer.in_header {
+                flush_header_paragraph(ctx);
+            } else if ctx.header_footer.in_footer {
+                flush_footer_paragraph(ctx);
+            } else if ctx.footnote.active {
                 flush_footnote_paragraph(ctx);
             } else if ctx.table.in_cell {
                 flush_cell_paragraph(ctx);
@@ -176,8 +193,17 @@ pub(super) fn handle_end_element(
         }
         "t" | "hp:t" => {
             ctx.in_text = false;
-            if !ctx.current_text.is_empty() {
-                let text = std::mem::take(&mut ctx.current_text);
+            // Drain from the correct buffer.  Header/footer paragraphs route
+            // text into `header_footer.text`; every other context uses
+            // `current_text`.
+            let text = if ctx.header_footer.active
+                && (ctx.header_footer.in_header || ctx.header_footer.in_footer)
+            {
+                std::mem::take(&mut ctx.header_footer.text)
+            } else {
+                std::mem::take(&mut ctx.current_text)
+            };
+            if !text.is_empty() {
                 let inline = ir::Inline::with_formatting(
                     text,
                     ctx.fmt.bold,
@@ -262,6 +288,15 @@ pub(super) fn handle_end_element(
             ctx.hyperlink_url = None;
         }
         "fieldBegin" | "hp:fieldBegin" => {}
+        "header" | "hp:header" => {
+            ctx.header_footer.in_header = false;
+        }
+        "footer" | "hp:footer" => {
+            ctx.header_footer.in_footer = false;
+        }
+        "headerFooter" | "hp:headerFooter" => {
+            ctx.header_footer.active = false;
+        }
         "rubyText" | "hp:rubyText" | "baseText" | "hp:baseText" => {
             ctx.ruby_current_part = RubyPart::None;
         }

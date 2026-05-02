@@ -12,6 +12,7 @@ fn make_image_section(src: &str) -> ir::Section {
             alt: String::new(),
         }],
         page_layout: None,
+        ..Default::default()
     }
 }
 
@@ -80,6 +81,7 @@ fn resolve_bin_refs_inside_table_cell() {
         }],
 
         page_layout: None,
+        ..Default::default()
     };
 
     resolve_bin_refs(&mut section, &bin_map);

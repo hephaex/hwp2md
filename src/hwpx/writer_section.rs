@@ -57,6 +57,29 @@ pub(super) fn generate_section_xml(
     sec.push_attribute(("xmlns:hp", "http://www.hancom.co.kr/hwpml/2011/paragraph"));
     writer.write_event(Event::Start(sec))?;
 
+    // Emit header/footer blocks before <hp:secPr> when present.
+    let has_header = section.header.as_ref().is_some_and(|b| !b.is_empty());
+    let has_footer = section.footer.as_ref().is_some_and(|b| !b.is_empty());
+    if has_header || has_footer {
+        writer.write_event(Event::Start(BytesStart::new("hp:headerFooter")))?;
+        let mut para_id_hf: u32 = 0;
+        if has_header {
+            writer.write_event(Event::Start(BytesStart::new("hp:header")))?;
+            for block in section.header.as_deref().unwrap_or(&[]) {
+                write_block(&mut writer, block, tables, &mut para_id_hf, 0, asset_map)?;
+            }
+            writer.write_event(Event::End(BytesEnd::new("hp:header")))?;
+        }
+        if has_footer {
+            writer.write_event(Event::Start(BytesStart::new("hp:footer")))?;
+            for block in section.footer.as_deref().unwrap_or(&[]) {
+                write_block(&mut writer, block, tables, &mut para_id_hf, 0, asset_map)?;
+            }
+            writer.write_event(Event::End(BytesEnd::new("hp:footer")))?;
+        }
+        writer.write_event(Event::End(BytesEnd::new("hp:headerFooter")))?;
+    }
+
     // Section-level page_layout takes precedence over the style template.
     let layout = section
         .page_layout

@@ -207,6 +207,7 @@ fn roundtrip_code_block_with_language_preserved() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -247,6 +248,7 @@ fn roundtrip_code_block_no_language_preserved() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -287,6 +289,7 @@ fn roundtrip_code_block_unusual_language_names() {
                 }],
 
                 page_layout: None,
+                ..Default::default()
             }],
             assets: Vec::new(),
         };
@@ -335,6 +338,7 @@ fn roundtrip_code_block_followed_by_paragraph() {
             ],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -371,6 +375,7 @@ fn md_writer_code_block_with_language_emits_fence_with_lang() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -398,6 +403,7 @@ fn md_writer_code_block_no_language_emits_plain_fence() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };

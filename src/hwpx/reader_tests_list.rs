@@ -423,6 +423,7 @@ fn roundtrip_nested_list_md_to_hwpx_to_md() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: vec![],
     };

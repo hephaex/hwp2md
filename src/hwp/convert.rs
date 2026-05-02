@@ -240,6 +240,7 @@ pub(crate) fn hwp_to_ir(hwp: &HwpDocument) -> ir::Document {
         doc.sections.push(ir::Section {
             blocks,
             page_layout: None,
+            ..Default::default()
         });
     }
 

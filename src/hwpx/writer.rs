@@ -695,6 +695,7 @@ pub fn write_hwpx(
         let empty_section = ir::Section {
             blocks: Vec::new(),
             page_layout: None,
+            ..Default::default()
         };
         zip.write_all(
             section::generate_section_xml(&empty_section, 0, &tables, &asset_map)?.as_bytes(),

@@ -104,6 +104,16 @@ pub struct Section {
     /// (e.g. plain Markdown input or very minimal HWPX files).  Writers
     /// should fall back to [`PageLayout::a4_portrait`] defaults in that case.
     pub page_layout: Option<PageLayout>,
+    /// Header text blocks (from HWPX `<hp:headerFooter>` → `<hp:header>`).
+    ///
+    /// `None` when the source document has no header definition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub header: Option<Vec<Block>>,
+    /// Footer text blocks (from HWPX `<hp:headerFooter>` → `<hp:footer>`).
+    ///
+    /// `None` when the source document has no footer definition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub footer: Option<Vec<Block>>,
 }
 
 /// A block-level content element within a section.

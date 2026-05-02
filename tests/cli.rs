@@ -576,3 +576,59 @@ fn cli_convert_md_to_md_rejected_with_clear_error() {
         "stderr should explain the rejection: {stderr}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 4 — `convert --force` overwrite protection (M-3)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn convert_refuses_overwrite_without_force() {
+    let dir = tempdir().expect("tempdir");
+    let input = dir.path().join("doc.md");
+    let output = dir.path().join("doc.hwpx");
+    std::fs::write(&input, "# Test").expect("write input");
+    std::fs::write(&output, "existing").expect("write pre-existing output");
+
+    let result = cargo_bin()
+        .args(["convert", input.to_str().unwrap(), output.to_str().unwrap()])
+        .output()
+        .expect("execute convert");
+    assert!(
+        !result.status.success(),
+        "must fail without --force when output already exists"
+    );
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert!(
+        stderr.contains("already exists"),
+        "stderr must mention 'already exists': {stderr}"
+    );
+}
+
+#[test]
+fn convert_overwrites_with_force_flag() {
+    let dir = tempdir().expect("tempdir");
+    let input = dir.path().join("doc.md");
+    let output = dir.path().join("doc.hwpx");
+    std::fs::write(&input, "# Test").expect("write input");
+    std::fs::write(&output, "existing").expect("write pre-existing output");
+
+    let result = cargo_bin()
+        .args([
+            "convert",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--force",
+        ])
+        .output()
+        .expect("execute convert");
+    assert!(
+        result.status.success(),
+        "must succeed with --force: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let content = std::fs::read(&output).expect("read output");
+    assert_ne!(
+        content, b"existing",
+        "output must be overwritten by --force conversion"
+    );
+}

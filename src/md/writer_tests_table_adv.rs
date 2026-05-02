@@ -43,6 +43,7 @@ fn write_markdown_html_table_second_row_is_header_uses_th() {
             blocks: vec![ir::Block::Table { rows, col_count: 2 }],
 
             page_layout: None,
+            ..Default::default()
         }],
         ..ir::Document::new()
     };
@@ -74,6 +75,7 @@ fn write_markdown_html_table_first_row_not_header_uses_td() {
             blocks: vec![ir::Block::Table { rows, col_count: 2 }],
 
             page_layout: None,
+            ..Default::default()
         }],
         ..ir::Document::new()
     };

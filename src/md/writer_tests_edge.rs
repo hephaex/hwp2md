@@ -14,6 +14,7 @@ fn make_doc_with_blocks(blocks: Vec<ir::Block>) -> ir::Document {
     doc.sections.push(ir::Section {
         blocks,
         page_layout: None,
+        ..Default::default()
     });
     doc
 }

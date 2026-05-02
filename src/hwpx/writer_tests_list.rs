@@ -652,6 +652,7 @@ fn roundtrip_ordered_list_text_preserved_in_hwpx() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -709,6 +710,7 @@ fn roundtrip_unordered_list_text_preserved_in_hwpx() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -756,6 +758,7 @@ fn roundtrip_header_xml_contains_numbering_list() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };

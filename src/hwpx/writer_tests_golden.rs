@@ -116,6 +116,7 @@ fn golden_comprehensive_document_structure() {
             ],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -431,6 +432,7 @@ fn roundtrip_blockquote_content_preserved() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };

@@ -82,6 +82,29 @@ pub(crate) struct FootnoteState {
     pub(crate) text: String,
 }
 
+/// Header/footer parsing accumulator.
+///
+/// OWPML documents may include a `<hp:headerFooter>` element as a sibling of
+/// the section paragraphs.  It contains `<hp:header>` and `<hp:footer>` sub-
+/// elements, each of which holds ordinary paragraph content.
+#[derive(Debug, Default)]
+pub(crate) struct HeaderFooterState {
+    /// `true` while the parser is inside a `<hp:headerFooter>` element.
+    pub(crate) active: bool,
+    /// `true` while the parser is inside the `<hp:header>` child.
+    pub(crate) in_header: bool,
+    /// `true` while the parser is inside the `<hp:footer>` child.
+    pub(crate) in_footer: bool,
+    /// Accumulated blocks for the header region.
+    pub(crate) header_blocks: Vec<ir::Block>,
+    /// Accumulated blocks for the footer region.
+    pub(crate) footer_blocks: Vec<ir::Block>,
+    /// Temporary text buffer used while parsing header/footer paragraphs.
+    pub(crate) text: String,
+    /// Temporary inline buffer used while parsing header/footer paragraphs.
+    pub(crate) inlines: Vec<ir::Inline>,
+}
+
 /// Page layout parsed from `<hp:secPr>` and its children.
 #[derive(Debug, Default)]
 pub(crate) struct PageLayoutState {
@@ -236,6 +259,9 @@ pub(crate) struct ParseContext {
 
     // ── Page layout ────────────────────────────────────────────────
     pub(crate) page_layout: PageLayoutState,
+
+    // ── Header / footer ────────────────────────────────────────────
+    pub(crate) header_footer: HeaderFooterState,
 }
 
 /// Which child element of a `<hp:ruby>` block is currently being parsed.
@@ -273,6 +299,7 @@ impl Default for ParseContext {
             current_num_pr_id: None,
             pending_code_lang: None,
             page_layout: PageLayoutState::default(),
+            header_footer: HeaderFooterState::default(),
         }
     }
 }
@@ -285,9 +312,13 @@ impl ParseContext {
 
     /// Returns a mutable reference to the active text buffer.
     ///
-    /// Priority: footnote > list_item > cell > default paragraph buffer.
+    /// Priority: header/footer > footnote > list_item > cell > default paragraph buffer.
     pub(crate) fn active_text_buf(&mut self) -> &mut String {
-        if self.footnote.active {
+        if self.header_footer.active
+            && (self.header_footer.in_header || self.header_footer.in_footer)
+        {
+            &mut self.header_footer.text
+        } else if self.footnote.active {
             &mut self.footnote.text
         } else if self.list.in_item {
             &mut self.list.item_text
@@ -300,7 +331,11 @@ impl ParseContext {
 
     /// Push an inline to the active inline buffer.
     pub(crate) fn push_inline(&mut self, inline: ir::Inline) {
-        if self.footnote.active {
+        if self.header_footer.active
+            && (self.header_footer.in_header || self.header_footer.in_footer)
+        {
+            self.header_footer.inlines.push(inline);
+        } else if self.footnote.active {
             self.footnote.inlines.push(inline);
         } else if self.list.in_item {
             self.list.item_inlines.push(inline);
@@ -612,6 +647,26 @@ pub(crate) fn flush_footnote_paragraph(ctx: &mut ParseContext) {
         &mut ctx.footnote.text,
         &mut ctx.footnote.inlines,
         &mut ctx.footnote.blocks,
+        &ctx.fmt,
+    );
+}
+
+/// Flush pending header paragraph into `header_footer.header_blocks`.
+pub(crate) fn flush_header_paragraph(ctx: &mut ParseContext) {
+    flush_inlines_to_blocks(
+        &mut ctx.header_footer.text,
+        &mut ctx.header_footer.inlines,
+        &mut ctx.header_footer.header_blocks,
+        &ctx.fmt,
+    );
+}
+
+/// Flush pending footer paragraph into `header_footer.footer_blocks`.
+pub(crate) fn flush_footer_paragraph(ctx: &mut ParseContext) {
+    flush_inlines_to_blocks(
+        &mut ctx.header_footer.text,
+        &mut ctx.header_footer.inlines,
+        &mut ctx.header_footer.footer_blocks,
         &ctx.fmt,
     );
 }

@@ -90,6 +90,7 @@ fn write_hwpx_two_sections_produces_section0_and_section1() {
                 }],
 
                 page_layout: None,
+                ..Default::default()
             },
             Section {
                 blocks: vec![Block::Paragraph {
@@ -97,6 +98,7 @@ fn write_hwpx_two_sections_produces_section0_and_section1() {
                 }],
 
                 page_layout: None,
+                ..Default::default()
             },
         ],
         assets: Vec::new(),
@@ -235,6 +237,7 @@ fn write_hwpx_image_block_xml_references_asset_name() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: vec![Asset {
             name: "diagram.png".into(),
@@ -314,6 +317,7 @@ fn content_hpf_with_title_and_author() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };
@@ -424,6 +428,7 @@ fn write_hwpx_metadata_in_content_hpf() {
             }],
 
             page_layout: None,
+            ..Default::default()
         }],
         assets: Vec::new(),
     };

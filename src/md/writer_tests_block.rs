@@ -14,6 +14,7 @@ fn make_doc_with_blocks(blocks: Vec<ir::Block>) -> ir::Document {
     doc.sections.push(ir::Section {
         blocks,
         page_layout: None,
+        ..Default::default()
     });
     doc
 }
@@ -453,5 +454,97 @@ fn ordered_task_list_items() {
     assert!(
         !md.contains("3. [x]") && !md.contains("3. [ ]"),
         "ordered normal item must not emit checkbox; got: {md:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// B-4: header/footer comment markers in Markdown output
+// -----------------------------------------------------------------------
+
+#[test]
+fn header_footer_in_markdown() {
+    let mut doc = ir::Document::new();
+    doc.sections.push(ir::Section {
+        blocks: vec![ir::Block::Paragraph {
+            inlines: vec![plain("body paragraph")],
+        }],
+        page_layout: None,
+        header: Some(vec![ir::Block::Paragraph {
+            inlines: vec![plain("Page header")],
+        }]),
+        footer: Some(vec![ir::Block::Paragraph {
+            inlines: vec![plain("Page footer")],
+        }]),
+    });
+
+    let md = write_markdown(&doc, false);
+
+    // HTML comment markers must wrap the header content.
+    assert!(
+        md.contains("<!-- header -->"),
+        "header open marker missing: {md:?}"
+    );
+    assert!(
+        md.contains("<!-- /header -->"),
+        "header close marker missing: {md:?}"
+    );
+    assert!(md.contains("Page header"), "header text missing: {md:?}");
+
+    // HTML comment markers must wrap the footer content.
+    assert!(
+        md.contains("<!-- footer -->"),
+        "footer open marker missing: {md:?}"
+    );
+    assert!(
+        md.contains("<!-- /footer -->"),
+        "footer close marker missing: {md:?}"
+    );
+    assert!(md.contains("Page footer"), "footer text missing: {md:?}");
+
+    // Body text must also appear.
+    assert!(md.contains("body paragraph"), "body text missing: {md:?}");
+}
+
+#[test]
+fn header_footer_markers_before_body() {
+    // Header and footer markers must appear before the body content.
+    let mut doc = ir::Document::new();
+    doc.sections.push(ir::Section {
+        blocks: vec![ir::Block::Paragraph {
+            inlines: vec![plain("body")],
+        }],
+        page_layout: None,
+        header: Some(vec![ir::Block::Paragraph {
+            inlines: vec![plain("hdr")],
+        }]),
+        footer: None,
+    });
+
+    let md = write_markdown(&doc, false);
+
+    let header_pos = md.find("<!-- header -->").expect("header marker");
+    let body_pos = md.find("body").expect("body text");
+    assert!(
+        header_pos < body_pos,
+        "header markers must precede body content: {md:?}"
+    );
+}
+
+#[test]
+fn no_header_footer_markers_when_none() {
+    // When header/footer are None, no HTML comment markers must appear.
+    let doc = make_doc_with_blocks(vec![ir::Block::Paragraph {
+        inlines: vec![plain("plain body")],
+    }]);
+
+    let md = write_markdown(&doc, false);
+
+    assert!(
+        !md.contains("<!-- header -->"),
+        "no header marker expected: {md:?}"
+    );
+    assert!(
+        !md.contains("<!-- footer -->"),
+        "no footer marker expected: {md:?}"
     );
 }
