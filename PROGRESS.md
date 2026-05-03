@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 5 완료 (C-4 structured errors + D-2 CI matrix + D-3 coverage)
+## 현재 상태: v0.5.0 Sprint 6 완료 (MD header/footer round-trip + DRM integration test + headerFooter type)
 
 ### 완료
 
@@ -183,13 +183,20 @@
   - 리뷰 수정 (CRITICAL): `read_hwp()` lenient fallback이 DrmProtected 에러를 삼키는 버그 수정, taiki-e/install-action으로 tarpaulin 설치 최적화
   - 1065 테스트 (926 unit + 23 CLI + 46 integration + 29 roundtrip + 기타, 0 failures)
 
+- [x] v0.5.0 Sprint 6 — MD header/footer round-trip + DRM integration test + headerFooter type (21a3399):
+  - S6-01: MD parser region state machine — `<!-- header/footer -->` 마커를 comrak AST 수준에서 감지, body/header/footer 버킷 라우팅
+  - S6-02: DrmProtected 통합 테스트 — `cfb::CompoundFile::create()`로 has_drm 비트 설정된 HWP fixture 생성 (Sprint 5 M2)
+  - S6-03: `<hp:headerFooter type="both|even|odd">` 속성 파싱/출력 — IR Section에 `header_footer_type` 필드 추가 (Sprint 4 L1)
+  - 1082 테스트 (940 unit + 23 CLI + 46 integration + 30 roundtrip + 기타, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
-- [ ] MD parser `<!-- header -->` / `<!-- footer -->` 마커 round-trip (Sprint 4 리뷰 M2)
-- [ ] `<hp:headerFooter type="">` 속성 파싱 (Sprint 4 리뷰 L1)
+- [ ] Unclosed marker fallback (Sprint 6 리뷰 M1) — EOF in non-Body region 경고/폴백
+- [ ] Interleaved marker edge case (Sprint 6 리뷰 M2) — `<!-- header --> <!-- footer -->` 중첩 처리
+- [ ] `header_footer_type` enum 타입화 (Sprint 6 리뷰 M3) — `Option<String>` → enum
 - [ ] Phase 9b: 배포문서 복호화 (AES-128 ECB, LCG+XOR, ViewText 스트림)
 - [ ] Phase 9c: Lenient CFB 폴백 + Ruby 텍스트 컨트롤
 - [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성 + 배포 (cargo publish)
@@ -261,6 +268,34 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-05-03 — v0.5.0 Sprint 6: MD Header/Footer Round-trip + DRM Integration Test + HeaderFooter Type
+
+**S6-01: MD parser header/footer round-trip** (Sprint 4 리뷰 M2):
+- `parse_markdown()` Region state machine: `enum Region { Body, Header, Footer }`
+- comrak AST level에서 `<!-- header -->` / `<!-- /header -->` / `<!-- footer -->` / `<!-- /footer -->` 마커 감지
+- 마커 안의 블록을 header/footer/body 버킷으로 라우팅, Section에 할당
+- `html_comment_keyword()` 공유 헬퍼: pagebreak 감지와 통합
+- 6 unit + 1 roundtrip 테스트
+
+**S6-02: DrmProtected integration test** (Sprint 5 리뷰 M2):
+- `cfb::CompoundFile::create()` + `create_stream("/FileHeader")` 로 valid CFB fixture 생성
+- FileHeader: HWP signature + version 5.1.0.0 + properties `0x10` (has_drm bit)
+- `read_hwp()` → `Hwp2MdError::DrmProtected` 반환 검증 + 에러 메시지 검증
+- 2 integration 테스트
+
+**S6-03: headerFooter type attribute** (Sprint 4 리뷰 L1):
+- `ir::Section`에 `header_footer_type: Option<String>` 필드 추가
+- HWPX reader: `<hp:headerFooter type="both|even|odd">` 속성 파싱 → `hf_type` 상태 저장 → Section 전달
+- HWPX writer: `header_footer_type` 존재 시 `<hp:headerFooter type="...">` 출력
+- 4 reader + 4 writer round-trip 테스트
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 3 MEDIUM, 3 LOW):
+- M1: Unclosed marker silently misroutes content — 향후 fallback 추가
+- M2: Interleaved markers produce surprising bucket assignment — 테스트/명세 추가
+- M3: `header_footer_type` is `Option<String>` — enum 타입화 고려
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1082 테스트 (0 failures)
 
 ### 2026-05-03 — v0.5.0 Sprint 5: Structured Errors + Cross-platform CI + Coverage
 

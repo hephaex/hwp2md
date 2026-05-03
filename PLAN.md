@@ -189,7 +189,7 @@ HWPX XML 파서 정확도 향상.
 | 순서/비순서 목록 | `1.` / `-` | 중첩 지원 |
 | 각주 | `[^1]` | GFM footnotes |
 | 수식 | `$LaTeX$` | 한글 수식 → LaTeX |
-| 머리글/바닥글 | 무시 또는 frontmatter | |
+| 머리글/바닥글 | `<!-- header/footer -->` 마커 | 양방향 round-trip |
 | 다단 | 단일 단으로 평탄화 | |
 
 ## 제한사항
@@ -197,7 +197,7 @@ HWPX XML 파서 정확도 향상.
 - HWP DRM (배포용) 문서는 지원하지 않음
 - 다단 레이아웃은 단일 단으로 평탄화
 - 복잡한 테이블 (colspan/rowspan)은 HTML 폴백
-- 머리글/바닥글은 변환에서 제외
+- 머리글/바닥글은 `<!-- header/footer -->` HTML 코멘트 마커로 round-trip
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
