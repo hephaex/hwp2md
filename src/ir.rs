@@ -114,6 +114,12 @@ pub struct Section {
     /// `None` when the source document has no footer definition.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub footer: Option<Vec<Block>>,
+    /// Header/footer scope (from `<hp:headerFooter type="…">` attribute).
+    ///
+    /// Possible values: `"both"`, `"even"`, `"odd"`, or `None` (document default).
+    /// This specifies which pages the header/footer applies to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub header_footer_type: Option<String>,
 }
 
 /// A block-level content element within a section.

@@ -17,17 +17,78 @@ pub fn parse_markdown(input: &str) -> ir::Document {
     let mut doc = ir::Document::new();
     doc.metadata = extract_frontmatter(input);
 
-    let mut section = ir::Section {
-        blocks: Vec::new(),
-        page_layout: None,
-        ..Default::default()
-    };
+    // Walk the AST nodes and route them into body, header, or footer
+    // depending on the surrounding `<!-- header -->` / `<!-- /header -->` and
+    // `<!-- footer -->` / `<!-- /footer -->` marker pairs.  The markers are
+    // detected at the comrak AST level (before `node_to_block` is called) so
+    // that they never appear as IR blocks themselves.
+    #[derive(PartialEq)]
+    enum Region {
+        Body,
+        Header,
+        Footer,
+    }
+
+    let mut region = Region::Body;
+    let mut header_blocks: Vec<ir::Block> = Vec::new();
+    let mut footer_blocks: Vec<ir::Block> = Vec::new();
+    let mut body_blocks: Vec<ir::Block> = Vec::new();
 
     for child in root.children() {
+        // Inspect the node value to detect marker comments.  The borrow of
+        // `child.data` must be dropped before calling `node_to_block`, which
+        // borrows the same RefCell internally.
+        let is_marker = {
+            let data = child.data.borrow();
+            if let NodeValue::HtmlBlock(html) = &data.value {
+                if is_header_start_marker(&html.literal) {
+                    region = Region::Header;
+                    true
+                } else if is_header_end_marker(&html.literal) {
+                    region = Region::Body;
+                    true
+                } else if is_footer_start_marker(&html.literal) {
+                    region = Region::Footer;
+                    true
+                } else if is_footer_end_marker(&html.literal) {
+                    region = Region::Body;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        };
+
+        if is_marker {
+            continue;
+        }
+
         if let Some(block) = node_to_block(child) {
-            section.blocks.push(block);
+            match region {
+                Region::Body => body_blocks.push(block),
+                Region::Header => header_blocks.push(block),
+                Region::Footer => footer_blocks.push(block),
+            }
         }
     }
+
+    let section = ir::Section {
+        blocks: body_blocks,
+        page_layout: None,
+        header: if header_blocks.is_empty() {
+            None
+        } else {
+            Some(header_blocks)
+        },
+        footer: if footer_blocks.is_empty() {
+            None
+        } else {
+            Some(footer_blocks)
+        },
+        header_footer_type: None,
+    };
 
     doc.sections.push(section);
     doc
@@ -211,14 +272,51 @@ fn node_to_block<'a>(node: &'a AstNode<'a>) -> Option<ir::Block> {
 /// comparing the keyword case-insensitively.  This is the round-trip marker
 /// emitted by [`crate::md::write_markdown`] for [`ir::Block::PageBreak`].
 fn is_pagebreak_marker(html: &str) -> bool {
+    html_comment_keyword(html).is_some_and(|k| k.eq_ignore_ascii_case("pagebreak"))
+}
+
+/// Return `true` when the HTML block is a `<!-- header -->` opening marker.
+fn is_header_start_marker(html: &str) -> bool {
+    html_comment_keyword(html).is_some_and(|k| k.eq_ignore_ascii_case("header"))
+}
+
+/// Return `true` when the HTML block is a `<!-- /header -->` closing marker.
+fn is_header_end_marker(html: &str) -> bool {
+    html_comment_keyword(html).is_some_and(|k| k.eq_ignore_ascii_case("/header"))
+}
+
+/// Return `true` when the HTML block is a `<!-- footer -->` opening marker.
+fn is_footer_start_marker(html: &str) -> bool {
+    html_comment_keyword(html).is_some_and(|k| k.eq_ignore_ascii_case("footer"))
+}
+
+/// Return `true` when the HTML block is a `<!-- /footer -->` closing marker.
+fn is_footer_end_marker(html: &str) -> bool {
+    html_comment_keyword(html).is_some_and(|k| k.eq_ignore_ascii_case("/footer"))
+}
+
+/// Extract the single keyword inside an HTML comment of the form
+/// `<!-- keyword -->` (or `<!--keyword-->`).  Returns `None` when the string
+/// is not a well-formed single-keyword comment.
+///
+/// The trimmed outer whitespace is stripped before checking the delimiters so
+/// that comrak's trailing newline in `HtmlBlock.literal` does not break the
+/// match.  The inner content is returned as-is (not lowercased) so callers can
+/// apply their own case comparison.
+fn html_comment_keyword(html: &str) -> Option<&str> {
     let trimmed = html.trim();
     let inner = trimmed
         .strip_prefix("<!--")
-        .and_then(|s| s.strip_suffix("-->"));
-    match inner {
-        Some(content) => content.trim().eq_ignore_ascii_case("pagebreak"),
-        None => false,
+        .and_then(|s| s.strip_suffix("-->"))?;
+    // The inner content must be a single token (no embedded whitespace that
+    // would indicate extra text) — but leading/trailing space around the
+    // keyword is allowed (e.g. `<!-- header -->`).
+    let keyword = inner.trim();
+    // Reject if the keyword itself contains whitespace (multi-word comment).
+    if keyword.contains(char::is_whitespace) {
+        return None;
     }
+    Some(keyword)
 }
 
 fn collect_alt_text<'a>(node: &'a AstNode<'a>) -> String {

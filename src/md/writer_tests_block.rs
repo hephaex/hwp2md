@@ -475,6 +475,7 @@ fn header_footer_in_markdown() {
         footer: Some(vec![ir::Block::Paragraph {
             inlines: vec![plain("Page footer")],
         }]),
+        header_footer_type: None,
     });
 
     let md = write_markdown(&doc, false);
@@ -518,6 +519,7 @@ fn header_footer_markers_before_body() {
             inlines: vec![plain("hdr")],
         }]),
         footer: None,
+        header_footer_type: None,
     });
 
     let md = write_markdown(&doc, false);

@@ -30,6 +30,7 @@ fn header_footer_emitted_in_section_xml() {
         page_layout: None,
         header: Some(vec![plain_para("Header line")]),
         footer: Some(vec![plain_para("Footer line")]),
+        header_footer_type: None,
     };
     let xml = section_xml_with_hf(sec);
 
@@ -73,6 +74,7 @@ fn header_footer_emitted_before_sec_pr() {
         page_layout: None,
         header: Some(vec![plain_para("hdr")]),
         footer: None,
+        header_footer_type: None,
     };
     let xml = section_xml_with_hf(sec);
 
@@ -94,6 +96,7 @@ fn no_header_footer_when_both_none() {
         page_layout: None,
         header: None,
         footer: None,
+        header_footer_type: None,
     };
     let xml = section_xml_with_hf(sec);
 
@@ -112,6 +115,7 @@ fn no_header_footer_when_both_empty_vecs() {
         page_layout: None,
         header: Some(vec![]),
         footer: Some(vec![]),
+        header_footer_type: None,
     };
     let xml = section_xml_with_hf(sec);
 
@@ -129,6 +133,7 @@ fn header_only_no_footer_element() {
         page_layout: None,
         header: Some(vec![plain_para("header only")]),
         footer: None,
+        header_footer_type: None,
     };
     let xml = section_xml_with_hf(sec);
 
@@ -141,4 +146,76 @@ fn header_only_no_footer_element() {
         "hp:footer must NOT be emitted when footer is None: {xml}"
     );
     assert!(xml.contains("header only"), "header text missing: {xml}");
+}
+
+#[test]
+fn header_footer_type_both() {
+    // Test that type="both" is emitted correctly.
+    let sec = Section {
+        blocks: vec![plain_para("body")],
+        page_layout: None,
+        header: Some(vec![plain_para("Header")]),
+        footer: None,
+        header_footer_type: Some("both".to_string()),
+    };
+    let xml = section_xml_with_hf(sec);
+
+    assert!(
+        xml.contains(r#"<hp:headerFooter type="both">"#) || xml.contains(r#"type="both"#),
+        "type=\"both\" attribute must be present: {xml}"
+    );
+}
+
+#[test]
+fn header_footer_type_even() {
+    // Test that type="even" is emitted correctly.
+    let sec = Section {
+        blocks: vec![plain_para("body")],
+        page_layout: None,
+        header: Some(vec![plain_para("Header")]),
+        footer: Some(vec![plain_para("Footer")]),
+        header_footer_type: Some("even".to_string()),
+    };
+    let xml = section_xml_with_hf(sec);
+
+    assert!(
+        xml.contains(r#"type="even"#),
+        "type=\"even\" attribute must be present: {xml}"
+    );
+}
+
+#[test]
+fn header_footer_type_odd() {
+    // Test that type="odd" is emitted correctly.
+    let sec = Section {
+        blocks: vec![plain_para("body")],
+        page_layout: None,
+        header: Some(vec![plain_para("Header")]),
+        footer: Some(vec![plain_para("Footer")]),
+        header_footer_type: Some("odd".to_string()),
+    };
+    let xml = section_xml_with_hf(sec);
+
+    assert!(
+        xml.contains(r#"type="odd"#),
+        "type=\"odd\" attribute must be present: {xml}"
+    );
+}
+
+#[test]
+fn header_footer_type_none_not_emitted() {
+    // Test that when type is None, no type attribute is emitted.
+    let sec = Section {
+        blocks: vec![plain_para("body")],
+        page_layout: None,
+        header: Some(vec![plain_para("Header")]),
+        footer: None,
+        header_footer_type: None,
+    };
+    let xml = section_xml_with_hf(sec);
+
+    assert!(
+        !xml.contains(r#"type="#),
+        "no type attribute should be present when header_footer_type is None: {xml}"
+    );
 }

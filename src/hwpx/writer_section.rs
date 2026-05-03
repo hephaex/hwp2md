@@ -61,7 +61,11 @@ pub(super) fn generate_section_xml(
     let has_header = section.header.as_ref().is_some_and(|b| !b.is_empty());
     let has_footer = section.footer.as_ref().is_some_and(|b| !b.is_empty());
     if has_header || has_footer {
-        writer.write_event(Event::Start(BytesStart::new("hp:headerFooter")))?;
+        let mut hf_elem = BytesStart::new("hp:headerFooter");
+        if let Some(hf_type) = &section.header_footer_type {
+            hf_elem.push_attribute(("type", hf_type.as_str()));
+        }
+        writer.write_event(Event::Start(hf_elem))?;
         let mut para_id_hf: u32 = 0;
         if has_header {
             writer.write_event(Event::Start(BytesStart::new("hp:header")))?;

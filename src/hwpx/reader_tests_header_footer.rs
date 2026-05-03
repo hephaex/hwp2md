@@ -226,3 +226,78 @@ fn page_break_in_footer_stays_in_footer() {
     let has_pb = footer.iter().any(|b| matches!(b, ir::Block::PageBreak));
     assert!(has_pb, "page break must stay in footer, not leak to body");
 }
+
+#[test]
+fn header_footer_type_both_parsed() {
+    // Test that type="both" attribute is parsed correctly.
+    let xml = r#"<root>
+        <hp:headerFooter type="both">
+            <hp:header>
+                <hp:p><hp:run><hp:t>Header</hp:t></hp:run></hp:p>
+            </hp:header>
+        </hp:headerFooter>
+    </root>"#;
+    let s = section(xml);
+
+    assert_eq!(
+        s.header_footer_type,
+        Some("both".to_string()),
+        "type attribute 'both' must be parsed"
+    );
+}
+
+#[test]
+fn header_footer_type_even_parsed() {
+    // Test that type="even" attribute is parsed correctly.
+    let xml = r#"<root>
+        <hp:headerFooter type="even">
+            <hp:header>
+                <hp:p><hp:run><hp:t>Header</hp:t></hp:run></hp:p>
+            </hp:header>
+        </hp:headerFooter>
+    </root>"#;
+    let s = section(xml);
+
+    assert_eq!(
+        s.header_footer_type,
+        Some("even".to_string()),
+        "type attribute 'even' must be parsed"
+    );
+}
+
+#[test]
+fn header_footer_type_odd_parsed() {
+    // Test that type="odd" attribute is parsed correctly.
+    let xml = r#"<root>
+        <hp:headerFooter type="odd">
+            <hp:footer>
+                <hp:p><hp:run><hp:t>Footer</hp:t></hp:run></hp:p>
+            </hp:footer>
+        </hp:headerFooter>
+    </root>"#;
+    let s = section(xml);
+
+    assert_eq!(
+        s.header_footer_type,
+        Some("odd".to_string()),
+        "type attribute 'odd' must be parsed"
+    );
+}
+
+#[test]
+fn header_footer_type_none_when_not_specified() {
+    // Test that header_footer_type is None when type attribute is not present.
+    let xml = r#"<root>
+        <hp:headerFooter>
+            <hp:header>
+                <hp:p><hp:run><hp:t>Header</hp:t></hp:run></hp:p>
+            </hp:header>
+        </hp:headerFooter>
+    </root>"#;
+    let s = section(xml);
+
+    assert!(
+        s.header_footer_type.is_none(),
+        "header_footer_type must be None when type attribute is not present"
+    );
+}

@@ -365,6 +365,7 @@ pub(crate) fn parse_section_xml_with_face_names(
         page_layout: None,
         header: None,
         footer: None,
+        header_footer_type: None,
     };
     let mut reader = Reader::from_str(xml);
     let mut buf = Vec::new();
@@ -443,6 +444,9 @@ pub(crate) fn parse_section_xml_with_face_names(
     } else {
         Some(std::mem::take(&mut context.header_footer.footer_blocks))
     };
+
+    // Transfer the header/footer type (e.g., "both", "even", "odd").
+    section.header_footer_type = context.header_footer.hf_type.take();
 
     Ok(section)
 }

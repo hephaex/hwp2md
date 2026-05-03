@@ -965,3 +965,342 @@ fn parse_markdown_task_list_text_is_preserved() {
         panic!("expected List, got {:?}", blocks[0]);
     }
 }
+
+// -----------------------------------------------------------------------
+// parse_markdown — header/footer HTML comment markers
+// -----------------------------------------------------------------------
+
+#[test]
+fn header_footer_markers_parsed_to_section() {
+    let md = "\
+<!-- header -->
+Header line
+<!-- /header -->
+
+<!-- footer -->
+Footer line
+<!-- /footer -->
+
+Body paragraph
+";
+    let doc = parse_markdown(md);
+    let section = doc.sections.first().expect("section must exist");
+
+    // Body must contain the paragraph but NOT the header/footer text.
+    let body_text: String = section
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        body_text.contains("Body paragraph"),
+        "body paragraph missing; got: {body_text:?}"
+    );
+    assert!(
+        !body_text.contains("Header line"),
+        "header text must not appear in body; got: {body_text:?}"
+    );
+    assert!(
+        !body_text.contains("Footer line"),
+        "footer text must not appear in body; got: {body_text:?}"
+    );
+
+    // Header blocks.
+    let header_blocks = section
+        .header
+        .as_ref()
+        .expect("section.header must be Some");
+    let header_text: String = header_blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        header_text.contains("Header line"),
+        "header text not found; got: {header_text:?}"
+    );
+
+    // Footer blocks.
+    let footer_blocks = section
+        .footer
+        .as_ref()
+        .expect("section.footer must be Some");
+    let footer_text: String = footer_blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        footer_text.contains("Footer line"),
+        "footer text not found; got: {footer_text:?}"
+    );
+}
+
+#[test]
+fn header_only_marker() {
+    let md = "\
+<!-- header -->
+Just a header
+<!-- /header -->
+
+Body text
+";
+    let doc = parse_markdown(md);
+    let section = doc.sections.first().expect("section must exist");
+
+    let header = section
+        .header
+        .as_ref()
+        .expect("section.header must be Some");
+    let htext: String = header
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        htext.contains("Just a header"),
+        "header text not found; got: {htext:?}"
+    );
+
+    assert!(
+        section.footer.is_none(),
+        "footer must be None when no footer marker present"
+    );
+}
+
+#[test]
+fn footer_only_marker() {
+    let md = "\
+<!-- footer -->
+Just a footer
+<!-- /footer -->
+
+Body text
+";
+    let doc = parse_markdown(md);
+    let section = doc.sections.first().expect("section must exist");
+
+    assert!(
+        section.header.is_none(),
+        "header must be None when no header marker present"
+    );
+
+    let footer = section
+        .footer
+        .as_ref()
+        .expect("section.footer must be Some");
+    let ftext: String = footer
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        ftext.contains("Just a footer"),
+        "footer text not found; got: {ftext:?}"
+    );
+}
+
+#[test]
+fn no_markers_leaves_header_footer_none() {
+    let doc = parse_markdown("# Heading\n\nParagraph.\n");
+    let section = doc.sections.first().expect("section must exist");
+    assert!(
+        section.header.is_none(),
+        "header must be None when no markers are present"
+    );
+    assert!(
+        section.footer.is_none(),
+        "footer must be None when no markers are present"
+    );
+}
+
+#[test]
+fn markers_case_insensitive() {
+    let md = "\
+<!-- HEADER -->
+Upper case header
+<!-- /HEADER -->
+
+<!-- FOOTER -->
+Upper case footer
+<!-- /FOOTER -->
+
+Body
+";
+    let doc = parse_markdown(md);
+    let section = doc.sections.first().expect("section must exist");
+
+    let header = section
+        .header
+        .as_ref()
+        .expect("header must be Some for HEADER marker");
+    let htext: String = header
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        htext.contains("Upper case header"),
+        "case-insensitive HEADER not matched; got: {htext:?}"
+    );
+
+    let footer = section
+        .footer
+        .as_ref()
+        .expect("footer must be Some for FOOTER marker");
+    let ftext: String = footer
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        ftext.contains("Upper case footer"),
+        "case-insensitive FOOTER not matched; got: {ftext:?}"
+    );
+}
+
+#[test]
+fn header_footer_markers_roundtrip_via_write_then_parse() {
+    use crate::md::write_markdown;
+
+    let header_text = "Running header text";
+    let footer_text = "Running footer text";
+    let body_text = "Main body content";
+
+    let mut doc = ir::Document::new();
+    doc.sections.push(ir::Section {
+        blocks: vec![ir::Block::Paragraph {
+            inlines: vec![ir::Inline::plain(body_text)],
+        }],
+        page_layout: None,
+        header: Some(vec![ir::Block::Paragraph {
+            inlines: vec![ir::Inline::plain(header_text)],
+        }]),
+        footer: Some(vec![ir::Block::Paragraph {
+            inlines: vec![ir::Inline::plain(footer_text)],
+        }]),
+        header_footer_type: None,
+    });
+
+    let md = write_markdown(&doc, false);
+    assert!(
+        md.contains("<!-- header -->"),
+        "header open marker missing in MD output; md: {md:?}"
+    );
+    assert!(
+        md.contains("<!-- /header -->"),
+        "header close marker missing in MD output; md: {md:?}"
+    );
+    assert!(
+        md.contains("<!-- footer -->"),
+        "footer open marker missing in MD output; md: {md:?}"
+    );
+    assert!(
+        md.contains("<!-- /footer -->"),
+        "footer close marker missing in MD output; md: {md:?}"
+    );
+
+    let parsed = parse_markdown(&md);
+    let section = parsed.sections.first().expect("section must exist");
+
+    // Body preserved, header/footer NOT leaked into body.
+    let body: String = section
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        body.contains(body_text),
+        "body text lost after roundtrip; body: {body:?}"
+    );
+    assert!(
+        !body.contains(header_text),
+        "header text leaked into body; body: {body:?}"
+    );
+    assert!(
+        !body.contains(footer_text),
+        "footer text leaked into body; body: {body:?}"
+    );
+
+    // Header preserved.
+    let header_blocks = section
+        .header
+        .as_ref()
+        .expect("section.header must be Some");
+    let htext: String = header_blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        htext.contains(header_text),
+        "header text lost after roundtrip; got: {htext:?}"
+    );
+
+    // Footer preserved.
+    let footer_blocks = section
+        .footer
+        .as_ref()
+        .expect("section.footer must be Some");
+    let ftext: String = footer_blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        ftext.contains(footer_text),
+        "footer text lost after roundtrip; got: {ftext:?}"
+    );
+}

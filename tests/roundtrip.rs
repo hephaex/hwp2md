@@ -911,6 +911,7 @@ fn header_footer_ir_to_hwpx_to_ir() {
         footer: Some(vec![ir::Block::Paragraph {
             inlines: vec![plain(footer_text)],
         }]),
+        header_footer_type: None,
     });
 
     // Write to a temp file and read back.
@@ -980,5 +981,122 @@ fn header_footer_ir_to_hwpx_to_ir() {
     assert!(
         footer_text_found.contains(footer_text),
         "footer text not preserved after HWPX roundtrip; got: {footer_text_found:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// MD header/footer marker round-trip
+// -----------------------------------------------------------------------
+
+#[test]
+fn header_footer_md_roundtrip() {
+    let header_text = "Page header content";
+    let footer_text = "Page footer content";
+    let body_text = "Body of the document";
+
+    let mut doc = ir::Document::new();
+    doc.sections.push(ir::Section {
+        blocks: vec![ir::Block::Paragraph {
+            inlines: vec![plain(body_text)],
+        }],
+        page_layout: None,
+        header: Some(vec![ir::Block::Paragraph {
+            inlines: vec![plain(header_text)],
+        }]),
+        footer: Some(vec![ir::Block::Paragraph {
+            inlines: vec![plain(footer_text)],
+        }]),
+        header_footer_type: None,
+    });
+
+    // IR → MD
+    let md = write_markdown(&doc, false);
+    assert!(
+        md.contains("<!-- header -->"),
+        "header open marker missing; md: {md:?}"
+    );
+    assert!(
+        md.contains("<!-- /header -->"),
+        "header close marker missing; md: {md:?}"
+    );
+    assert!(
+        md.contains("<!-- footer -->"),
+        "footer open marker missing; md: {md:?}"
+    );
+    assert!(
+        md.contains("<!-- /footer -->"),
+        "footer close marker missing; md: {md:?}"
+    );
+
+    // MD → IR
+    let parsed = parse_markdown(&md);
+    let section = parsed
+        .sections
+        .first()
+        .expect("parsed document has no sections");
+
+    // Body content preserved and not contaminated with header/footer text.
+    let body: String = section
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        body.contains(body_text),
+        "body text lost after MD roundtrip; body: {body:?}"
+    );
+    assert!(
+        !body.contains(header_text),
+        "header text leaked into body; body: {body:?}"
+    );
+    assert!(
+        !body.contains(footer_text),
+        "footer text leaked into body; body: {body:?}"
+    );
+
+    // Header recovered.
+    let header_blocks = section
+        .header
+        .as_ref()
+        .expect("section.header must be Some after MD roundtrip");
+    let htext: String = header_blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        htext.contains(header_text),
+        "header text not recovered after MD roundtrip; got: {htext:?}"
+    );
+
+    // Footer recovered.
+    let footer_blocks = section
+        .footer
+        .as_ref()
+        .expect("section.footer must be Some after MD roundtrip");
+    let ftext: String = footer_blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        ftext.contains(footer_text),
+        "footer text not recovered after MD roundtrip; got: {ftext:?}"
     );
 }

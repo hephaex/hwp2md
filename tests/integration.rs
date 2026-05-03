@@ -532,3 +532,69 @@ fn fixture_empty_title_and_author_do_not_panic() {
     // The key invariant is: no panic.
     let _ = md::write_markdown(&doc, true);
 }
+
+// ---------------------------------------------------------------------------
+// 11. DRM-protected HWP file detection
+// ---------------------------------------------------------------------------
+
+fn create_drm_protected_hwp_fixture() -> (tempfile::TempDir, std::path::PathBuf) {
+    use std::io::Write;
+
+    let dir = tempfile::tempdir().expect("create tempdir");
+    let path = dir.path().join("drm_protected.hwp");
+
+    let file = std::fs::File::create(&path).expect("create file");
+    let mut cfb = cfb::CompoundFile::create(file).expect("create CFB");
+
+    let mut stream = cfb
+        .create_stream("/FileHeader")
+        .expect("create FileHeader stream");
+
+    let mut header_data = [0u8; 256];
+    let sig = b"HWP Document File";
+    header_data[..sig.len()].copy_from_slice(sig);
+    header_data[32] = 0; // version extra
+    header_data[33] = 0; // version micro
+    header_data[34] = 1; // version minor
+    header_data[35] = 5; // version major
+    header_data[36..40].copy_from_slice(&0x10u32.to_le_bytes()); // has_drm
+
+    stream.write_all(&header_data).expect("write FileHeader");
+    drop(stream);
+    cfb.flush().expect("flush CFB");
+    drop(cfb);
+
+    (dir, path)
+}
+
+#[test]
+fn drm_protected_hwp_returns_error() {
+    let (_dir, path) = create_drm_protected_hwp_fixture();
+
+    let result = hwp2md::convert::to_markdown(&path, None, None, false);
+
+    assert!(
+        result.is_err(),
+        "expected DrmProtected error for encrypted HWP; got Ok"
+    );
+
+    if let Err(hwp2md::Hwp2MdError::DrmProtected { path: err_path }) = result {
+        assert_eq!(err_path, path);
+    } else {
+        panic!("expected DrmProtected error variant; got {result:?}");
+    }
+}
+
+#[test]
+fn drm_protected_hwp_error_message_contains_drm() {
+    let (_dir, path) = create_drm_protected_hwp_fixture();
+
+    let result = hwp2md::convert::to_markdown(&path, None, None, false);
+    assert!(result.is_err(), "expected error for DRM-protected file");
+
+    let error_msg = result.unwrap_err().to_string();
+    assert!(
+        error_msg.to_lowercase().contains("drm"),
+        "error message should mention DRM; got: {error_msg:?}"
+    );
+}

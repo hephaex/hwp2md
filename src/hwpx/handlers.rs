@@ -143,6 +143,16 @@ pub(super) fn handle_start_element(
             ctx.header_footer.inlines.clear();
             ctx.header_footer.header_blocks.clear();
             ctx.header_footer.footer_blocks.clear();
+            ctx.header_footer.hf_type = None;
+
+            // Parse the `type` attribute (e.g., "both", "even", "odd").
+            for attr in e.attributes().flatten() {
+                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                if key == "type" || key == "hp:type" {
+                    ctx.header_footer.hf_type =
+                        Some(attr.unescape_value().unwrap_or_default().to_string());
+                }
+            }
         }
         "header" | "hp:header" if ctx.header_footer.active => {
             ctx.header_footer.in_header = true;
