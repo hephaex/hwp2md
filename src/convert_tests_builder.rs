@@ -113,11 +113,12 @@ fn builder_refuses_overwrite_without_force() {
         // force defaults to false
         .execute()
         .expect_err("must fail when output exists and force is false");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("already exists"),
-        "error must mention 'already exists': {msg}"
-    );
+    match err {
+        crate::error::Hwp2MdError::OutputExists { path } => {
+            assert_eq!(path, output, "OutputExists must carry the output path");
+        }
+        other => panic!("expected OutputExists, got: {other}"),
+    }
     // Existing file must be untouched.
     assert_eq!(std::fs::read(&output).unwrap(), b"existing");
 }

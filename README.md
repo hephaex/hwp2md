@@ -2,6 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/hwp2md.svg)](https://crates.io/crates/hwp2md)
 [![CI](https://github.com/hephaex/hwp2md/actions/workflows/ci.yml/badge.svg)](https://github.com/hephaex/hwp2md/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/hephaex/hwp2md/graph/badge.svg)](https://codecov.io/gh/hephaex/hwp2md)
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
 **hwp2md** is a bidirectional converter between Korean 한글(Hangul) document formats — HWP 5.0 (binary OLE2) and HWPX (XML/ZIP) — and CommonMark-compatible Markdown. It ships as both a command-line tool and a Rust library, making it straightforward to integrate document conversion into build pipelines, static-site generators, or document-management workflows that need to exchange content with the Korean public-sector ecosystem.

@@ -55,6 +55,30 @@ pub enum Hwp2MdError {
         limit: u64,
     },
 
+    /// The output file already exists and `--force` was not specified.
+    ///
+    /// Returned by [`convert_auto`](crate::convert::convert_auto) and
+    /// [`ConvertOptions::execute`](crate::convert::ConvertOptions) when the
+    /// output path is occupied and `force` is `false`.  Callers should
+    /// surface the path to users and suggest passing `--force`.
+    #[error("output file '{}' already exists; use --force to overwrite", path.display())]
+    OutputExists {
+        /// Path of the pre-existing output file.
+        path: PathBuf,
+    },
+
+    /// The HWP file is DRM-protected (encrypted distribution document).
+    ///
+    /// HWP files with the `has_drm` flag set in the file header cannot be
+    /// parsed without a valid decryption key.  This error is distinct from
+    /// [`Hwp2MdError::HwpParse`] so that callers can give a precise,
+    /// actionable message rather than a generic parse-error string.
+    #[error("DRM-protected file: {}", path.display())]
+    DrmProtected {
+        /// Path of the DRM-protected HWP file.
+        path: PathBuf,
+    },
+
     /// A binary record in the HWP stream has an invalid or inconsistent header.
     #[error("invalid record: {0}")]
     InvalidRecord(String),

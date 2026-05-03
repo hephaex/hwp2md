@@ -177,14 +177,13 @@ pub fn show_info(input: &Path) -> Result<(), Hwp2MdError> {
 /// extensions are consulted.
 ///
 /// When `force` is `false` and `output` already exists the function
-/// returns an error instead of silently overwriting.  Pass `true` to
-/// permit overwriting.
+/// returns [`Hwp2MdError::OutputExists`] instead of silently overwriting.
+/// Pass `true` to permit overwriting.
 pub fn convert_auto(input: &Path, output: &Path, force: bool) -> Result<(), Hwp2MdError> {
     if !force && output.exists() {
-        return Err(Hwp2MdError::UnsupportedFormat(format!(
-            "output file '{}' already exists; use --force to overwrite",
-            output.display()
-        )));
+        return Err(Hwp2MdError::OutputExists {
+            path: output.to_path_buf(),
+        });
     }
 
     let in_ext = input
@@ -444,7 +443,7 @@ impl<'a> ConvertOptions<'a> {
     /// Allow overwriting an existing output file.
     ///
     /// When `false` (the default) [`execute`](Self::execute) returns
-    /// [`Hwp2MdError::UnsupportedFormat`] if the output path already exists.
+    /// [`Hwp2MdError::OutputExists`] if the output path already exists.
     /// Set to `true` to permit overwriting.
     #[must_use]
     pub fn force(mut self, enabled: bool) -> Self {
@@ -456,18 +455,17 @@ impl<'a> ConvertOptions<'a> {
     ///
     /// # Errors
     ///
-    /// - [`Hwp2MdError::UnsupportedFormat`] — unknown extension pair or output
-    ///   exists and `force` is `false`.
+    /// - [`Hwp2MdError::UnsupportedFormat`] — unknown extension pair.
+    /// - [`Hwp2MdError::OutputExists`] — output exists and `force` is `false`.
     /// - [`Hwp2MdError::Io`] — file read/write failure.
     /// - [`Hwp2MdError::HwpParse`] / [`Hwp2MdError::HwpxParse`] — parse error
     ///   in the input document.
     /// - [`Hwp2MdError::HwpxWrite`] — error while generating the HWPX output.
     pub fn execute(self) -> Result<(), Hwp2MdError> {
         if !self.force && self.output.exists() {
-            return Err(Hwp2MdError::UnsupportedFormat(format!(
-                "output file '{}' already exists; use --force to overwrite",
-                self.output.display()
-            )));
+            return Err(Hwp2MdError::OutputExists {
+                path: self.output.to_path_buf(),
+            });
         }
 
         let in_ext = self
@@ -1223,12 +1221,12 @@ mod tests {
         std::fs::write(&output, "existing").unwrap();
 
         let result = convert_auto(&input, &output, false);
-        assert!(result.is_err());
-        let msg = result.unwrap_err().to_string();
-        assert!(
-            msg.contains("already exists"),
-            "error must mention 'already exists': {msg}"
-        );
+        match result.unwrap_err() {
+            Hwp2MdError::OutputExists { path } => {
+                assert_eq!(path, output, "OutputExists must carry the output path");
+            }
+            other => panic!("expected OutputExists, got: {other}"),
+        }
     }
 
     #[test]
@@ -1259,6 +1257,58 @@ mod tests {
 
         convert_auto(&input, &output, false).unwrap();
         assert!(output.exists());
+    }
+
+    // -----------------------------------------------------------------------
+    // C-4 — Structured error payload Display format tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn output_exists_display_includes_path() {
+        use std::path::PathBuf;
+        let err = Hwp2MdError::OutputExists {
+            path: PathBuf::from("test.hwpx"),
+        };
+        let msg = err.to_string();
+        assert!(
+            msg.contains("test.hwpx"),
+            "display must include path: {msg}"
+        );
+        assert!(
+            msg.contains("--force"),
+            "display must mention --force: {msg}"
+        );
+    }
+
+    #[test]
+    fn drm_protected_display_includes_path() {
+        use std::path::PathBuf;
+        let err = Hwp2MdError::DrmProtected {
+            path: PathBuf::from("secret.hwp"),
+        };
+        let msg = err.to_string();
+        assert!(
+            msg.contains("secret.hwp"),
+            "display must include path: {msg}"
+        );
+        assert!(msg.contains("DRM"), "display must mention DRM: {msg}");
+    }
+
+    #[test]
+    fn output_exists_carries_correct_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("doc.md");
+        let output = dir.path().join("doc.hwpx");
+        std::fs::write(&input, "# Hi").unwrap();
+        std::fs::write(&output, b"existing").unwrap();
+
+        let err = convert_auto(&input, &output, false).unwrap_err();
+        match err {
+            Hwp2MdError::OutputExists { path } => {
+                assert_eq!(path, output);
+            }
+            other => panic!("expected OutputExists, got: {other}"),
+        }
     }
 }
 

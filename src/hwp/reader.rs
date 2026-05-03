@@ -42,9 +42,9 @@ fn parse_hwp_file(path: &Path) -> Result<HwpDocument, Hwp2MdError> {
     let header = read_file_header(&mut cfb)?;
 
     if header.encrypted || header.has_drm {
-        return Err(Hwp2MdError::HwpParse(
-            "HWP file is encrypted or DRM-protected".into(),
-        ));
+        return Err(Hwp2MdError::DrmProtected {
+            path: path.to_path_buf(),
+        });
     }
 
     let doc_info = read_doc_info(&mut cfb, header.compressed)?;

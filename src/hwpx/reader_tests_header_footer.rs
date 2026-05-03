@@ -202,10 +202,11 @@ fn image_in_header_stays_in_header() {
         "header must have at least 2 blocks (text + image), got {}",
         header.len()
     );
-    let has_image = header
-        .iter()
-        .any(|b| matches!(b, ir::Block::Image { .. }));
-    assert!(has_image, "image block must stay in header, not leak to body");
+    let has_image = header.iter().any(|b| matches!(b, ir::Block::Image { .. }));
+    assert!(
+        has_image,
+        "image block must stay in header, not leak to body"
+    );
 }
 
 #[test]
@@ -222,8 +223,6 @@ fn page_break_in_footer_stays_in_footer() {
 
     assert!(s.blocks.is_empty(), "body must be empty");
     let footer = s.footer.as_ref().expect("footer must be Some");
-    let has_pb = footer
-        .iter()
-        .any(|b| matches!(b, ir::Block::PageBreak));
+    let has_pb = footer.iter().any(|b| matches!(b, ir::Block::PageBreak));
     assert!(has_pb, "page break must stay in footer, not leak to body");
 }
