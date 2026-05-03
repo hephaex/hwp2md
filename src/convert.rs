@@ -503,6 +503,7 @@ impl<'a> ConvertOptions<'a> {
 mod tests {
     use super::*;
     use crate::ir::{Asset, Block, Document, Inline, ListItem, TableCell, TableRow};
+    use std::path::PathBuf;
 
     // -----------------------------------------------------------------------
     // Helpers
@@ -1265,7 +1266,6 @@ mod tests {
 
     #[test]
     fn output_exists_display_includes_path() {
-        use std::path::PathBuf;
         let err = Hwp2MdError::OutputExists {
             path: PathBuf::from("test.hwpx"),
         };
@@ -1282,7 +1282,6 @@ mod tests {
 
     #[test]
     fn drm_protected_display_includes_path() {
-        use std::path::PathBuf;
         let err = Hwp2MdError::DrmProtected {
             path: PathBuf::from("secret.hwp"),
         };

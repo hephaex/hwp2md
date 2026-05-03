@@ -27,6 +27,7 @@ pub(crate) use shapes::{parse_bin_data_entry, parse_char_shape, parse_para_shape
 pub fn read_hwp(path: &Path) -> Result<ir::Document, Hwp2MdError> {
     match parse_hwp_file(path) {
         Ok(hwp_doc) => Ok(hwp_to_ir(&hwp_doc)),
+        Err(e @ Hwp2MdError::DrmProtected { .. }) => Err(e),
         Err(e) => {
             tracing::warn!("Normal HWP parse failed ({e}), attempting lenient recovery");
             lenient::try_lenient_read(path)
