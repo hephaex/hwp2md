@@ -516,3 +516,11 @@ fn collect_inlines_recursive<'a>(
 #[cfg(test)]
 #[path = "parser_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "parser_tests_inline.rs"]
+mod tests_inline;
+
+#[cfg(test)]
+#[path = "parser_tests_marker.rs"]
+mod tests_marker;

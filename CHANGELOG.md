@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - Unreleased
+## [0.5.0] - 2026-05-03
 
 ### Added
 - **Phase B-1**: YAML-based style template (`--style`) — `StyleTemplate` with
@@ -36,6 +36,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file extensions (`.hwp`/`.hwpx` ↔ `.md`/`.markdown`) and dispatches to
   the appropriate reader/writer; ambiguous or same-format pairs are rejected
   with a descriptive error.
+- **Sprint 4 / Phase B-4**: Header/footer reader — `ir::Section` gains
+  `header: Option<Vec<Block>>` and `footer: Option<Vec<Block>>`; HWPX
+  `<hp:headerFooter>` → `<hp:header>` / `<hp:footer>` parsed into IR; MD
+  output wraps content in `<!-- header -->` / `<!-- footer -->` markers;
+  full round-trip writer support; 1 062 tests.
+- **Sprint 4 / Phase M3**: `convert` subcommand `--force` flag — prevents
+  accidental overwrite of existing output files; explicit opt-in required.
+- **Sprint 4 / Phase C-3**: `ConvertOptions<'a>` builder — `assets_dir`,
+  `frontmatter`, `style`, `force` consolidated into a single fluent API;
+  re-exported from `lib.rs`.
+- **Sprint 5 / Phase C-4**: Structured error variants — `OutputExists { path }`
+  (overwrite guard) and `DrmProtected { path }` (encrypted HWP) replace
+  prior `UnsupportedFormat` reuse; `convert_auto` and `hwp::reader` migrated.
+- **Sprint 5 / Phase D-2**: Cross-platform CI — GitHub Actions matrix for
+  ubuntu / windows / macos at MSRV 1.75; lint step isolated to ubuntu.
+- **Sprint 5 / Phase D-3**: Coverage reporting — `cargo-tarpaulin` + Codecov
+  upload; `codecov` badge added to README.
+- **Sprint 6 / S6-01**: Markdown header/footer round-trip — `parse_markdown()`
+  region state machine detects `<!-- header/footer -->` markers in the comrak
+  AST and routes blocks into the correct `Section` bucket.
+- **Sprint 6 / S6-02**: DRM integration test — synthetic CFB fixture with the
+  `has_drm` bit set, constructed with `cfb::CompoundFile::create()`, exercising
+  the full `DrmProtected` error path.
+- **Sprint 6 / S6-03**: `<hp:headerFooter type="both|even|odd">` attribute —
+  `header_footer_type: Option<String>` added to `ir::Section`; reader parses
+  and writer emits the attribute.
+- **Sprint 7 / S7-01**: Unclosed marker fallback — if `parse_markdown()` reaches
+  EOF while inside a header or footer region, all accumulated blocks are drained
+  back to body with a `tracing::warn!`; 4 new tests.
+- **Sprint 7 / S7-02**: `HeaderFooterType` enum (`Both` / `Even` / `Odd` /
+  `Other(String)`) replacing bare `Option<String>`; `#[serde(rename_all =
+  "camelCase")]`; `as_str()` method; HWPX reader, writer, and tests migrated.
+- **Sprint 7 / S7-03**: `<ruby>base<rt>annotation</rt></ruby>` HTML parsing
+  in the Markdown parser — comrak HTML inline nodes are scanned for ruby
+  structure and converted to `Inline::ruby` fields; nested-ruby guard prevents
+  infinite recursion; 1 091 tests total (949 unit + 23 CLI + 46 integration +
+  30 roundtrip).
 
 ### Changed
 - **Phase A-1**: `ParseContext` god object (37 flat fields) refactored into 5
@@ -48,6 +85,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   duplication between `handle_start_element` and `handle_empty_element`.
 - `build_list` merged identical `depth == 0` and `items.is_empty()` branches
   (clippy `if_same_then_else` fix).
+- `push_block_scoped` / `flush_active_paragraph_scope` gained header/footer
+  scope routing so that blocks accumulated in those regions land in the correct
+  `Section` field rather than body.
 
 ### Fixed
 - `serde_yaml` (deprecated) replaced with `serde_yml 0.0.12`.
@@ -57,6 +97,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sprint 3 / M1**: dedicated `Hwp2MdError::FileTooLarge { path, size, limit }`
   variant replaces the misleading `UnsupportedFormat` reuse for the Markdown
   size guard, distinguishing resource-limit violations from extension errors.
+- **Sprint 5 review**: `read_hwp()` lenient CFB fallback no longer silently
+  swallows `DrmProtected` errors — the error is re-surfaced after partial
+  section collection.
+- **Sprint 7 review**: multi-region drain correctly flushes both header and
+  footer block buffers on unclosed-marker fallback; nested `<ruby>` guard
+  prevents infinite recursion in the HTML ruby parser.
 
 ## [0.4.0] - 2026-04-26
 

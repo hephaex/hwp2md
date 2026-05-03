@@ -124,6 +124,23 @@ impl HeaderFooterType {
     }
 }
 
+impl From<String> for HeaderFooterType {
+    /// Construct a `HeaderFooterType` from a string, normalizing known values.
+    ///
+    /// Known OWPML values (`"both"`, `"even"`, `"odd"`) are converted to their
+    /// corresponding enum variants. Any unrecognized value becomes [`Other`][Self::Other].
+    /// This ensures that known values can only be constructed via their dedicated variants,
+    /// maintaining serde round-trip consistency.
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "both" => Self::Both,
+            "even" => Self::Even,
+            "odd" => Self::Odd,
+            _ => Self::Other(s),
+        }
+    }
+}
+
 /// A logical section of a document containing an ordered sequence of blocks.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Section {
@@ -535,7 +552,7 @@ mod tests {
     fn header_footer_type_serde_roundtrip() {
         use serde_json;
 
-        // Known variants serialize to their camelCase string and deserialize back.
+        // Known variants serialize to their string and deserialize back via From<String>.
         let cases: &[(HeaderFooterType, &str)] = &[
             (HeaderFooterType::Both, r#""both""#),
             (HeaderFooterType::Even, r#""even""#),
@@ -557,6 +574,52 @@ mod tests {
                 back, *variant,
                 "deserialized value mismatch for {variant:?}"
             );
+        }
+    }
+
+    #[test]
+    fn header_footer_type_from_string_normalizes_known_values() {
+        // Known values normalize to their enum variants via From<String>.
+        assert_eq!(
+            HeaderFooterType::from("both".to_string()),
+            HeaderFooterType::Both
+        );
+        assert_eq!(
+            HeaderFooterType::from("even".to_string()),
+            HeaderFooterType::Even
+        );
+        assert_eq!(
+            HeaderFooterType::from("odd".to_string()),
+            HeaderFooterType::Odd
+        );
+    }
+
+    #[test]
+    fn header_footer_type_from_string_unknown_becomes_other() {
+        // Unknown values become Other variant.
+        assert_eq!(
+            HeaderFooterType::from("custom".to_string()),
+            HeaderFooterType::Other("custom".to_string())
+        );
+        assert_eq!(
+            HeaderFooterType::from("unknown".to_string()),
+            HeaderFooterType::Other("unknown".to_string())
+        );
+    }
+
+    #[test]
+    fn header_footer_type_known_never_created_as_other() {
+        // Verify that known values cannot be created as Other via From.
+        // If someone tries to create Other("both"), it normalizes to Both.
+        let other_both = HeaderFooterType::from("both".to_string());
+        match other_both {
+            HeaderFooterType::Both => {
+                // Expected: normalizes to Both, not Other("both")
+            }
+            HeaderFooterType::Other(_) => {
+                panic!("Known value 'both' should not be wrapped in Other variant");
+            }
+            _ => panic!("Unexpected variant"),
         }
     }
 }

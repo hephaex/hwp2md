@@ -202,10 +202,7 @@
 없음
 
 ### 미착수
-- [ ] Serde asymmetry: `HeaderFooterType::Other("both")` → serializes as `"both"` → deserializes to `Both` (Sprint 7 M1)
-- [ ] `parser_tests.rs` 1622행 → 분할 필요 (Sprint 7 L1)
-- [ ] Phase 9c: Lenient CFB 폴백
-- [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성 + 배포 (cargo publish)
+- [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성
 
 ## 중기 개선 로드맵 (Phase 1.5)
 

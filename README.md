@@ -111,7 +111,7 @@ Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-hwp2md = "0.4"
+hwp2md = "0.5"
 ```
 
 ### Convert a file
