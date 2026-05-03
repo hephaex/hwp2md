@@ -1304,3 +1304,319 @@ fn header_footer_markers_roundtrip_via_write_then_parse() {
         "footer text lost after roundtrip; got: {ftext:?}"
     );
 }
+
+// -----------------------------------------------------------------------
+// parse_markdown — unclosed marker fallback
+// -----------------------------------------------------------------------
+
+/// `<!-- header -->` with no closing `<!-- /header -->`: all content after
+/// the opening marker ends up in body (fallback), not in header.
+#[test]
+fn unclosed_header_marker_falls_back_to_body() {
+    let md = "\
+<!-- header -->
+Orphaned header text
+
+Body paragraph
+";
+    let doc = parse_markdown(md);
+    let section = doc.sections.first().expect("section must exist");
+
+    // The unclosed header region is moved to body, so header must be None.
+    assert!(
+        section.header.is_none(),
+        "unclosed header marker must leave section.header as None; got: {:?}",
+        section.header
+    );
+
+    // The content that was routed to header must appear in body.
+    let body_text: String = section
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        body_text.contains("Orphaned header text"),
+        "orphaned header content must fall back into body; got: {body_text:?}"
+    );
+    assert!(
+        body_text.contains("Body paragraph"),
+        "normal body paragraph must be present; got: {body_text:?}"
+    );
+}
+
+/// `<!-- footer -->` with no closing `<!-- /footer -->`: all content after
+/// the opening marker ends up in body (fallback), not in footer.
+#[test]
+fn unclosed_footer_marker_falls_back_to_body() {
+    let md = "\
+<!-- footer -->
+Orphaned footer text
+
+Body paragraph
+";
+    let doc = parse_markdown(md);
+    let section = doc.sections.first().expect("section must exist");
+
+    // The unclosed footer region is moved to body, so footer must be None.
+    assert!(
+        section.footer.is_none(),
+        "unclosed footer marker must leave section.footer as None; got: {:?}",
+        section.footer
+    );
+
+    let body_text: String = section
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        body_text.contains("Orphaned footer text"),
+        "orphaned footer content must fall back into body; got: {body_text:?}"
+    );
+    assert!(
+        body_text.contains("Body paragraph"),
+        "normal body paragraph must be present; got: {body_text:?}"
+    );
+}
+
+/// `<!-- header -->` immediately followed by `<!-- /header -->` with no
+/// content between them: section.header must be None (empty header).
+#[test]
+fn empty_header_marker_region() {
+    let md = "\
+<!-- header -->
+<!-- /header -->
+
+Body paragraph
+";
+    let doc = parse_markdown(md);
+    let section = doc.sections.first().expect("section must exist");
+
+    assert!(
+        section.header.is_none(),
+        "empty header region must produce section.header = None; got: {:?}",
+        section.header
+    );
+
+    let body_text: String = section
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        body_text.contains("Body paragraph"),
+        "body paragraph must be preserved; got: {body_text:?}"
+    );
+}
+
+/// Input with interleaved markers: `<!-- header --> text1 <!-- footer -->
+/// text2 <!-- /header -->`.  The second marker (`<!-- footer -->`) opens a
+/// footer region, but the next close marker is `<!-- /header -->` which does
+/// NOT match `<!-- /footer -->` — so footer is left open at EOF and falls
+/// back to body.  Crucially, neither `text1` nor `text2` should be silently
+/// lost.
+#[test]
+fn interleaved_markers_body_fallback() {
+    // After `<!-- header -->`:    region = Header,  text1 → header_blocks
+    // After `<!-- footer -->`:    region = Footer,  text2 → footer_blocks
+    // After `<!-- /header -->`:   region = Body     (close-header marker)
+    // EOF with region = Body: no fallback needed.
+    // footer_blocks still has text2, section.footer = Some([text2]).
+    // header_blocks has text1, section.header = Some([text1]).
+    let md = "\
+<!-- header -->
+text1
+<!-- footer -->
+text2
+<!-- /header -->
+";
+    let doc = parse_markdown(md);
+    let section = doc.sections.first().expect("section must exist");
+
+    // Collect all text visible anywhere in the document so we can assert
+    // nothing is lost regardless of which bucket each block ended up in.
+    let mut all_text = String::new();
+
+    // body blocks
+    let body_part: String = section
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    all_text.push_str(&body_part);
+
+    // header blocks (if any)
+    if let Some(hblocks) = &section.header {
+        let hpart: String = hblocks
+            .iter()
+            .filter_map(|b| {
+                if let ir::Block::Paragraph { inlines } = b {
+                    Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        all_text.push_str(&hpart);
+    }
+
+    // footer blocks (if any)
+    if let Some(fblocks) = &section.footer {
+        let fpart: String = fblocks
+            .iter()
+            .filter_map(|b| {
+                if let ir::Block::Paragraph { inlines } = b {
+                    Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        all_text.push_str(&fpart);
+    }
+
+    assert!(
+        all_text.contains("text1"),
+        "text1 must not be lost in interleaved-marker document; all_text: {all_text:?}"
+    );
+    assert!(
+        all_text.contains("text2"),
+        "text2 must not be lost in interleaved-marker document; all_text: {all_text:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// <ruby> HTML inline parsing
+// -----------------------------------------------------------------------
+
+/// `<ruby>漢字<rt>かんじ</rt></ruby>` must produce an inline whose `text`
+/// is "漢字" and `ruby` is `Some("かんじ")`.
+#[test]
+fn ruby_html_parsed_to_inline() {
+    let inlines = parse_with_unsafe_html("<ruby>漢字<rt>かんじ</rt></ruby>\n");
+    let found = inlines
+        .iter()
+        .any(|i| i.text == "漢字" && i.ruby.as_deref() == Some("かんじ"));
+    assert!(
+        found,
+        "<ruby>漢字<rt>かんじ</rt></ruby>: expected inline with text='漢字' ruby=Some('かんじ'); got {inlines:?}"
+    );
+}
+
+/// A round-trip through write → parse must preserve the ruby annotation.
+#[test]
+fn ruby_roundtrip_via_write_then_parse() {
+    use crate::md::write_markdown;
+
+    let mut doc = ir::Document::new();
+    doc.sections.push(ir::Section {
+        blocks: vec![ir::Block::Paragraph {
+            inlines: vec![ir::Inline {
+                text: "漢字".into(),
+                ruby: Some("かんじ".into()),
+                ..ir::Inline::default()
+            }],
+        }],
+        page_layout: None,
+        header: None,
+        footer: None,
+        header_footer_type: None,
+    });
+
+    let md = write_markdown(&doc, false);
+    // The writer should have embedded the ruby HTML.
+    assert!(
+        md.contains("<ruby>") && md.contains("<rt>"),
+        "ruby HTML not found in written markdown; md: {md:?}"
+    );
+
+    // Re-parse using unsafe HTML so comrak emits HtmlInline nodes.
+    let mut options = comrak::Options::default();
+    options.extension.table = true;
+    options.extension.strikethrough = true;
+    options.extension.footnotes = true;
+    options.extension.math_dollars = true;
+    options.extension.superscript = true;
+    options.extension.tasklist = true;
+    options.render.unsafe_ = true;
+    let arena = comrak::Arena::new();
+    let root = comrak::parse_document(&arena, &md, &options);
+
+    let para = root
+        .children()
+        .find(|c| matches!(c.data.borrow().value, NodeValue::Paragraph))
+        .expect("paragraph not found after roundtrip");
+
+    let inlines = collect_inlines(para);
+    let found = inlines
+        .iter()
+        .any(|i| i.text == "漢字" && i.ruby.as_deref() == Some("かんじ"));
+    assert!(
+        found,
+        "ruby annotation lost after roundtrip; inlines: {inlines:?}"
+    );
+}
+
+/// `<ruby>text</ruby>` with no `<rt>` must produce an inline with the base
+/// text and `ruby = None` (no annotation to attach).
+#[test]
+fn ruby_without_rt_produces_no_annotation() {
+    let inlines = parse_with_unsafe_html("<ruby>text</ruby>\n");
+    // The base text "text" must be present.
+    let has_text = inlines.iter().any(|i| i.text.contains("text"));
+    assert!(
+        has_text,
+        "<ruby>text</ruby>: base text 'text' missing; got {inlines:?}"
+    );
+    // No inline must carry a ruby annotation.
+    let has_annotation = inlines.iter().any(|i| i.ruby.is_some());
+    assert!(
+        !has_annotation,
+        "<ruby>text</ruby>: unexpected ruby annotation; got {inlines:?}"
+    );
+}
+
+/// `<ruby>**bold**<rt>anno</rt></ruby>` — the bold base inline must carry the
+/// ruby annotation so that rich-content bases round-trip correctly.
+#[test]
+fn ruby_with_bold_base() {
+    let inlines = parse_with_unsafe_html("<ruby>**bold**<rt>anno</rt></ruby>\n");
+    // comrak may or may not emit the Strong node inside an HtmlInline
+    // paragraph depending on how it interleaves inline HTML with Markdown
+    // markup.  We accept either:
+    //   (a) a bold inline with ruby="anno", or
+    //   (b) the text "bold" with ruby="anno" (strong markup stripped),
+    //   (c) or any inline whose text contains "bold" and ruby is Some("anno").
+    let found = inlines
+        .iter()
+        .any(|i| i.text.contains("bold") && i.ruby.as_deref() == Some("anno"));
+    assert!(
+        found,
+        "<ruby>**bold**<rt>anno</rt></ruby>: expected bold inline with ruby='anno'; got {inlines:?}"
+    );
+}

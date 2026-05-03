@@ -241,7 +241,7 @@ fn header_footer_type_both_parsed() {
 
     assert_eq!(
         s.header_footer_type,
-        Some("both".to_string()),
+        Some(ir::HeaderFooterType::Both),
         "type attribute 'both' must be parsed"
     );
 }
@@ -260,7 +260,7 @@ fn header_footer_type_even_parsed() {
 
     assert_eq!(
         s.header_footer_type,
-        Some("even".to_string()),
+        Some(ir::HeaderFooterType::Even),
         "type attribute 'even' must be parsed"
     );
 }
@@ -279,7 +279,7 @@ fn header_footer_type_odd_parsed() {
 
     assert_eq!(
         s.header_footer_type,
-        Some("odd".to_string()),
+        Some(ir::HeaderFooterType::Odd),
         "type attribute 'odd' must be parsed"
     );
 }

@@ -93,6 +93,37 @@ impl PageLayout {
     }
 }
 
+/// Scope of a `<hp:headerFooter>` element, from the OWPML `type` attribute.
+///
+/// The OWPML specification defines three known values; any other value that
+/// appears in the wild is preserved via the [`Other`][HeaderFooterType::Other]
+/// variant so that round-trip fidelity is not lost for non-standard documents.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HeaderFooterType {
+    /// Applies to all pages (`type="both"`).
+    Both,
+    /// Applies to even-numbered pages only (`type="even"`).
+    Even,
+    /// Applies to odd-numbered pages only (`type="odd"`).
+    Odd,
+    /// An unrecognised value preserved verbatim for round-trip fidelity.
+    #[serde(untagged)]
+    Other(String),
+}
+
+impl HeaderFooterType {
+    /// Return the OWPML attribute string for this variant.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Both => "both",
+            Self::Even => "even",
+            Self::Odd => "odd",
+            Self::Other(s) => s.as_str(),
+        }
+    }
+}
+
 /// A logical section of a document containing an ordered sequence of blocks.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Section {
@@ -116,10 +147,10 @@ pub struct Section {
     pub footer: Option<Vec<Block>>,
     /// Header/footer scope (from `<hp:headerFooter type="…">` attribute).
     ///
-    /// Possible values: `"both"`, `"even"`, `"odd"`, or `None` (document default).
+    /// `None` means no `type` attribute was present (document default).
     /// This specifies which pages the header/footer applies to.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub header_footer_type: Option<String>,
+    pub header_footer_type: Option<HeaderFooterType>,
 }
 
 /// A block-level content element within a section.
@@ -498,5 +529,34 @@ mod tests {
         };
         let cloned = item.clone();
         assert_eq!(cloned.checked, Some(true));
+    }
+
+    #[test]
+    fn header_footer_type_serde_roundtrip() {
+        use serde_json;
+
+        // Known variants serialize to their camelCase string and deserialize back.
+        let cases: &[(HeaderFooterType, &str)] = &[
+            (HeaderFooterType::Both, r#""both""#),
+            (HeaderFooterType::Even, r#""even""#),
+            (HeaderFooterType::Odd, r#""odd""#),
+            (HeaderFooterType::Other("custom".to_string()), r#""custom""#),
+        ];
+
+        for (variant, expected_json) in cases {
+            let json = serde_json::to_string(variant)
+                .unwrap_or_else(|e| panic!("serialize {variant:?} failed: {e}"));
+            assert_eq!(
+                json, *expected_json,
+                "serialized form mismatch for {variant:?}"
+            );
+
+            let back: HeaderFooterType = serde_json::from_str(&json)
+                .unwrap_or_else(|e| panic!("deserialize {json:?} failed: {e}"));
+            assert_eq!(
+                back, *variant,
+                "deserialized value mismatch for {variant:?}"
+            );
+        }
     }
 }

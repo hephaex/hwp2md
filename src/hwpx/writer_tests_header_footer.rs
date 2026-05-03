@@ -1,5 +1,5 @@
 use super::*;
-use crate::ir::{Block, Document, Inline, Metadata, Section};
+use crate::ir::{self, Block, Document, Inline, Metadata, Section};
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
@@ -156,7 +156,7 @@ fn header_footer_type_both() {
         page_layout: None,
         header: Some(vec![plain_para("Header")]),
         footer: None,
-        header_footer_type: Some("both".to_string()),
+        header_footer_type: Some(ir::HeaderFooterType::Both),
     };
     let xml = section_xml_with_hf(sec);
 
@@ -174,7 +174,7 @@ fn header_footer_type_even() {
         page_layout: None,
         header: Some(vec![plain_para("Header")]),
         footer: Some(vec![plain_para("Footer")]),
-        header_footer_type: Some("even".to_string()),
+        header_footer_type: Some(ir::HeaderFooterType::Even),
     };
     let xml = section_xml_with_hf(sec);
 
@@ -192,7 +192,7 @@ fn header_footer_type_odd() {
         page_layout: None,
         header: Some(vec![plain_para("Header")]),
         footer: Some(vec![plain_para("Footer")]),
-        header_footer_type: Some("odd".to_string()),
+        header_footer_type: Some(ir::HeaderFooterType::Odd),
     };
     let xml = section_xml_with_hf(sec);
 

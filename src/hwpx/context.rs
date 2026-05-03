@@ -104,7 +104,7 @@ pub(crate) struct HeaderFooterState {
     /// Temporary inline buffer used while parsing header/footer paragraphs.
     pub(crate) inlines: Vec<ir::Inline>,
     /// The `type` attribute of the `<hp:headerFooter>` element (e.g. "both", "even", "odd").
-    pub(crate) hf_type: Option<String>,
+    pub(crate) hf_type: Option<ir::HeaderFooterType>,
 }
 
 /// Page layout parsed from `<hp:secPr>` and its children.

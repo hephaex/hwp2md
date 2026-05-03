@@ -149,8 +149,13 @@ pub(super) fn handle_start_element(
             for attr in e.attributes().flatten() {
                 let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                 if key == "type" || key == "hp:type" {
-                    ctx.header_footer.hf_type =
-                        Some(attr.unescape_value().unwrap_or_default().to_string());
+                    let val = attr.unescape_value().unwrap_or_default().to_string();
+                    ctx.header_footer.hf_type = Some(match val.as_str() {
+                        "both" => ir::HeaderFooterType::Both,
+                        "even" => ir::HeaderFooterType::Even,
+                        "odd" => ir::HeaderFooterType::Odd,
+                        other => ir::HeaderFooterType::Other(other.to_string()),
+                    });
                 }
             }
         }

@@ -22,7 +22,7 @@ pub fn parse_markdown(input: &str) -> ir::Document {
     // `<!-- footer -->` / `<!-- /footer -->` marker pairs.  The markers are
     // detected at the comrak AST level (before `node_to_block` is called) so
     // that they never appear as IR blocks themselves.
-    #[derive(PartialEq)]
+    #[derive(PartialEq, Debug)]
     enum Region {
         Body,
         Header,
@@ -71,6 +71,19 @@ pub fn parse_markdown(input: &str) -> ir::Document {
                 Region::Header => header_blocks.push(block),
                 Region::Footer => footer_blocks.push(block),
             }
+        }
+    }
+
+    // Unclosed marker fallback: if we reach end-of-input still inside a
+    // Header or Footer region, the marker was never closed.  Move the
+    // misrouted blocks into body_blocks so content is not silently lost,
+    // and warn the caller.
+    if region != Region::Body {
+        tracing::warn!("unclosed {region:?} marker in markdown input, falling back to body");
+        match region {
+            Region::Header => body_blocks.append(&mut header_blocks),
+            Region::Footer => body_blocks.append(&mut footer_blocks),
+            Region::Body => unreachable!(),
         }
     }
 
@@ -353,10 +366,25 @@ fn collect_inlines_recursive<'a>(
     style: InlineStyle,
 ) {
     let mut current_style = style.clone();
+
+    // Ruby annotation state: tracks `<ruby>…<rt>annotation</rt></ruby>` sequences
+    // in the inline HTML node stream emitted by comrak.
+    let mut in_ruby = false;
+    let mut in_rt = false;
+    let mut ruby_annotation = String::new();
+    // Index into `inlines` at which the current ruby base span started.
+    let mut ruby_base_start: usize = 0;
+
     for child in node.children() {
         let data = child.data.borrow();
         match &data.value {
             NodeValue::Text(text) => {
+                // When inside <rt>…</rt>, accumulate annotation text rather than
+                // emitting a regular inline.
+                if in_rt {
+                    ruby_annotation.push_str(text);
+                    continue;
+                }
                 inlines.push(
                     ir::Inline::with_formatting(
                         text.clone(),
@@ -372,28 +400,57 @@ fn collect_inlines_recursive<'a>(
                 );
             }
             NodeValue::SoftBreak | NodeValue::LineBreak => {
-                inlines.push(ir::Inline::plain("\n"));
+                if !in_rt {
+                    inlines.push(ir::Inline::plain("\n"));
+                }
             }
             NodeValue::Code(code) => {
-                inlines.push(ir::Inline {
-                    text: code.literal.clone(),
-                    bold: false,
-                    italic: false,
-                    underline: false,
-                    strikethrough: false,
-                    code: true,
-                    superscript: false,
-                    subscript: false,
-                    link: None,
-                    footnote_ref: None,
-                    color: None,
-                    font_name: None,
-                    ruby: None,
-                });
+                if !in_rt {
+                    inlines.push(ir::Inline {
+                        text: code.literal.clone(),
+                        bold: false,
+                        italic: false,
+                        underline: false,
+                        strikethrough: false,
+                        code: true,
+                        superscript: false,
+                        subscript: false,
+                        link: None,
+                        footnote_ref: None,
+                        color: None,
+                        font_name: None,
+                        ruby: None,
+                    });
+                }
             }
             NodeValue::HtmlInline(html) => {
                 let tag = html.trim();
-                if tag.eq_ignore_ascii_case("<u>") {
+                if tag.eq_ignore_ascii_case("<ruby>") {
+                    in_ruby = true;
+                    in_rt = false;
+                    ruby_annotation.clear();
+                    ruby_base_start = inlines.len();
+                    continue;
+                } else if tag.eq_ignore_ascii_case("<rt>") {
+                    in_rt = true;
+                    continue;
+                } else if tag.eq_ignore_ascii_case("</rt>") {
+                    in_rt = false;
+                    continue;
+                } else if tag.eq_ignore_ascii_case("</ruby>") {
+                    // Attach the accumulated annotation to every inline that
+                    // was emitted as part of the ruby base span.
+                    if in_ruby && !ruby_annotation.is_empty() {
+                        let annotation = ruby_annotation.clone();
+                        for inline in &mut inlines[ruby_base_start..] {
+                            inline.ruby = Some(annotation.clone());
+                        }
+                    }
+                    in_ruby = false;
+                    in_rt = false;
+                    ruby_annotation.clear();
+                    continue;
+                } else if tag.eq_ignore_ascii_case("<u>") {
                     current_style.underline = true;
                     continue;
                 } else if tag.eq_ignore_ascii_case("</u>") {
@@ -412,6 +469,9 @@ fn collect_inlines_recursive<'a>(
             NodeValue::Strong => {
                 let mut s = current_style.clone();
                 s.bold = true;
+                // For ruby base spans that contain rich content (e.g. bold),
+                // recurse and then patch the newly-added inlines with the ruby
+                // annotation when </ruby> is encountered later.
                 collect_inlines_recursive(child, inlines, s);
             }
             NodeValue::Emph => {

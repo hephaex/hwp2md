@@ -65,6 +65,7 @@ pub(super) fn generate_section_xml(
         if let Some(hf_type) = &section.header_footer_type {
             hf_elem.push_attribute(("type", hf_type.as_str()));
         }
+
         writer.write_event(Event::Start(hf_elem))?;
         let mut para_id_hf: u32 = 0;
         if has_header {
