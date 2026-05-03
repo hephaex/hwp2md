@@ -80,11 +80,8 @@ pub fn parse_markdown(input: &str) -> ir::Document {
     // and warn the caller.
     if region != Region::Body {
         tracing::warn!("unclosed {region:?} marker in markdown input, falling back to body");
-        match region {
-            Region::Header => body_blocks.append(&mut header_blocks),
-            Region::Footer => body_blocks.append(&mut footer_blocks),
-            Region::Body => unreachable!(),
-        }
+        body_blocks.append(&mut header_blocks);
+        body_blocks.append(&mut footer_blocks);
     }
 
     let section = ir::Section {
@@ -426,6 +423,10 @@ fn collect_inlines_recursive<'a>(
             NodeValue::HtmlInline(html) => {
                 let tag = html.trim();
                 if tag.eq_ignore_ascii_case("<ruby>") {
+                    if in_ruby {
+                        tracing::warn!("nested <ruby> not supported, ignoring inner");
+                        continue;
+                    }
                     in_ruby = true;
                     in_rt = false;
                     ruby_annotation.clear();
