@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 7 완료 (unclosed marker fallback + HeaderFooterType enum + ruby HTML parsing)
+## 현재 상태: v0.5.0 Sprint 8 완료 (test split + serde fix + publish prep)
 
 ### 완료
 
@@ -197,11 +197,19 @@
   - 리뷰 수정: multi-region drain (header+footer both drained), nested `<ruby>` guard
   - 1091 테스트 (949 unit + 23 CLI + 46 integration + 30 roundtrip + 기타, 0 failures)
 
+- [x] v0.5.0 Sprint 8 — test split + serde fix + publish prep (1ffd314):
+  - S8-01: `parser_tests.rs` 1622행 → 3파일 분할 (521+390+730행, 69 테스트 보존)
+  - S8-02: `HeaderFooterType` `From<String>` normalizer — serde asymmetry 해결
+  - S8-03: PROGRESS.md Phase 9b/9c 완료 확인 + 로드맵 정리
+  - S8-04: `cargo publish --dry-run` 통과, Cargo.toml v0.5.0, CHANGELOG.md 작성
+  - 1094 테스트 (952 unit + 23 CLI + 46 integration + 30 roundtrip + 기타, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
+- [ ] `From<String>` edge case 테스트 (empty, whitespace, capitalized) (Sprint 8 M1)
 - [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성
 
 ## 중기 개선 로드맵 (Phase 1.5)
@@ -271,6 +279,30 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-05-04 — v0.5.0 Sprint 8: Test Split + Serde Fix + Publish Prep
+
+**S8-01: parser_tests.rs 분할** (Sprint 7 L1):
+- `parser_tests.rs` (1622행) → 3 파일: `parser_tests.rs` (521행, 31 core), `parser_tests_inline.rs` (390행, 19 inline), `parser_tests_marker.rs` (730행, 19 marker)
+- `#[cfg(test)] #[path]` 패턴, `pub(super)` 헬퍼 공유
+
+**S8-02: HeaderFooterType serde 수정** (Sprint 7 M2):
+- `From<String>` impl: `"both"/"even"/"odd"` → enum variant 자동 정규화
+- `handlers.rs` simplified: explicit match → `.into()`
+- 3 새 테스트
+
+**S8-03: PROGRESS.md 정리**:
+- Phase 9b (crypto) + 9c (lenient CFB + ruby) 이미 구현 확인 → 완료 처리
+
+**S8-04: v0.5.0 배포 준비**:
+- Cargo.toml v0.5.0, README dependency `"0.5"`, CHANGELOG.md 작성
+- `cargo publish --dry-run` 통과 (93 files, 240.8 KiB)
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 1 MEDIUM, 1 LOW):
+- M1: `From<String>` edge case 미테스트 (empty, whitespace, capitalized)
+- L1: `From<&str>` 편의 impl 부재
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1094 테스트 (0 failures), publish dry-run 통과
 
 ### 2026-05-04 — v0.5.0 Sprint 7: Unclosed Marker Fallback + HeaderFooterType Enum + Ruby HTML Parsing
 
