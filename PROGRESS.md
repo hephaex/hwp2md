@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 6 완료 (MD header/footer round-trip + DRM integration test + headerFooter type)
+## 현재 상태: v0.5.0 Sprint 7 완료 (unclosed marker fallback + HeaderFooterType enum + ruby HTML parsing)
 
 ### 완료
 
@@ -189,16 +189,22 @@
   - S6-03: `<hp:headerFooter type="both|even|odd">` 속성 파싱/출력 — IR Section에 `header_footer_type` 필드 추가 (Sprint 4 L1)
   - 1082 테스트 (940 unit + 23 CLI + 46 integration + 30 roundtrip + 기타, 0 failures)
 
+- [x] v0.5.0 Sprint 7 — unclosed marker fallback + HeaderFooterType enum + ruby HTML parsing (e4ae1d9 + a098423):
+  - S7-01: Unclosed marker fallback — `region != Body` at EOF → warn + drain all non-body blocks to body (Sprint 6 M1)
+  - S7-02: `HeaderFooterType` enum (`Both`/`Even`/`Odd`/`Other(String)`) replacing `Option<String>` (Sprint 6 M3)
+  - S7-03: MD parser `<ruby>base<rt>annotation</rt></ruby>` HTML parsing → IR inline ruby field
+  - S7-04: HWP CTRL_RUBY already fully implemented — verified 35 existing ruby tests
+  - 리뷰 수정: multi-region drain (header+footer both drained), nested `<ruby>` guard
+  - 1091 테스트 (949 unit + 23 CLI + 46 integration + 30 roundtrip + 기타, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
-- [ ] Unclosed marker fallback (Sprint 6 리뷰 M1) — EOF in non-Body region 경고/폴백
-- [ ] Interleaved marker edge case (Sprint 6 리뷰 M2) — `<!-- header --> <!-- footer -->` 중첩 처리
-- [ ] `header_footer_type` enum 타입화 (Sprint 6 리뷰 M3) — `Option<String>` → enum
-- [ ] Phase 9b: 배포문서 복호화 (AES-128 ECB, LCG+XOR, ViewText 스트림)
-- [ ] Phase 9c: Lenient CFB 폴백 + Ruby 텍스트 컨트롤
+- [ ] Serde asymmetry: `HeaderFooterType::Other("both")` → serializes as `"both"` → deserializes to `Both` (Sprint 7 M1)
+- [ ] `parser_tests.rs` 1622행 → 분할 필요 (Sprint 7 L1)
+- [ ] Phase 9c: Lenient CFB 폴백
 - [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성 + 배포 (cargo publish)
 
 ## 중기 개선 로드맵 (Phase 1.5)
@@ -268,6 +274,31 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-05-04 — v0.5.0 Sprint 7: Unclosed Marker Fallback + HeaderFooterType Enum + Ruby HTML Parsing
+
+**S7-01: Unclosed marker fallback** (Sprint 6 리뷰 M1):
+- `parse_markdown()` Region state machine: EOF에서 `region != Body`이면 header_blocks + footer_blocks 모두 body로 drain
+- `tracing::warn!` 경고 출력
+- 4 테스트: unclosed header/footer, empty marker region, interleaved markers
+
+**S7-02: HeaderFooterType enum** (Sprint 6 리뷰 M3):
+- `HeaderFooterType` enum: `Both`, `Even`, `Odd`, `Other(String)` — `#[serde(rename_all = "camelCase")]`
+- `as_str()` 메서드 + serde roundtrip 테스트
+- HWPX reader/writer/tests 전수 마이그레이션
+
+**S7-03: Ruby HTML parsing** (Phase 9c):
+- MD parser: `<ruby>`, `<rt>`, `</rt>`, `</ruby>` 태그 상태 머신
+- `ruby_base_start` 인덱스로 복수 base inline에 annotation 일괄 적용
+- 4 테스트: basic ruby, roundtrip, without rt, bold base
+
+**S7-04: HWP CTRL_RUBY** — 이미 완전 구현 확인 (35 ruby 테스트 통과)
+
+**리뷰 수정** (1 HIGH + 2 MEDIUM):
+- HIGH: nested `<ruby>` guard 추가 (tracing::warn + skip)
+- MEDIUM: multi-region drain — unclosed marker 시 header+footer 모두 body로 drain (단일 region만 drain하던 버그 수정)
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1091 테스트 (0 failures)
 
 ### 2026-05-03 — v0.5.0 Sprint 6: MD Header/Footer Round-trip + DRM Integration Test + HeaderFooter Type
 
