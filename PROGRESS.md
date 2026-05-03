@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 4 완료 (B-4 header/footer + --force + ConvertOptions)
+## 현재 상태: v0.5.0 Sprint 5 완료 (C-4 structured errors + D-2 CI matrix + D-3 coverage)
 
 ### 완료
 
@@ -169,21 +169,27 @@
   - Sprint 2 리뷰 M1 수정: 전용 `Hwp2MdError::FileTooLarge { path, size, limit }` 변형으로 256MB 가드 분리
   - 1021 테스트 (887 unit + 21 CLI + 46 integration + 27 roundtrip + 기타, 0 failures)
 
-- [x] v0.5.0 Sprint 4 — B-4 + M3 + C-3 (이번 스프린트):
+- [x] v0.5.0 Sprint 4 — B-4 + M3 + C-3 (ad511aa):
   - Phase B-4: Header/footer 읽기 — `ir::Section`에 `header`/`footer` `Option<Vec<Block>>` 추가, HWPX `<hp:headerFooter>` → `<hp:header>`/`<hp:footer>` 파싱, MD `<!-- header -->` / `<!-- footer -->` 마커 출력, HWPX writer round-trip
   - Phase M3 (Sprint 3 리뷰): `convert` 서브커맨드 `--force` 플래그 — 기존 출력 파일 덮어쓰기 보호
   - Phase C-3: `ConvertOptions<'a>` builder 패턴 — `assets_dir`, `frontmatter`, `style`, `force` 통합 fluent API, `lib.rs`에서 re-export
   - 리뷰 수정: `push_block_scoped`/`flush_active_paragraph_scope`에 header/footer scope 분기 추가, `headerFooter` 시작 시 블록 버퍼 초기화
   - 1062 테스트 (923 unit + 23 CLI + 46 integration + 29 roundtrip + 기타, 0 failures)
 
+- [x] v0.5.0 Sprint 5 — C-4 + D-2 + D-3 (이번 스프린트):
+  - Phase C-4: 구조화된 에러 — `OutputExists { path }` (--force 가드), `DrmProtected { path }` (암호화 HWP) 전용 variant 추가, convert_auto/ConvertOptions/hwp::reader 마이그레이션
+  - Phase D-2: Cross-platform CI — ubuntu/windows/macos 매트릭스, MSRV 1.75.0, lint 분리(ubuntu only)
+  - Phase D-3: Coverage reporting — cargo-tarpaulin + Codecov 업로드 + README 배지
+  - 리뷰 수정 (CRITICAL): `read_hwp()` lenient fallback이 DrmProtected 에러를 삼키는 버그 수정, taiki-e/install-action으로 tarpaulin 설치 최적화
+  - 1065 테스트 (926 unit + 23 CLI + 46 integration + 29 roundtrip + 기타, 0 failures)
+
 ### 진행 중
 
 없음
 
 ### 미착수
-- [ ] Phase C-4: 구조화된 에러 페이로드 (String → (file_path, line, element))
-- [ ] Phase D-2: Cross-platform CI (Windows/macOS + MSRV 1.75 검증)
-- [ ] Phase D-3: Coverage reporting (cargo-llvm-cov → Codecov badge)
+- [ ] MD parser `<!-- header -->` / `<!-- footer -->` 마커 round-trip (Sprint 4 리뷰 M2)
+- [ ] `<hp:headerFooter type="">` 속성 파싱 (Sprint 4 리뷰 L1)
 - [ ] Phase 9b: 배포문서 복호화 (AES-128 ECB, LCG+XOR, ViewText 스트림)
 - [ ] Phase 9c: Lenient CFB 폴백 + Ruby 텍스트 컨트롤
 - [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성 + 배포 (cargo publish)
@@ -255,6 +261,31 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-05-03 — v0.5.0 Sprint 5: Structured Errors + Cross-platform CI + Coverage
+
+**Phase C-4: Structured error payloads**:
+- `Hwp2MdError::OutputExists { path: PathBuf }` — `--force` 가드에서 `UnsupportedFormat` 남용 교체
+- `Hwp2MdError::DrmProtected { path: PathBuf }` — 암호화 HWP에서 `HwpParse(String)` 남용 교체
+- `convert_auto`, `ConvertOptions::execute` → `OutputExists` 사용
+- `hwp::reader::parse_hwp_file` → `DrmProtected` 사용
+- Display 포맷 검증 테스트 + 패턴 매칭 검증 테스트
+
+**Phase D-2: Cross-platform CI**:
+- GitHub Actions 매트릭스: ubuntu-latest + windows-latest + macos-latest
+- MSRV 1.75.0 핀, `fail-fast: false`
+- lint (clippy + fmt) 분리 → ubuntu only
+
+**Phase D-3: Coverage reporting**:
+- cargo-tarpaulin (ubuntu, stable toolchain) + cobertura.xml 출력
+- Codecov 업로드 (codecov-action@v4, `fail_ci_if_error: false`)
+- README.md Codecov 배지 추가
+
+**리뷰 수정** (1 CRITICAL + 1 HIGH):
+- CRITICAL: `read_hwp()` lenient fallback이 `DrmProtected` 에러를 삼킴 → 조기 반환 가드 추가
+- HIGH: `cargo install cargo-tarpaulin` → `taiki-e/install-action@v2` 프리빌트 바이너리 (CI 5-10분 절약)
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1065 테스트 (0 failures)
 
 ### 2026-05-02 — v0.5.0 Sprint 4: Header/Footer + --force + ConvertOptions
 
