@@ -66,6 +66,20 @@ enum Commands {
         #[arg(long)]
         force: bool,
     },
+    /// Batch-convert all HWP/HWPX files in a directory to Markdown
+    Batch {
+        /// Input directory containing .hwp/.hwpx files
+        input_dir: PathBuf,
+        /// Output directory for .md files (default: same as input)
+        #[arg(short, long)]
+        output_dir: Option<PathBuf>,
+        /// Include frontmatter metadata
+        #[arg(long)]
+        frontmatter: bool,
+        /// Overwrite existing output files
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -110,6 +124,112 @@ fn main() -> Result<()> {
         } => {
             hwp2md::convert::convert_auto(&input, &output, force)?;
         }
+        Commands::Batch {
+            input_dir,
+            output_dir,
+            frontmatter,
+            force,
+        } => {
+            run_batch(&input_dir, output_dir.as_deref(), frontmatter, force)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Batch-convert all `.hwp` / `.hwpx` files in `input_dir` to Markdown.
+///
+/// Each converted file is placed in `output_dir` (or `input_dir` when not
+/// supplied) with the same stem and a `.md` extension.  Conversion errors for
+/// individual files are logged and counted; the function returns `Ok(())` as
+/// long as at least one file succeeded (or zero files were found).  It only
+/// returns an `Err` when the input directory cannot be read or all files
+/// failed.
+fn run_batch(
+    input_dir: &std::path::Path,
+    output_dir: Option<&std::path::Path>,
+    frontmatter: bool,
+    force: bool,
+) -> Result<()> {
+    if !input_dir.exists() {
+        anyhow::bail!(
+            "input directory does not exist: {}",
+            input_dir.display()
+        );
+    }
+    if !input_dir.is_dir() {
+        anyhow::bail!(
+            "input path is not a directory: {}",
+            input_dir.display()
+        );
+    }
+
+    let out_dir = output_dir.unwrap_or(input_dir);
+    if !out_dir.exists() {
+        std::fs::create_dir_all(out_dir)?;
+    }
+
+    let entries = std::fs::read_dir(input_dir)?;
+
+    let mut converted: usize = 0;
+    let mut errors: usize = 0;
+
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path();
+
+        if !path.is_file() {
+            continue;
+        }
+
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        if ext != "hwp" && ext != "hwpx" {
+            continue;
+        }
+
+        let stem = match path.file_stem().and_then(|s| s.to_str()) {
+            Some(s) => s.to_owned(),
+            None => {
+                tracing::warn!("Skipping file with non-UTF-8 stem: {:?}", path);
+                errors += 1;
+                continue;
+            }
+        };
+
+        let out_path = out_dir.join(format!("{stem}.md"));
+
+        if !force && out_path.exists() {
+            eprintln!(
+                "Skipping {:?}: output already exists (use --force to overwrite)",
+                path.display()
+            );
+            errors += 1;
+            continue;
+        }
+
+        match hwp2md::convert::to_markdown(&path, Some(&out_path), None, frontmatter) {
+            Ok(()) => {
+                println!("Converted: {} -> {}", path.display(), out_path.display());
+                converted += 1;
+            }
+            Err(e) => {
+                eprintln!("Error converting {}: {e}", path.display());
+                errors += 1;
+            }
+        }
+    }
+
+    println!("Converted {converted} files, {errors} errors");
+
+    if converted == 0 && errors > 0 {
+        // Only surface an error when every attempted file failed.
+        // An empty directory is still considered success.
+        anyhow::bail!("All {errors} file(s) failed to convert");
     }
 
     Ok(())

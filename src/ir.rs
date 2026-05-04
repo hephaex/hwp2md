@@ -124,20 +124,29 @@ impl HeaderFooterType {
     }
 }
 
-impl From<String> for HeaderFooterType {
-    /// Construct a `HeaderFooterType` from a string, normalizing known values.
+impl From<&str> for HeaderFooterType {
+    /// Construct a `HeaderFooterType` from a string slice, normalizing known values.
     ///
     /// Known OWPML values (`"both"`, `"even"`, `"odd"`) are converted to their
     /// corresponding enum variants. Any unrecognized value becomes [`Other`][Self::Other].
     /// This ensures that known values can only be constructed via their dedicated variants,
     /// maintaining serde round-trip consistency.
-    fn from(s: String) -> Self {
-        match s.as_str() {
+    fn from(s: &str) -> Self {
+        match s {
             "both" => Self::Both,
             "even" => Self::Even,
             "odd" => Self::Odd,
-            _ => Self::Other(s),
+            other => Self::Other(other.to_string()),
         }
+    }
+}
+
+impl From<String> for HeaderFooterType {
+    /// Construct a `HeaderFooterType` from an owned string, normalizing known values.
+    ///
+    /// This delegates to [`From<&str>`] to avoid code duplication.
+    fn from(s: String) -> Self {
+        Self::from(s.as_str())
     }
 }
 
@@ -621,5 +630,34 @@ mod tests {
             }
             _ => panic!("Unexpected variant"),
         }
+    }
+
+    #[test]
+    fn header_footer_type_from_empty_string() {
+        // Empty string should become Other(""), not panic or match a known variant.
+        let result = HeaderFooterType::from("");
+        assert_eq!(result, HeaderFooterType::Other("".to_string()));
+    }
+
+    #[test]
+    fn header_footer_type_from_whitespace() {
+        // Whitespace is not trimmed — " both " is treated as unknown.
+        let result = HeaderFooterType::from(" both ");
+        assert_eq!(result, HeaderFooterType::Other(" both ".to_string()));
+    }
+
+    #[test]
+    fn header_footer_type_from_capitalized() {
+        // Matching is case-sensitive — "Both" is treated as unknown, not normalized.
+        let result = HeaderFooterType::from("Both");
+        assert_eq!(result, HeaderFooterType::Other("Both".to_string()));
+    }
+
+    #[test]
+    fn header_footer_type_from_str_ref() {
+        // Verify From<&str> works correctly with known values.
+        assert_eq!(HeaderFooterType::from("both"), HeaderFooterType::Both);
+        assert_eq!(HeaderFooterType::from("even"), HeaderFooterType::Even);
+        assert_eq!(HeaderFooterType::from("odd"), HeaderFooterType::Odd);
     }
 }
