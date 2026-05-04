@@ -504,5 +504,9 @@ impl<'a> ConvertOptions<'a> {
 mod tests;
 
 #[cfg(test)]
+#[path = "convert_tests_count.rs"]
+mod tests_count;
+
+#[cfg(test)]
 #[path = "convert_tests_builder.rs"]
 mod tests_builder;

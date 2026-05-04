@@ -179,10 +179,12 @@ fn run_batch(
         let entry = entry?;
 
         if entry.file_name().to_string_lossy().starts_with('.') {
+            tracing::debug!("Skipping hidden file: {:?}", entry.path());
             continue;
         }
 
         if entry.file_type()?.is_symlink() {
+            tracing::debug!("Skipping symlink: {:?}", entry.path());
             continue;
         }
 
