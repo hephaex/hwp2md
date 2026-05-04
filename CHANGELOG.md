@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2026-05-03
+## [0.5.0] - 2026-05-04
 
 ### Added
 - **Phase B-1**: YAML-based style template (`--style`) — `StyleTemplate` with
@@ -81,8 +81,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sprint 9 / S9-03**: `batch` CLI subcommand — directory-level HWP/HWPX → MD
   conversion; `--force` overwrite flag; input validation for missing or
   non-directory paths; 8 integration tests.
+- **Sprint 10 / S10-01**: `batch` hidden-file and symlink guards — dotfiles
+  (`.DS_Store`, `.env`, etc.) and symlinks are silently skipped during
+  directory walk; 2 new CLI tests.
 
 ### Changed
+- **Sprint 10 / S10-02**: `batch` output now reports separate counters:
+  "N converted, M skipped, F failed" — previously-existing files that are
+  skipped without `--force` are counted as "skipped" rather than "errors".
+- **Sprint 10 / S10-03**: `hwpx/writer.rs` split (822 → 390 + 453 lines);
+  image-asset collection, base64, and static XML generators extracted to
+  `writer_content.rs`.
+- **Sprint 10 / S10-04**: Orphaned `reader_tests.rs` (1 296 lines) deleted;
+  4 page-break tests recovered to `reader_tests_structure.rs`.
+- **Sprint 10 / S10-05**: `hwpx_roundtrip.rs` split (1 288 → 275 + 536 +
+  630 lines) into three integration test files.
 - **Sprint 8 / S8-01**: `parser_tests.rs` split (1 622 → 521 + 390 + 730 lines)
   into core, inline, and marker test modules; `pub(super)` shared helpers.
 - **Sprint 9 / S9-02**: `convert.rs` inline tests extracted to `convert_tests.rs`

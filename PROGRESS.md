@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 9 완료 (batch CLI + test splits + From edge cases)
+## 현재 상태: v0.5.0 Sprint 10 완료 (batch hardening + file splits)
 
 ### 완료
 
@@ -210,8 +210,8 @@
 
 ### 미착수
 - [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성
-- [ ] Batch CLI: hidden file/symlink guard (Sprint 9 M1)
-- [ ] Batch CLI: separate skip/error counters (Sprint 9 L1)
+- [ ] Batch CLI: trace logging for skipped hidden/symlink files (Sprint 10 M2)
+- [ ] tests/cli.rs + tests/roundtrip.rs 분할 (Sprint 10 M3)
 
 ## 중기 개선 로드맵 (Phase 1.5)
 
@@ -280,6 +280,38 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-05-04 — v0.5.0 Sprint 10: Batch Hardening + File Splits
+
+**S10-01: Batch hidden file/symlink guard** (Sprint 9 M1):
+- `run_batch()` dir-walk: dotfile (`starts_with('.')`) 필터 + symlink (`file_type()?.is_symlink()`) 필터
+- 2 CLI 테스트: `batch_skips_hidden_files`, `batch_skips_symlinks` (unix-only)
+
+**S10-02: Batch separate skip/error counters** (Sprint 9 L1):
+- `errors` → `skipped` + `failed` 분리
+- 출력 형식: "Batch complete: N converted, M skipped, F failed"
+- skip-existing 은 skipped, 변환 실패는 failed로 분류
+
+**S10-03: hwpx/writer.rs 분할** (코드 품질):
+- `writer.rs` (822행) → `writer.rs` (390행) + `writer_content.rs` (453행)
+- 이미지 수집, base64, 정적 XML 생성 함수 추출
+- `#[path]` + `pub(super)` 패턴, `#[cfg(test)]` re-export
+
+**S10-04: Orphan reader_tests.rs 정리** (코드 품질):
+- 이전 분할에서 orphan된 `reader_tests.rs` (1296행) 삭제
+- 누락된 4 page-break 테스트 `reader_tests_structure.rs`에 복구
+- Clippy `manual_contains` 수정
+
+**S10-05: hwpx_roundtrip.rs 분할** (코드 품질):
+- `hwpx_roundtrip.rs` (1288행) → 3파일 (275+536+630행)
+- 46 roundtrip 테스트 전수 보존
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 3 MEDIUM):
+- M1: `file_type()?.is_symlink()` Windows 호환 제한
+- M2: Hidden/symlink skip 시 trace 로깅 부재
+- M3: `tests/cli.rs` (975행), `tests/roundtrip.rs` (1102행) 800행 초과
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1209 테스트 (0 failures)
 
 ### 2026-05-04 — v0.5.0 Sprint 9: Batch CLI + Test Splits + From Edge Cases
 
