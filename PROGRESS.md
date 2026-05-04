@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 10 완료 (batch hardening + file splits)
+## 현재 상태: v0.5.0 Sprint 11 완료 (trace logging + test splits + orphan cleanup)
 
 ### 완료
 
@@ -210,8 +210,9 @@
 
 ### 미착수
 - [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성
-- [ ] Batch CLI: trace logging for skipped hidden/symlink files (Sprint 10 M2)
-- [ ] tests/cli.rs + tests/roundtrip.rs 분할 (Sprint 10 M3)
+- [ ] tests/common/mod.rs 공통 헬퍼 추출 (Sprint 11 M1)
+- [ ] writer_tests_list.rs 분할 (871행, Sprint 11 L1)
+- [ ] `cargo publish` — crates.io 배포
 
 ## 중기 개선 로드맵 (Phase 1.5)
 
@@ -280,6 +281,32 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-05-04 — v0.5.0 Sprint 11: Trace Logging + Test Splits + Orphan Cleanup
+
+**S11-01: Batch trace logging** (Sprint 10 M2):
+- `run_batch()`: hidden file, symlink skip 시 `tracing::debug!` 로깅 추가
+
+**S11-02: tests/cli.rs 분할** (Sprint 10 M3):
+- `tests/cli.rs` (975행) → `cli.rs` (635행, 23 tests) + `cli_batch.rs` (385행, 10 tests)
+- 공통 헬퍼 (`cargo_bin`, `make_hwpx`) 양쪽 복사
+
+**S11-03: tests/roundtrip.rs 분할** (Sprint 10 M3):
+- `tests/roundtrip.rs` (1102행) → `roundtrip.rs` (622행, 20 tests) + `roundtrip_stability.rs` (505행, 10 tests)
+- 공통 헬퍼 (`plain`, `make_doc`, `first_blocks`) 양쪽 복사
+
+**S11-04: convert_tests 분할 + orphan 삭제**:
+- `src/hwp/convert_tests.rs` (950행) orphan 삭제 — 이미 5개 분할 파일에 전수 포함
+- `src/convert_tests.rs` (808행) → `convert_tests.rs` (517행, 33 tests) + `convert_tests_count.rs` (293행, 21 tests)
+
+**S11-05: cargo publish --dry-run**:
+- 99 files, 235.2 KiB compressed, 통과
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 1 MEDIUM, 1 LOW):
+- M1: Integration test 헬퍼 중복 — tests/common/mod.rs 추출 권장
+- L1: writer_tests_list.rs (871행) 800행 초과 (기존)
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1209 테스트 (0 failures), publish dry-run 통과
 
 ### 2026-05-04 — v0.5.0 Sprint 10: Batch Hardening + File Splits
 
