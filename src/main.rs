@@ -172,10 +172,20 @@ fn run_batch(
     let entries = std::fs::read_dir(input_dir)?;
 
     let mut converted: usize = 0;
-    let mut errors: usize = 0;
+    let mut skipped: usize = 0;
+    let mut failed: usize = 0;
 
     for entry in entries {
         let entry = entry?;
+
+        if entry.file_name().to_string_lossy().starts_with('.') {
+            continue;
+        }
+
+        if entry.file_type()?.is_symlink() {
+            continue;
+        }
+
         let path = entry.path();
 
         if !path.is_file() {
@@ -196,7 +206,7 @@ fn run_batch(
             Some(s) => s.to_owned(),
             None => {
                 tracing::warn!("Skipping file with non-UTF-8 stem: {:?}", path);
-                errors += 1;
+                failed += 1;
                 continue;
             }
         };
@@ -208,7 +218,7 @@ fn run_batch(
                 "Skipping {:?}: output already exists (use --force to overwrite)",
                 path.display()
             );
-            errors += 1;
+            skipped += 1;
             continue;
         }
 
@@ -219,17 +229,15 @@ fn run_batch(
             }
             Err(e) => {
                 eprintln!("Error converting {}: {e}", path.display());
-                errors += 1;
+                failed += 1;
             }
         }
     }
 
-    println!("Converted {converted} files, {errors} errors");
+    println!("Batch complete: {converted} converted, {skipped} skipped, {failed} failed");
 
-    if converted == 0 && errors > 0 {
-        // Only surface an error when every attempted file failed.
-        // An empty directory is still considered success.
-        anyhow::bail!("All {errors} file(s) failed to convert");
+    if converted == 0 && failed > 0 {
+        anyhow::bail!("All {failed} file(s) failed to convert");
     }
 
     Ok(())

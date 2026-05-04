@@ -703,8 +703,8 @@ fn batch_empty_directory() {
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("Converted 0 files"),
-        "expected 'Converted 0 files' in stdout, got: {stdout}"
+        stdout.contains("0 converted"),
+        "expected '0 converted' in stdout, got: {stdout}"
     );
 }
 
@@ -747,8 +747,8 @@ fn batch_converts_hwpx_files() {
 
     let stdout = String::from_utf8_lossy(&result.stdout);
     assert!(
-        stdout.contains("Converted 2 files"),
-        "expected 'Converted 2 files' in stdout, got: {stdout}"
+        stdout.contains("2 converted"),
+        "expected '2 converted' in stdout, got: {stdout}"
     );
 }
 
@@ -772,8 +772,8 @@ fn batch_skips_non_hwp_files() {
     );
     let stdout = String::from_utf8_lossy(&result.stdout);
     assert!(
-        stdout.contains("Converted 0 files"),
-        "expected 'Converted 0 files' in stdout, got: {stdout}"
+        stdout.contains("0 converted"),
+        "expected '0 converted' in stdout, got: {stdout}"
     );
     // No .md output for the ignored files.
     assert!(
@@ -841,15 +841,18 @@ fn batch_skips_existing_output_without_force() {
     // Should still exit 0 (partial success / zero converted is fine when
     // the only failure was an overwrite guard).
     let stdout = String::from_utf8_lossy(&result.stdout);
-    // The file content must remain unchanged.
     let content = std::fs::read_to_string(&out_md).expect("read md");
     assert_eq!(
         content, "existing content",
         "existing output must not be overwritten without --force"
     );
     assert!(
-        stdout.contains("0 errors") || stdout.contains("1 errors"),
-        "expected error count in stdout, got: {stdout}"
+        stdout.contains("1 skipped"),
+        "expected '1 skipped' in stdout, got: {stdout}"
+    );
+    assert!(
+        stdout.contains("0 failed"),
+        "expected '0 failed' in stdout, got: {stdout}"
     );
 }
 
@@ -882,7 +885,91 @@ fn batch_overwrites_with_force() {
     );
     let stdout = String::from_utf8_lossy(&result.stdout);
     assert!(
-        stdout.contains("Converted 1 files"),
-        "expected 'Converted 1 files' in stdout, got: {stdout}"
+        stdout.contains("1 converted"),
+        "expected '1 converted' in stdout, got: {stdout}"
+    );
+}
+
+// 26. batch skips hidden (dot-prefixed) files
+#[test]
+fn batch_skips_hidden_files() {
+    let dir = tempdir().expect("tempdir");
+
+    make_hwpx(&dir.path().join("visible.hwpx"));
+    make_hwpx(&dir.path().join(".hidden.hwpx"));
+
+    let out_dir = dir.path().join("output");
+
+    let result = cargo_bin()
+        .args([
+            "batch",
+            dir.path().to_str().unwrap(),
+            "--output-dir",
+            out_dir.to_str().unwrap(),
+        ])
+        .output()
+        .expect("execute batch");
+    assert!(
+        result.status.success(),
+        "batch must exit 0; stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    assert!(
+        out_dir.join("visible.md").exists(),
+        "visible.md must be created"
+    );
+    assert!(
+        !out_dir.join(".hidden.md").exists(),
+        ".hidden.md must not be created"
+    );
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    assert!(
+        stdout.contains("1 converted"),
+        "expected '1 converted' in stdout, got: {stdout}"
+    );
+}
+
+// 27. batch skips symlinks
+#[cfg(unix)]
+#[test]
+fn batch_skips_symlinks() {
+    let dir = tempdir().expect("tempdir");
+
+    let real = dir.path().join("real.hwpx");
+    make_hwpx(&real);
+
+    let link = dir.path().join("link.hwpx");
+    std::os::unix::fs::symlink(&real, &link).expect("create symlink");
+
+    let out_dir = dir.path().join("output");
+
+    let result = cargo_bin()
+        .args([
+            "batch",
+            dir.path().to_str().unwrap(),
+            "--output-dir",
+            out_dir.to_str().unwrap(),
+        ])
+        .output()
+        .expect("execute batch");
+    assert!(
+        result.status.success(),
+        "batch must exit 0; stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+
+    assert!(
+        out_dir.join("real.md").exists(),
+        "real.md must be created"
+    );
+    assert!(
+        !out_dir.join("link.md").exists(),
+        "link.md must not be created (symlink)"
+    );
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    assert!(
+        stdout.contains("1 converted"),
+        "expected '1 converted' in stdout, got: {stdout}"
     );
 }
