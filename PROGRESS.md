@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 8 완료 (test split + serde fix + publish prep)
+## 현재 상태: v0.5.0 Sprint 9 완료 (batch CLI + test splits + From edge cases)
 
 ### 완료
 
@@ -209,8 +209,9 @@
 없음
 
 ### 미착수
-- [ ] `From<String>` edge case 테스트 (empty, whitespace, capitalized) (Sprint 8 M1)
 - [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성
+- [ ] Batch CLI: hidden file/symlink guard (Sprint 9 M1)
+- [ ] Batch CLI: separate skip/error counters (Sprint 9 L1)
 
 ## 중기 개선 로드맵 (Phase 1.5)
 
@@ -279,6 +280,33 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-05-04 — v0.5.0 Sprint 9: Batch CLI + Test Splits + From Edge Cases
+
+**S9-01: From<&str> + edge case tests** (Sprint 8 M1):
+- `From<String>` → `From<&str>` 위임 패턴 적용
+- 4 edge case 테스트: empty, whitespace, capitalized, str ref known values
+
+**S9-02: convert_tests.rs 추출** (Sprint 8 L1):
+- `convert.rs` 인라인 테스트 → `convert_tests.rs` 분리 (1316→508+808행)
+- 54 테스트 전수 보존, `#[path]` 모듈 패턴
+
+**S9-03: batch CLI** (신규):
+- `hwp2md batch <input_dir> [output_dir]` 서브커맨드
+- `--force` 덮어쓰기, `--frontmatter` 메타데이터 옵션
+- 입력 검증: 미존재/비디렉토리 경로 에러 처리
+- 8 CLI 통합 테스트
+
+**S9-04: writer_tests 분할** (코드 품질):
+- `writer_tests.rs` (1395행) → 2파일 (718+705행)
+- 97 테스트 전수 보존, `#[path]` 모듈 패턴
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 2 MEDIUM, 1 LOW):
+- M1: Hidden files/symlinks not filtered in batch
+- M2: Output path not canonicalized
+- L1: Skipped-existing counted as errors
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1203 테스트 (0 failures)
 
 ### 2026-05-04 — v0.5.0 Sprint 8: Test Split + Serde Fix + Publish Prep
 

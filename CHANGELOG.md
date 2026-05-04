@@ -73,8 +73,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   structure and converted to `Inline::ruby` fields; nested-ruby guard prevents
   infinite recursion; 1 091 tests total (949 unit + 23 CLI + 46 integration +
   30 roundtrip).
+- **Sprint 8 / S8-02**: `HeaderFooterType` `From<String>` normalizer — serde
+  round-trip asymmetry fixed; `From<&str>` impl normalizes known values,
+  `From<String>` delegates to it; HWPX handler simplified to `.into()`.
+- **Sprint 9 / S9-01**: `From<&str>` edge case tests — empty string, whitespace,
+  capitalized, and str-ref known-value coverage.
+- **Sprint 9 / S9-03**: `batch` CLI subcommand — directory-level HWP/HWPX → MD
+  conversion; `--force` overwrite flag; input validation for missing or
+  non-directory paths; 8 integration tests.
 
 ### Changed
+- **Sprint 8 / S8-01**: `parser_tests.rs` split (1 622 → 521 + 390 + 730 lines)
+  into core, inline, and marker test modules; `pub(super)` shared helpers.
+- **Sprint 9 / S9-02**: `convert.rs` inline tests extracted to `convert_tests.rs`
+  (1 316 → 508 + 808 lines); 54 tests preserved.
+- **Sprint 9 / S9-04**: `writer_tests.rs` split (1 395 → 718 + 705 lines) into
+  core and paragraph test modules; 97 tests preserved.
 - **Phase A-1**: `ParseContext` god object (37 flat fields) refactored into 5
   sub-structs: `FormattingState`, `TableState`, `ListState`, `FootnoteState`,
   `PageLayoutState`; `flush_inlines_to_blocks` simplified from 11 parameters
