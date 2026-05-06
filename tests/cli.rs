@@ -4,7 +4,7 @@
 /// verifies exit codes and output text.  A minimal valid HWPX is produced by
 /// first calling `to-hwpx` on a temp `.md` file, which guarantees a
 /// well-formed ZIP that the `to-md` / `info` subcommands can read back.
-use std::io::Write as _;
+use std::io::{Read as _, Write as _};
 use tempfile::tempdir;
 
 #[path = "common/mod.rs"]
@@ -746,6 +746,63 @@ fn convert_assets_dir_extracts_embedded_image() {
         std::fs::read(&extracted).unwrap(),
         png_data,
         "extracted image data must match original"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 15 — `--style` flag applies custom page dimensions to HWPX output
+// ---------------------------------------------------------------------------
+
+#[test]
+fn to_hwpx_style_template_applies_page_dimensions() {
+    let dir = tempdir().expect("tempdir");
+
+    // Write a minimal markdown source file.
+    let md_file = dir.path().join("input.md");
+    std::fs::write(&md_file, "# Hello\n\nTest document\n").expect("write md");
+
+    // Write a YAML style template with custom page dimensions.
+    let style_file = dir.path().join("style.yaml");
+    std::fs::write(&style_file, "page:\n  width: 70000\n  height: 90000\n").expect("write style");
+
+    // Run `hwp2md to-hwpx input.md -o output.hwpx --style style.yaml`.
+    let hwpx_path = dir.path().join("output.hwpx");
+    let result = cargo_bin()
+        .args([
+            "to-hwpx",
+            md_file.to_str().unwrap(),
+            "-o",
+            hwpx_path.to_str().unwrap(),
+            "--style",
+            style_file.to_str().unwrap(),
+        ])
+        .output()
+        .expect("execute to-hwpx --style");
+    assert!(
+        result.status.success(),
+        "to-hwpx --style failed; stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(hwpx_path.exists(), "output.hwpx was not created");
+
+    // Open the HWPX ZIP and read Contents/section0.xml.
+    let hwpx_file = std::fs::File::open(&hwpx_path).expect("open hwpx");
+    let mut archive = zip::ZipArchive::new(hwpx_file).expect("parse ZIP");
+    let mut section_entry = archive
+        .by_name("Contents/section0.xml")
+        .expect("Contents/section0.xml not found in HWPX ZIP");
+
+    let mut xml = String::new();
+    section_entry.read_to_string(&mut xml).expect("read section0.xml");
+
+    // The pageSize element must carry the custom dimensions.
+    assert!(
+        xml.contains("width=\"70000\""),
+        "expected width=\"70000\" in section0.xml, got:\n{xml}"
+    );
+    assert!(
+        xml.contains("height=\"90000\""),
+        "expected height=\"90000\" in section0.xml, got:\n{xml}"
     );
 }
 

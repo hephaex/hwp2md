@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2026-05-04
+## [0.5.0] - 2026-05-07
 
 ### Added
 - **Phase B-1**: YAML-based style template (`--style`) — `StyleTemplate` with
@@ -99,8 +99,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fixtures can now embed `BinData/` image entries in generated HWPX ZIPs.
 - **Sprint 14 / S14-02**: End-to-end image extraction test — CLI `convert
   --assets-dir` verified with embedded BinData image fixture.
+- **Sprint 15 / S15-02**: CLI `--style` end-to-end test — verifies that
+  `to-hwpx --style` actually applies custom page dimensions to the output
+  HWPX section XML.
 
 ### Changed
+- **Sprint 15 / S15-01**: README documentation refresh — stale "in progress"
+  and "not yet applied" claims for style templates removed; format support
+  matrix updated (headers/footers now marked as supported for HWPX read/write);
+  known limitations section corrected.
 - **Sprint 10 / S10-02**: `batch` output now reports separate counters:
   "N converted, M skipped, F failed" — previously-existing files that are
   skipped without `--force` are counted as "skipped" rather than "errors".

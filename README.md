@@ -28,7 +28,7 @@
 - Math expressions — HWP EqEdit equations converted to LaTeX (`$...$` / `$$...$$`)
 - Document metadata (title, author, date) optionally emitted as YAML front matter
 - `info` subcommand for quick document inspection without conversion
-- YAML style templates for Markdown-to-HWPX output (interface defined; implementation in progress)
+- YAML style templates for Markdown-to-HWPX output (page dimensions, margins, fonts, heading line spacing)
 - Structured intermediate representation (IR) exposed as a public library API
 - Release builds with LTO and symbol stripping for minimal binary size
 
@@ -78,7 +78,7 @@ hwp2md to-hwpx draft.md
 # Specify output path
 hwp2md to-hwpx draft.md -o final.hwpx
 
-# Apply a YAML style template (interface available; full implementation pending)
+# Apply a YAML style template
 hwp2md to-hwpx draft.md -o final.hwpx --style corporate.yaml
 ```
 
@@ -228,7 +228,7 @@ println!("{} sections", doc.sections.len());
 | Math (LaTeX) | yes | yes | yes |
 | YAML front matter | yes | yes | n/a |
 | Multi-column layout | flattened | flattened | n/a |
-| Headers / footers | skipped | skipped | planned |
+| Headers / footers | skipped | yes | yes |
 | DRM-protected HWP | no | no | n/a |
 | MD -> HWP binary | n/a | n/a | no |
 
@@ -275,9 +275,8 @@ tests/             Integration tests
 - DRM-protected (배포용) HWP files are not supported.
 - Multi-column (다단) layouts are flattened to a single column.
 - Tables with non-trivial `colspan`/`rowspan` fall back to raw HTML in the Markdown output.
-- Headers and footers are currently skipped.
+- Headers and footers in HWP 5.0 binary files are skipped; HWPX headers/footers are fully supported.
 - Writing back to the binary HWP 5.0 format (MD -> HWP) is not supported; only HWPX output is available.
-- The `--style` YAML template option for `to-hwpx` is accepted by the CLI but not yet applied.
 
 ## Contributing
 
