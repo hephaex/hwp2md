@@ -90,6 +90,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   helpers (`cargo_bin`, `make_hwpx`, `plain`, `make_doc`, `first_blocks`,
   `collect_all_text`, `md_to_hwpx_to_ir`, `md_to_hwpx_to_md`,
   `ir_to_hwpx_to_md`) extracted from 7 test files, eliminating duplication.
+- **Sprint 13 / S13-02**: `convert` subcommand gains `--assets-dir`,
+  `--frontmatter`, and `--style` flags — full parity with the
+  `ConvertOptions` builder API.
+- **Sprint 13 / S13-03**: `batch` subcommand gains `--assets-dir` flag —
+  extracted images are placed in per-file subdirectories (`<dir>/<stem>/`).
 
 ### Changed
 - **Sprint 10 / S10-02**: `batch` output now reports separate counters:

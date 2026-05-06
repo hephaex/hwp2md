@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 12 완료 (common helpers + list split + publish prep)
+## 현재 상태: v0.5.0 Sprint 13 완료 (CLI completeness + unwrap consistency)
 
 ### 완료
 
@@ -209,8 +209,8 @@
 없음
 
 ### 미착수
-- [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성
-- [ ] common/mod.rs unwrap→expect 일관성 통일 (Sprint 12 L1)
+- [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿)
+- [ ] convert --assets-dir image extraction test (Sprint 13 M1)
 - [ ] `cargo publish` — crates.io 배포
 
 ## 중기 개선 로드맵 (Phase 1.5)
@@ -280,6 +280,30 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-05-07 — v0.5.0 Sprint 13: CLI Completeness + Unwrap Consistency
+
+**S13-01: common/mod.rs unwrap→expect** (Sprint 12 L1):
+- 3 bare `.unwrap()` → `.expect("descriptive message")` for test diagnostics
+
+**S13-02: convert CLI option parity**:
+- `--assets-dir` 플래그 추가 (HWP/HWPX→MD 이미지 추출 디렉토리)
+- `--frontmatter` 플래그 추가 (YAML 메타데이터 포함)
+- `--style` 플래그 추가 (MD→HWPX 스타일 템플릿)
+- ConvertOptions builder 직접 사용으로 convert_auto 대체
+
+**S13-03: batch CLI --assets-dir**:
+- `--assets-dir` 플래그 추가 — per-file `<base>/<stem>/` 서브디렉토리 자동 생성
+- run_batch 시그니처에 assets_dir 파라미터 추가
+
+**S13-04: cargo publish --dry-run**:
+- 101 files, 236.4 KiB compressed, 통과
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 2 MEDIUM):
+- M1: convert --assets-dir 테스트가 smoke test 수준 (이미지 포함 fixture 없음)
+- M2: run_batch 호출 라인 길이 → 수정 완료
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1213 테스트 (0 failures), publish dry-run 통과
 
 ### 2026-05-06 — v0.5.0 Sprint 12: Common Helpers + List Split + Publish Prep
 
