@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 14 완료 (image asset tests + README CLI docs)
+## 현재 상태: v0.5.0 Sprint 15 완료 (README doc refresh + style template CLI test)
 
 ### 완료
 
@@ -279,6 +279,32 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-05-07 — v0.5.0 Sprint 15: README Doc Refresh + Style Template CLI Test
+
+**S15-01: README stale documentation cleanup**:
+- style template "interface defined; implementation in progress" → 구현 완료 문구로 변경
+- CLI 예제 "full implementation pending" 경고 제거
+- format support matrix: Headers/footers → HWPX read/write "yes" 반영
+- Known Limitations: "--style not yet applied" 항목 제거
+- Headers/footers 제한 사항 → HWP 5.0만 skipped, HWPX 지원 명시
+
+**S15-02: CLI --style end-to-end test**:
+- `to_hwpx_style_template_applies_page_dimensions` — YAML style template로 커스텀 page dimensions (70000×90000) 적용 → HWPX ZIP 내 section0.xml 검증
+
+**S15-03: CHANGELOG Sprint 15 entries + date update**:
+- v0.5.0 릴리스 날짜 2026-05-04 → 2026-05-07
+- Sprint 15 Added/Changed 항목 추가
+
+**S15-04: cargo publish --dry-run**:
+- 통과 확인
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 1 MEDIUM, 2 LOW):
+- M1: CHANGELOG Changed 섹션 Sprint 순서 (cosmetic)
+- L1: CLI 테스트가 page dimensions만 검증 (margins/fonts 미포함)
+- L2: 문자열 기반 XML assertion (brittle)
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
 
 ### 2026-05-07 — v0.5.0 Sprint 14: Image Asset Tests + README CLI Docs
 
