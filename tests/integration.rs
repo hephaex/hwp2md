@@ -598,3 +598,34 @@ fn drm_protected_hwp_error_message_contains_drm() {
         "error message should mention DRM; got: {error_msg:?}"
     );
 }
+
+#[test]
+fn read_hwpx_with_bindata_populates_assets() {
+    let png_data = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]; // PNG magic
+    let fixture = HwpxFixture::new()
+        .section(&para_xml("Has image"))
+        .bin_data("test_image.png", png_data.clone());
+    let (_dir, path) = fixture.write_to_tempfile();
+
+    let doc = hwp2md::hwpx::read_hwpx(&path).expect("read fixture");
+    assert!(!doc.assets.is_empty(), "assets should contain the BinData entry");
+    assert_eq!(doc.assets[0].name, "test_image.png");
+    assert_eq!(doc.assets[0].data, png_data);
+}
+
+#[test]
+fn write_assets_extracts_bindata_to_disk() {
+    let png_data = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    let fixture = HwpxFixture::new()
+        .section(&para_xml("Doc with image"))
+        .bin_data("photo.png", png_data.clone());
+    let (dir, path) = fixture.write_to_tempfile();
+
+    let assets_dir = dir.path().join("extracted");
+    hwp2md::convert::to_markdown(&path, Some(&dir.path().join("out.md")), Some(&assets_dir), false)
+        .expect("convert with assets");
+
+    let extracted = assets_dir.join("photo.png");
+    assert!(extracted.exists(), "image should be extracted to assets dir");
+    assert_eq!(std::fs::read(&extracted).unwrap(), png_data, "extracted data must match");
+}

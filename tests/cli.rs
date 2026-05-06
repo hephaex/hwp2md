@@ -9,6 +9,9 @@ use tempfile::tempdir;
 
 #[path = "common/mod.rs"]
 mod common;
+#[allow(dead_code)]
+#[path = "fixtures/mod.rs"]
+mod fixtures;
 
 use common::cargo_bin;
 
@@ -709,5 +712,40 @@ fn convert_assets_dir_flag_accepted() {
         String::from_utf8_lossy(&result.stderr)
     );
     assert!(md_out.exists(), "md output not created");
+}
+
+#[test]
+fn convert_assets_dir_extracts_embedded_image() {
+    let png_data = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    let fixture = fixtures::HwpxFixture::new()
+        .section(&fixtures::para_xml("Image doc"))
+        .bin_data("logo.png", png_data.clone());
+    let (dir, hwpx_path) = fixture.write_to_tempfile();
+
+    let md_out = dir.path().join("out.md");
+    let assets = dir.path().join("extracted");
+
+    let result = cargo_bin()
+        .args([
+            "convert",
+            hwpx_path.to_str().unwrap(),
+            md_out.to_str().unwrap(),
+            "--assets-dir",
+            assets.to_str().unwrap(),
+        ])
+        .output()
+        .expect("execute convert --assets-dir");
+    assert!(
+        result.status.success(),
+        "convert --assets-dir failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let extracted = assets.join("logo.png");
+    assert!(extracted.exists(), "image must be extracted to assets dir");
+    assert_eq!(
+        std::fs::read(&extracted).unwrap(),
+        png_data,
+        "extracted image data must match original"
+    );
 }
 

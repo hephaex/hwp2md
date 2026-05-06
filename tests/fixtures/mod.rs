@@ -27,6 +27,7 @@ pub struct HwpxFixture {
     author: Option<String>,
     /// Raw XML snippets (paragraph / table / etc.) that go *inside* `<hs:sec …>`.
     section_body: String,
+    bin_data_entries: Vec<(String, Vec<u8>)>,  // (name, data)
 }
 
 impl HwpxFixture {
@@ -35,6 +36,7 @@ impl HwpxFixture {
             title: None,
             author: None,
             section_body: String::new(),
+            bin_data_entries: Vec::new(),
         }
     }
 
@@ -52,6 +54,12 @@ impl HwpxFixture {
     /// Pass one or more paragraph / table XML strings.
     pub fn section(mut self, xml: &str) -> Self {
         self.section_body.push_str(xml);
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn bin_data(mut self, name: &str, data: Vec<u8>) -> Self {
+        self.bin_data_entries.push((name.to_owned(), data));
         self
     }
 
@@ -90,6 +98,11 @@ impl HwpxFixture {
         zip.start_file("Contents/section0.xml", deflated).unwrap();
         zip.write_all(build_section_xml(&self.section_body).as_bytes())
             .unwrap();
+
+        for (name, data) in &self.bin_data_entries {
+            zip.start_file(format!("BinData/{name}"), stored).unwrap();
+            zip.write_all(data).unwrap();
+        }
 
         let inner = zip.finish().unwrap();
         inner.into_inner()

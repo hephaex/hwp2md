@@ -82,6 +82,33 @@ hwp2md to-hwpx draft.md -o final.hwpx
 hwp2md to-hwpx draft.md -o final.hwpx --style corporate.yaml
 ```
 
+### Auto-detect format with `convert`
+
+```bash
+# Direction inferred from extensions (.hwpx → .md)
+hwp2md convert report.hwpx report.md
+
+# With options: frontmatter, image extraction, style template
+hwp2md convert report.hwpx report.md --frontmatter --assets-dir ./images
+hwp2md convert draft.md draft.hwpx --style corporate.yaml
+
+# Overwrite existing output
+hwp2md convert report.hwpx report.md --force
+```
+
+### Batch convert a directory
+
+```bash
+# Convert all HWP/HWPX files in a directory
+hwp2md batch ./reports/ --output-dir converted/
+
+# Extract images into per-file subdirectories
+hwp2md batch ./reports/ --assets-dir ./images --frontmatter
+
+# Overwrite existing output files
+hwp2md batch ./reports/ -o converted/ --force
+```
+
 ### Inspect a document without converting
 
 ```bash
