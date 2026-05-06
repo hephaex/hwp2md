@@ -5,16 +5,12 @@
 /// first calling `to-hwpx` on a temp `.md` file, which guarantees a
 /// well-formed ZIP that the `to-md` / `info` subcommands can read back.
 use std::io::Write as _;
-use std::process::Command;
 use tempfile::tempdir;
 
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
+#[path = "common/mod.rs"]
+mod common;
 
-fn cargo_bin() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_hwp2md"))
-}
+use common::cargo_bin;
 
 // ---------------------------------------------------------------------------
 // 1. No arguments → non-zero exit, stderr contains usage hint

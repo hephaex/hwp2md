@@ -2,30 +2,10 @@
 use hwp2md::ir;
 use hwp2md::md::{parse_markdown, write_markdown};
 
-// -----------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------
+#[path = "common/mod.rs"]
+mod common;
 
-fn plain(t: &str) -> ir::Inline {
-    ir::Inline::plain(t)
-}
-
-fn make_doc(blocks: Vec<ir::Block>) -> ir::Document {
-    let mut doc = ir::Document::new();
-    doc.sections.push(ir::Section {
-        blocks,
-        page_layout: None,
-        ..Default::default()
-    });
-    doc
-}
-
-fn first_blocks(doc: &ir::Document) -> &[ir::Block] {
-    doc.sections
-        .first()
-        .map(|s| s.blocks.as_slice())
-        .unwrap_or(&[])
-}
+use common::{first_blocks, make_doc, plain};
 
 // -----------------------------------------------------------------------
 // IR → Markdown → IR: key structure preserved

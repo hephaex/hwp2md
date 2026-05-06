@@ -6,62 +6,11 @@
 /// `hwpx_roundtrip_full.rs`.
 use hwp2md::hwpx::{read_hwpx, write_hwpx};
 use hwp2md::ir;
-use hwp2md::md::parse_markdown;
 
-// -----------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------
+#[path = "common/mod.rs"]
+mod common;
 
-/// Pipeline (A): MD → HWPX → IR.
-fn md_to_hwpx_to_ir(markdown: &str) -> ir::Document {
-    let doc = parse_markdown(markdown);
-    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
-    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
-    read_hwpx(tmp.path()).expect("read_hwpx")
-}
-
-fn first_blocks(doc: &ir::Document) -> &[ir::Block] {
-    doc.sections
-        .first()
-        .map(|s| s.blocks.as_slice())
-        .unwrap_or(&[])
-}
-
-fn collect_all_text(blocks: &[ir::Block]) -> String {
-    let mut out = String::new();
-    for block in blocks {
-        match block {
-            ir::Block::Heading { inlines, .. } | ir::Block::Paragraph { inlines } => {
-                for i in inlines {
-                    out.push_str(&i.text);
-                }
-            }
-            ir::Block::CodeBlock { code, .. } => {
-                out.push_str(code);
-            }
-            ir::Block::Table { rows, .. } => {
-                for row in rows {
-                    for cell in &row.cells {
-                        out.push_str(&collect_all_text(&cell.blocks));
-                    }
-                }
-            }
-            ir::Block::BlockQuote { blocks }
-            | ir::Block::Footnote {
-                content: blocks, ..
-            } => {
-                out.push_str(&collect_all_text(blocks));
-            }
-            ir::Block::List { items, .. } => {
-                for item in items {
-                    out.push_str(&collect_all_text(&item.blocks));
-                }
-            }
-            _ => {}
-        }
-    }
-    out
-}
+use common::{collect_all_text, first_blocks, md_to_hwpx_to_ir};
 
 // -----------------------------------------------------------------------
 // Test 1: Simple paragraph text roundtrip

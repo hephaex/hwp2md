@@ -4,38 +4,12 @@
 /// spawning the compiled binary via `std::process::Command`.  A minimal valid
 /// HWPX is produced by the `make_hwpx` helper, which calls `to-hwpx` on a
 /// temporary Markdown source.
-use std::process::Command;
 use tempfile::tempdir;
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+#[path = "common/mod.rs"]
+mod common;
 
-fn cargo_bin() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_hwp2md"))
-}
-
-/// Produce a valid HWPX file at `path` from a minimal Markdown source.
-fn make_hwpx(path: &std::path::Path) {
-    let dir = path.parent().unwrap();
-    let md_src = dir.join("_tmp_src.md");
-    std::fs::write(&md_src, "# Batch Test\n\nContent.\n").expect("write md src");
-    let result = cargo_bin()
-        .args([
-            "to-hwpx",
-            md_src.to_str().unwrap(),
-            "--output",
-            path.to_str().unwrap(),
-        ])
-        .output()
-        .expect("run to-hwpx");
-    assert!(
-        result.status.success(),
-        "make_hwpx failed; stderr: {}",
-        String::from_utf8_lossy(&result.stderr)
-    );
-    std::fs::remove_file(&md_src).ok();
-}
+use common::{cargo_bin, make_hwpx};
 
 // ---------------------------------------------------------------------------
 // 18. batch --help → shows input-dir, output-dir, frontmatter, force options

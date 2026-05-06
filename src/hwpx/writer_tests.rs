@@ -109,6 +109,9 @@ mod tests_image;
 #[path = "writer_tests_list.rs"]
 mod tests_list;
 
+#[path = "writer_tests_list_adv.rs"]
+mod tests_list_adv;
+
 #[path = "writer_tests_golden.rs"]
 mod tests_golden;
 
