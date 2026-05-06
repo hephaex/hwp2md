@@ -629,3 +629,85 @@ fn convert_overwrites_with_force_flag() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// Sprint 13 — `convert` subcommand gains --frontmatter, --style, --assets-dir
+// ---------------------------------------------------------------------------
+
+#[test]
+fn convert_frontmatter_flag_adds_yaml_header() {
+    let dir = tempdir().expect("tempdir");
+    let hwpx = dir.path().join("doc.hwpx");
+    common::make_hwpx(&hwpx);
+    let md_out = dir.path().join("doc.md");
+
+    let result = cargo_bin()
+        .args([
+            "convert",
+            hwpx.to_str().unwrap(),
+            md_out.to_str().unwrap(),
+            "--frontmatter",
+        ])
+        .output()
+        .expect("execute convert --frontmatter");
+    assert!(
+        result.status.success(),
+        "convert --frontmatter failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let body = std::fs::read_to_string(&md_out).expect("read md");
+    assert!(body.starts_with("---"), "expected YAML frontmatter: {body:?}");
+}
+
+#[test]
+fn convert_style_flag_accepted_for_md_to_hwpx() {
+    let dir = tempdir().expect("tempdir");
+    let input = dir.path().join("styled.md");
+    std::fs::write(&input, "# Styled\n\nBody.\n").expect("write md");
+    let style_yml = dir.path().join("style.yml");
+    std::fs::write(&style_yml, "page:\n  width: 210\n  height: 297\n").expect("write style");
+    let output = dir.path().join("styled.hwpx");
+
+    let result = cargo_bin()
+        .args([
+            "convert",
+            input.to_str().unwrap(),
+            output.to_str().unwrap(),
+            "--style",
+            style_yml.to_str().unwrap(),
+        ])
+        .output()
+        .expect("execute convert --style");
+    assert!(
+        result.status.success(),
+        "convert --style failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(output.exists(), "styled hwpx not created");
+}
+
+#[test]
+fn convert_assets_dir_flag_accepted() {
+    let dir = tempdir().expect("tempdir");
+    let hwpx = dir.path().join("doc.hwpx");
+    common::make_hwpx(&hwpx);
+    let md_out = dir.path().join("doc.md");
+    let assets = dir.path().join("assets");
+
+    let result = cargo_bin()
+        .args([
+            "convert",
+            hwpx.to_str().unwrap(),
+            md_out.to_str().unwrap(),
+            "--assets-dir",
+            assets.to_str().unwrap(),
+        ])
+        .output()
+        .expect("execute convert --assets-dir");
+    assert!(
+        result.status.success(),
+        "convert --assets-dir failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(md_out.exists(), "md output not created");
+}
+

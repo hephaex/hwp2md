@@ -13,15 +13,15 @@ pub fn cargo_bin() -> std::process::Command {
 /// Markdown source written to the same parent directory.
 #[allow(dead_code)]
 pub fn make_hwpx(path: &std::path::Path) {
-    let dir = path.parent().unwrap();
+    let dir = path.parent().expect("test path must have parent");
     let md_src = dir.join("_tmp_src.md");
     std::fs::write(&md_src, "# Batch Test\n\nContent.\n").expect("write md src");
     let result = cargo_bin()
         .args([
             "to-hwpx",
-            md_src.to_str().unwrap(),
+            md_src.to_str().expect("md source path must be valid UTF-8"),
             "--output",
-            path.to_str().unwrap(),
+            path.to_str().expect("output path must be valid UTF-8"),
         ])
         .output()
         .expect("run to-hwpx");

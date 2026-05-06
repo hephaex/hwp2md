@@ -65,6 +65,15 @@ enum Commands {
         /// Overwrite the output file if it already exists
         #[arg(long)]
         force: bool,
+        /// Extract images to this directory (HWP/HWPX → MD only)
+        #[arg(long)]
+        assets_dir: Option<PathBuf>,
+        /// Include frontmatter metadata (HWP/HWPX → MD only)
+        #[arg(long)]
+        frontmatter: bool,
+        /// Style template YAML (MD → HWPX only)
+        #[arg(long)]
+        style: Option<PathBuf>,
     },
     /// Batch-convert all HWP/HWPX files in a directory to Markdown
     Batch {
@@ -79,6 +88,9 @@ enum Commands {
         /// Overwrite existing output files
         #[arg(long)]
         force: bool,
+        /// Extract images to per-file subdirectories under this path
+        #[arg(long)]
+        assets_dir: Option<PathBuf>,
     },
 }
 
@@ -121,16 +133,35 @@ fn main() -> Result<()> {
             input,
             output,
             force,
+            assets_dir,
+            frontmatter,
+            style,
         } => {
-            hwp2md::convert::convert_auto(&input, &output, force)?;
+            let mut opts = hwp2md::convert::ConvertOptions::new(&input, &output)
+                .force(force)
+                .frontmatter(frontmatter);
+            if let Some(ref dir) = assets_dir {
+                opts = opts.assets_dir(dir);
+            }
+            if let Some(ref path) = style {
+                opts = opts.style(path);
+            }
+            opts.execute()?;
         }
         Commands::Batch {
             input_dir,
             output_dir,
             frontmatter,
             force,
+            assets_dir,
         } => {
-            run_batch(&input_dir, output_dir.as_deref(), frontmatter, force)?;
+            run_batch(
+                &input_dir,
+                output_dir.as_deref(),
+                frontmatter,
+                force,
+                assets_dir.as_deref(),
+            )?;
         }
     }
 
@@ -150,6 +181,7 @@ fn run_batch(
     output_dir: Option<&std::path::Path>,
     frontmatter: bool,
     force: bool,
+    assets_dir: Option<&std::path::Path>,
 ) -> Result<()> {
     if !input_dir.exists() {
         anyhow::bail!(
@@ -224,7 +256,14 @@ fn run_batch(
             continue;
         }
 
-        match hwp2md::convert::to_markdown(&path, Some(&out_path), None, frontmatter) {
+        let file_assets_dir = if let Some(base) = assets_dir {
+            let d = base.join(&stem);
+            Some(d)
+        } else {
+            None
+        };
+
+        match hwp2md::convert::to_markdown(&path, Some(&out_path), file_assets_dir.as_deref(), frontmatter) {
             Ok(()) => {
                 println!("Converted: {} -> {}", path.display(), out_path.display());
                 converted += 1;

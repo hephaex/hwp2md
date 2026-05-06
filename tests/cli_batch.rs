@@ -357,3 +357,35 @@ fn batch_skips_symlinks() {
         "expected '1 converted' in stdout, got: {stdout}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 13 — batch --assets-dir flag
+// ---------------------------------------------------------------------------
+
+#[test]
+fn batch_assets_dir_flag_accepted() {
+    let dir = tempdir().expect("tempdir");
+    let hwpx = dir.path().join("doc.hwpx");
+    common::make_hwpx(&hwpx);
+    let assets = dir.path().join("img");
+
+    let result = cargo_bin()
+        .args([
+            "batch",
+            dir.path().to_str().unwrap(),
+            "--assets-dir",
+            assets.to_str().unwrap(),
+        ])
+        .output()
+        .expect("execute batch --assets-dir");
+    assert!(
+        result.status.success(),
+        "batch --assets-dir failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    assert!(
+        stdout.contains("1 converted"),
+        "expected '1 converted': {stdout}"
+    );
+}
