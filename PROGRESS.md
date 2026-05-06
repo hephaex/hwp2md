@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 11 완료 (trace logging + test splits + orphan cleanup)
+## 현재 상태: v0.5.0 Sprint 12 완료 (common helpers + list split + publish prep)
 
 ### 완료
 
@@ -210,8 +210,7 @@
 
 ### 미착수
 - [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿) + CLI 완성
-- [ ] tests/common/mod.rs 공통 헬퍼 추출 (Sprint 11 M1)
-- [ ] writer_tests_list.rs 분할 (871행, Sprint 11 L1)
+- [ ] common/mod.rs unwrap→expect 일관성 통일 (Sprint 12 L1)
 - [ ] `cargo publish` — crates.io 배포
 
 ## 중기 개선 로드맵 (Phase 1.5)
@@ -281,6 +280,27 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-05-06 — v0.5.0 Sprint 12: Common Helpers + List Split + Publish Prep
+
+**S12-01: tests/common/mod.rs 공통 헬퍼 추출** (Sprint 11 M1):
+- 7개 통합 테스트 파일에서 중복된 헬퍼 함수를 `tests/common/mod.rs`로 추출
+- 9개 헬퍼: `cargo_bin`, `make_hwpx`, `plain`, `make_doc`, `first_blocks`, `collect_all_text`, `md_to_hwpx_to_ir`, `md_to_hwpx_to_md`, `ir_to_hwpx_to_md`
+- `#[path = "common/mod.rs"] mod common;` 패턴으로 참조
+- Clippy `empty_line_after_doc_comments` 수정: `///` → `//` (모듈 레벨 주석)
+
+**S12-02: writer_tests_list.rs 분할** (Sprint 11 L1):
+- `writer_tests_list.rs` (871행) → `writer_tests_list.rs` (622행) + `writer_tests_list_adv.rs` (251행)
+- 기본 리스트 테스트 유지, 고급/roundtrip/task-list 테스트 7건 추출
+
+**S12-03: cargo publish --dry-run**:
+- 통과 확인, v0.5.0 배포 준비 완료
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 1 MEDIUM, 1 LOW):
+- M1: `make_doc()` mutation (acceptable — test helper)
+- L1: common/mod.rs unwrap/expect 일관성
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1209 테스트 (0 failures), publish dry-run 통과
 
 ### 2026-05-04 — v0.5.0 Sprint 11: Trace Logging + Test Splits + Orphan Cleanup
 

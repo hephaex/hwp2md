@@ -86,6 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directory walk; 2 new CLI tests.
 - **Sprint 11 / S11-01**: `batch` trace logging — `tracing::debug!` emitted
   when hidden files or symlinks are skipped, improving observability.
+- **Sprint 12 / S12-01**: `tests/common/mod.rs` — 9 shared integration test
+  helpers (`cargo_bin`, `make_hwpx`, `plain`, `make_doc`, `first_blocks`,
+  `collect_all_text`, `md_to_hwpx_to_ir`, `md_to_hwpx_to_md`,
+  `ir_to_hwpx_to_md`) extracted from 7 test files, eliminating duplication.
 
 ### Changed
 - **Sprint 10 / S10-02**: `batch` output now reports separate counters:
@@ -104,6 +108,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lines); stability tests extracted to `roundtrip_stability.rs`.
 - **Sprint 11 / S11-04**: Orphaned `hwp/convert_tests.rs` (950 lines)
   deleted; `convert_tests.rs` split (808 → 517 + 293 lines).
+- **Sprint 12 / S12-02**: `writer_tests_list.rs` split (871 → 622 + 251
+  lines); advanced roundtrip and task-list tests extracted to
+  `writer_tests_list_adv.rs`.
 - **Sprint 8 / S8-01**: `parser_tests.rs` split (1 622 → 521 + 390 + 730 lines)
   into core, inline, and marker test modules; `pub(super)` shared helpers.
 - **Sprint 9 / S9-02**: `convert.rs` inline tests extracted to `convert_tests.rs`
