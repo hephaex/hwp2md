@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 13 완료 (CLI completeness + unwrap consistency)
+## 현재 상태: v0.5.0 Sprint 14 완료 (image asset tests + README CLI docs)
 
 ### 완료
 
@@ -210,7 +210,6 @@
 
 ### 미착수
 - [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿)
-- [ ] convert --assets-dir image extraction test (Sprint 13 M1)
 - [ ] `cargo publish` — crates.io 배포
 
 ## 중기 개선 로드맵 (Phase 1.5)
@@ -280,6 +279,28 @@
 - [ ] 샘플 HWPX 파일 기반 통합 테스트
 
 ## 변경 이력
+
+### 2026-05-07 — v0.5.0 Sprint 14: Image Asset Tests + README CLI Docs
+
+**S14-01: HwpxFixture.bin_data()** (테스트 인프라):
+- `bin_data(name, data)` 빌더 메서드 — BinData/ ZIP 엔트리 임베딩
+- 2 integration 테스트: read_hwpx BinData assets 검증 + write_assets 디스크 추출 검증
+
+**S14-02: CLI convert --assets-dir 이미지 추출 테스트** (Sprint 13 M1):
+- HwpxFixture로 이미지 포함 HWPX 생성 → CLI convert --assets-dir → 파일 추출 + 바이트 일치 검증
+
+**S14-03: README CLI 문서 업데이트**:
+- `convert` 서브커맨드: --assets-dir, --frontmatter, --style, --force 문서화
+- `batch` 서브커맨드: --output-dir, --assets-dir, --frontmatter, --force 문서화
+
+**S14-04: cargo publish --dry-run**:
+- 통과 확인
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 1 MEDIUM, 3 LOW):
+- M1: README batch 예제 --output-dir 장형 누락 → 수정 완료
+- L1: 불필요한 _doc 바인딩 → 제거
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1216 테스트 (0 failures), publish dry-run 통과
 
 ### 2026-05-07 — v0.5.0 Sprint 13: CLI Completeness + Unwrap Consistency
 

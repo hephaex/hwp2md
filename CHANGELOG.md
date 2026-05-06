@@ -95,6 +95,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ConvertOptions` builder API.
 - **Sprint 13 / S13-03**: `batch` subcommand gains `--assets-dir` flag —
   extracted images are placed in per-file subdirectories (`<dir>/<stem>/`).
+- **Sprint 14 / S14-01**: `HwpxFixture.bin_data()` builder method — test
+  fixtures can now embed `BinData/` image entries in generated HWPX ZIPs.
+- **Sprint 14 / S14-02**: End-to-end image extraction test — CLI `convert
+  --assets-dir` verified with embedded BinData image fixture.
 
 ### Changed
 - **Sprint 10 / S10-02**: `batch` output now reports separate counters:
