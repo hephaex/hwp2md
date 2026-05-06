@@ -806,3 +806,119 @@ fn to_hwpx_style_template_applies_page_dimensions() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// Sprint 16 — `--style` flag applies custom margins to HWPX output
+// ---------------------------------------------------------------------------
+
+#[test]
+fn to_hwpx_style_template_applies_margins() {
+    let dir = tempdir().expect("tempdir");
+
+    let md_file = dir.path().join("input.md");
+    std::fs::write(&md_file, "# Hello\n\nTest document\n").expect("write md");
+
+    let style_file = dir.path().join("style.yaml");
+    std::fs::write(
+        &style_file,
+        "page:\n  margin:\n    left: 8000\n    right: 8000\n    top: 6000\n    bottom: 6000\n",
+    )
+    .expect("write style");
+
+    let hwpx_path = dir.path().join("output.hwpx");
+    let result = cargo_bin()
+        .args([
+            "to-hwpx",
+            md_file.to_str().unwrap(),
+            "-o",
+            hwpx_path.to_str().unwrap(),
+            "--style",
+            style_file.to_str().unwrap(),
+        ])
+        .output()
+        .expect("execute to-hwpx --style");
+    assert!(
+        result.status.success(),
+        "to-hwpx --style (margins) failed; stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(hwpx_path.exists(), "output.hwpx was not created");
+
+    let hwpx_file = std::fs::File::open(&hwpx_path).expect("open hwpx");
+    let mut archive = zip::ZipArchive::new(hwpx_file).expect("parse ZIP");
+    let mut section_entry = archive
+        .by_name("Contents/section0.xml")
+        .expect("Contents/section0.xml not found in HWPX ZIP");
+
+    let mut xml = String::new();
+    section_entry
+        .read_to_string(&mut xml)
+        .expect("read section0.xml");
+
+    assert!(
+        xml.contains("left=\"8000\""),
+        "expected left=\"8000\" in section0.xml, got:\n{xml}"
+    );
+    assert!(
+        xml.contains("right=\"8000\""),
+        "expected right=\"8000\" in section0.xml, got:\n{xml}"
+    );
+    assert!(
+        xml.contains("top=\"6000\""),
+        "expected top=\"6000\" in section0.xml, got:\n{xml}"
+    );
+    assert!(
+        xml.contains("bottom=\"6000\""),
+        "expected bottom=\"6000\" in section0.xml, got:\n{xml}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 16 — `--style` flag applies custom font name to HWPX output
+// ---------------------------------------------------------------------------
+
+#[test]
+fn to_hwpx_style_template_applies_custom_font() {
+    let dir = tempdir().expect("tempdir");
+
+    let md_file = dir.path().join("input.md");
+    std::fs::write(&md_file, "# Hello\n\nTest document\n").expect("write md");
+
+    let style_file = dir.path().join("style.yaml");
+    std::fs::write(&style_file, "font:\n  default: \"맑은 고딕\"\n").expect("write style");
+
+    let hwpx_path = dir.path().join("output.hwpx");
+    let result = cargo_bin()
+        .args([
+            "to-hwpx",
+            md_file.to_str().unwrap(),
+            "-o",
+            hwpx_path.to_str().unwrap(),
+            "--style",
+            style_file.to_str().unwrap(),
+        ])
+        .output()
+        .expect("execute to-hwpx --style");
+    assert!(
+        result.status.success(),
+        "to-hwpx --style (font) failed; stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(hwpx_path.exists(), "output.hwpx was not created");
+
+    let hwpx_file = std::fs::File::open(&hwpx_path).expect("open hwpx");
+    let mut archive = zip::ZipArchive::new(hwpx_file).expect("parse ZIP");
+    let mut header_entry = archive
+        .by_name("Contents/header.xml")
+        .expect("Contents/header.xml not found in HWPX ZIP");
+
+    let mut xml = String::new();
+    header_entry
+        .read_to_string(&mut xml)
+        .expect("read header.xml");
+
+    assert!(
+        xml.contains("맑은 고딕"),
+        "expected \"맑은 고딕\" in header.xml face attributes, got:\n{xml}"
+    );
+}
+

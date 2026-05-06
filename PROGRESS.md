@@ -209,8 +209,10 @@
 없음
 
 ### 미착수
-- [ ] Phase 10: HWPX 라이터 고도화 (스타일, 템플릿)
 - [ ] `cargo publish` — crates.io 배포
+
+### 완료 (이전 미착수)
+- [x] Phase 10: HWPX 라이터 고도화 — Sprint 1 (StyleTemplate), Sprint 4 (header/footer), Sprint 15 (README 반영)
 
 ## 중기 개선 로드맵 (Phase 1.5)
 

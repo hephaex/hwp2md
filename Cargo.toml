@@ -18,7 +18,6 @@ exclude = [
     "PLAN.md",
     "PROGRESS.md",
     "tests/fixtures/",
-    "benches/",
 ]
 
 [[bin]]
