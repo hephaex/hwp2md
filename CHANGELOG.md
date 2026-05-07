@@ -109,6 +109,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 20 / S20-01**: `writer_tests_image.rs` (791 lines) split;
+  `writer_tests_image_util.rs` (262 lines) extracted for base64, MIME, and
+  dedup/collision tests.
+- **Sprint 20 / S20-02**: `writer_tests_section.rs` (786 lines) split;
+  `writer_tests_section_adv.rs` (364 lines) extracted for advanced/ID tests.
+- **Sprint 20 / S20-03**: CHANGELOG v0.5.0 date changed to "Unreleased".
 - **Sprint 19 / S19-02**: `context.rs` (723 lines) split into `context/`
   submodule: `state.rs` (201), `flush.rs` (350), `mod.rs` (188).
 - **Sprint 19 / S19-01**: `examples/convert.rs` ConvertOptions demo wrapped

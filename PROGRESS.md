@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 19 완료 (context.rs split + example doc-test fences)
+## 현재 상태: v0.5.0 Sprint 20 완료 (test file splits + CHANGELOG Unreleased)
 
 ### 완료
 
@@ -259,6 +259,24 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-08 — v0.5.0 Sprint 20: Test File Splits + CHANGELOG Unreleased
+
+**S20-01: writer_tests_image.rs split** (791→568 + 262행):
+- `writer_tests_image_util.rs` 신규 (262행) — base64, MIME, dedup/collision 테스트 13건 추출
+- `base64_encode_test` 헬퍼 의도적 복제 (dead_code 방지)
+
+**S20-02: writer_tests_section.rs split** (786→426 + 364행):
+- `writer_tests_section_adv.rs` 신규 (364행) — 15건 고급/ID 테스트 추출
+- `use super::*;` 패턴으로 부모 헬퍼 접근
+
+**S20-03: CHANGELOG v0.5.0 date → "Unreleased"**:
+- Keep a Changelog 규약에 따라 미배포 상태 명시
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 1 MEDIUM, 0 LOW):
+- M1: 헬퍼 복제 — 의도적, dead_code 경고 방지 목적. 향후 shared test utility 모듈 검토 가능.
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures), publish dry-run 경고 0건 통과
 
 ### 2026-05-08 — v0.5.0 Sprint 19: context.rs Split + Example Doc-Test Fences
 
