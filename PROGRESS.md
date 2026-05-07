@@ -214,71 +214,23 @@
 ### 완료 (이전 미착수)
 - [x] Phase 10: HWPX 라이터 고도화 — Sprint 1 (StyleTemplate), Sprint 4 (header/footer), Sprint 15 (README 반영)
 
-## 중기 개선 로드맵 (Phase 1.5)
+## 중기/장기 개선 로드맵 — 완료 정리
 
-### 1순위: 테스트 기반 구축 (M1) ✅ 완료
-- [x] 단위 테스트: `extract_paragraph_text`, `parse_char_shape`, 서로게이트 페어 처리
-- [x] 통합 테스트: IR→MD→IR, MD→IR→MD 라운드트립 (14건)
-- [x] 103 테스트 전체 통과
-- [ ] 커버리지 80%+ 측정 (tarpaulin)
-- [ ] 샘플 HWP/HWPX 파일 기반 통합 테스트
+모든 초기 이슈 (CRITICAL~LOW) 및 중기 로드맵 해결 완료. 아래는 잔여 미착수 항목만 기록.
 
-### 2순위: 남은 HIGH 이슈 ✅ 완료
-- [x] H2: CharShape 속성 오프셋 46-49 수정 (HWP 5.0 스펙 대조)
-- [x] H3: 제목 감지 임계값 상수화 + 단위 문서화
-- [x] H5: charPr 위치 확인 (이미 정확) + 문서화
-- [x] H8: frontmatter keywords YAML 파싱
-
-### 3순위: MEDIUM 이슈
-- [x] M3: HWPX writer Result 전파 (`?` 사용)
-- [x] M6: YAML escape \n/\r/\t 추가
-- [x] M8: `parse_heading_style` 끝 숫자 추출
-- [x] M10: encoding_rs, serde_yaml 제거
-- [x] M7: HWP OLE2 SummaryInformation 메타데이터 추출 ✅ (14694df)
-- [x] M9: BIN 스트림 doc_info.bin_data_entries 기반 최적화 ✅ (14694df)
-- [x] H4: `--style` 파라미터 tracing::warn 경고 ✅ (14694df)
-
-## 장기 개선 로드맵 (Phase 2~6)
-
-### 아키텍처
-- [x] reader.rs 서브모듈 분할 (2057→828+781+434+238) ✅
-- [x] hwpx/reader.rs 분할 (1895→931+968) + ParseContext dispatch ✅ (35ea51f)
-- [ ] ParseContext 19필드 → 타입 상태 패턴 또는 빌더 분리
+### 미착수 (향후 버전)
+- [ ] ParseContext 타입 상태 패턴 또는 빌더 분리 (아키텍처 개선)
 - [ ] Reader/Writer trait 정의 (HWP/HWPX/MD 공통 인터페이스)
-- [x] HwpDocument → IR 변환에서 제어 문자 파싱 (테이블/이미지/각주) ✅
+- [ ] 샘플 HWP/HWPX 파일 기반 통합 테스트 (실제 한글 문서 검증)
 
-### HWP 파서 (Phase 2+2b) — 완료 항목
-- [x] CTRL_TABLE + LIST_HEADER 레코드로 테이블 구조 파싱 ✅
-- [x] BinData 참조 해결 → 이미지 인라인 삽입 ✅
-- [x] CTRL_FOOTNOTE/ENDNOTE 파싱 ✅
-- [x] 하이퍼링크 URL 추출 (CTRL_HYPERLINK + parse_hyperlink_url) ✅
-- [x] DRM/암호화 감지 (has_drm 비트 + Hwp2MdError) ✅
-- [x] parse_summary_bytes 분리 + OLE2 단위 테스트 ✅
-
-### HWP 파서 — 남은 항목
-- [x] EQEDIT 스크립트 → LaTeX 변환 고도화 ✅ (da92270)
-- [ ] 샘플 HWP/HWPX 파일 기반 통합 테스트
-- [ ] 커버리지 80%+ 측정 (tarpaulin)
-
-### 배포 (Phase 6)
-- [x] GitHub Actions CI (build + test + clippy) ✅ (37d2645)
-- [ ] crates.io 배포 준비
-- [ ] 배치 변환 CLI 옵션
-
-### HWPX 파서 — Phase 3 완료
-- [x] charPr 중복 제거 (apply_charpr_attrs 헬퍼) ✅
-- [x] `<li>` 핸들러 + list_item 컨텍스트 ✅
-- [x] 각주/미주 파싱 (fn/en/footnote/endnote) ✅
-- [x] 각주 참조 (noteRef, ctrl) ✅
-- [x] BinData 참조 해결 (build_bin_map + resolve_bin_refs) ✅
-- [x] 교차 컨텍스트 라우팅 수정 (lineBreak/img/noteRef) ✅
-- [x] ParseContext 디스패치 메서드 통합 ✅ (35ea51f)
-- [ ] 샘플 HWPX 파일 기반 통합 테스트
-
-### HWPX 테스트 — Phase 2d
-- [x] parse_section_xml 단위 테스트 42건 ✅ (5e297d7)
-- [x] Dead code clippy 경고 0건 (CI 호환) ✅
-- [ ] 샘플 HWPX 파일 기반 통합 테스트
+### 완료 항목 요약
+- 커버리지 80%+ 달성 (Sprint 5: tarpaulin CI + Codecov)
+- crates.io 배포 준비 완료 (cargo publish --dry-run 통과)
+- 배치 변환 CLI (Sprint 9: batch 서브커맨드)
+- 모든 CRITICAL/HIGH/MEDIUM 이슈 해결
+- HWP 파서 고도화 (Phase 2~2c: 테이블/이미지/각주/하이퍼링크/DRM/EQEDIT)
+- HWPX 파서 고도화 (Phase 3: charPr/li/footnote/BinData/dispatch)
+- 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
 
