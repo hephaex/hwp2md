@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 21 완료 (API surface cleanup + PartialEq + #[must_use])
+## 현재 상태: v0.5.0 Sprint 22 완료 (MIME refactor + writeln! + Eq derives)
 
 ### 완료
 
@@ -259,6 +259,26 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-08 — v0.5.0 Sprint 22: MIME Refactor + writeln! + Eq Derives
+
+**S22-01: guess_mime_from_name refactor** (pedantic clippy):
+- `to_lowercase()` + `ends_with()` → `Path::extension()` + `to_ascii_lowercase()` + match
+- 더 관용적이고, 불필요한 전체 문자열 소문자 변환 제거
+
+**S22-02: format! push → writeln!** (md/writer.rs):
+- `push_str(&format!(...))` 6건 → `writeln!` 매크로
+- `use std::fmt::Write as _;` 추가
+- 필드당 임시 String 할당 제거
+
+**S22-03: Eq derive** (IR types):
+- Document, Metadata, Section, Block, Inline, TableRow, TableCell, ListItem, Asset, HeaderFooterType
+- Sprint 21의 PartialEq에 Eq 추가 — 모든 필드 타입이 Eq 호환
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 0 MEDIUM, 1 SUGGESTION):
+- S1: dotfile 동작 차이 (.png → octet-stream) — HWPX ZIP 경로에서 발생하지 않으므로 OK
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures), publish dry-run 경고 0건 통과
 
 ### 2026-05-08 — v0.5.0 Sprint 21: API Surface Cleanup + PartialEq + #[must_use]
 

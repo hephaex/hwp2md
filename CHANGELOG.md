@@ -109,6 +109,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 22 / S22-01**: `guess_mime_from_name` refactored to use
+  `Path::extension()` + `to_ascii_lowercase()` match (idiomatic, avoids
+  clippy pedantic warning).
+- **Sprint 22 / S22-02**: `write_frontmatter` uses `writeln!` macro
+  instead of `push_str(&format!(...))` — eliminates 6 intermediate
+  String allocations.
+- **Sprint 22 / S22-03**: `Eq` derived on all IR types (Document,
+  Metadata, Section, Block, Inline, TableRow, TableCell, ListItem,
+  Asset, HeaderFooterType).
 - **Sprint 21 / S21-01**: `pub use model::*` removed from `hwp/mod.rs` —
   internal HWP model types no longer exported; API surface reduced to
   `read_hwp()` only.
