@@ -102,8 +102,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sprint 15 / S15-02**: CLI `--style` end-to-end test — verifies that
   `to-hwpx --style` actually applies custom page dimensions to the output
   HWPX section XML.
+- **Sprint 16 / S16-01**: Style template CLI tests — margin overrides
+  verified in section XML; custom default font name verified in header XML.
 
 ### Changed
+- **Sprint 16 / S16-02**: `benches/` removed from Cargo.toml `exclude` list,
+  fixing "ignoring benchmark" warning during `cargo publish --dry-run`.
 - **Sprint 15 / S15-01**: README documentation refresh — stale "in progress"
   and "not yet applied" claims for style templates removed; format support
   matrix updated (headers/footers now marked as supported for HWPX read/write);

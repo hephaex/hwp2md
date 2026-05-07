@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 15 완료 (README doc refresh + style template CLI test)
+## 현재 상태: v0.5.0 Sprint 16 완료 (style template CLI tests + publish fix)
 
 ### 완료
 
@@ -307,6 +307,28 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-07 — v0.5.0 Sprint 16: Style Template CLI Tests + Publish Fix
+
+**S16-01: Style template CLI tests — margins + font** (Sprint 15 L1):
+- `to_hwpx_style_template_applies_margins` — margin 값 (8000/8000/6000/6000) section XML 검증
+- `to_hwpx_style_template_applies_custom_font` — "맑은 고딕" font name header.xml 검증
+
+**S16-02: Fix cargo publish benchmark warning**:
+- Cargo.toml exclude에서 `"benches/"` 제거 — `[[bench]]` 참조 경고 해결
+
+**S16-03: PROGRESS.md Phase 10 status cleanup**:
+- Phase 10 "HWPX 라이터 고도화" 미착수 → 완료 처리 (Sprint 1/4/15에서 구현 완료)
+
+**S16-04: cargo publish --dry-run**:
+- 경고 0건 통과
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 1 MEDIUM, 2 LOW):
+- M1: 3개 style template 테스트 간 setup 중복 → 헬퍼 추출 권장
+- L1: Sprint 15 → 16 comment 오타 → 수정 완료
+- L2: 문자열 기반 XML assertion (brittle)
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures), publish dry-run 경고 0건 통과
 
 ### 2026-05-07 — v0.5.0 Sprint 14: Image Asset Tests + README CLI Docs
 
