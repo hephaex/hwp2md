@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 16 완료 (style template CLI tests + publish fix)
+## 현재 상태: v0.5.0 Sprint 17 완료 (CLI test split + lib.rs URL fix)
 
 ### 완료
 
@@ -307,6 +307,24 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-07 — v0.5.0 Sprint 17: CLI Test Split + lib.rs URL Fix
+
+**S17-01: CLI style template test helper + split** (Sprint 16 M1):
+- `tests/cli_style.rs` 신규 (155행) — 3 style template 테스트 추출
+- `run_to_hwpx_with_style(md, yaml)` 공유 헬퍼 (tempdir + CLI 실행 + ZIP 경로 반환)
+- `tests/cli.rs` 924→751행 (800행 가이드라인 준수)
+
+**S17-02: lib.rs README URL 수정**:
+- `CasterLink/hwp2md` → `hephaex/hwp2md` (docs.rs 404 방지)
+
+**S17-03: cargo publish --dry-run**:
+- 경고 0건 통과
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 0 MEDIUM, 0 LOW):
+- 클린 승인. ZIP 읽기 패턴 추가 헬퍼 추출 선택적 제안만.
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures), publish dry-run 경고 0건 통과
 
 ### 2026-05-07 — v0.5.0 Sprint 16: Style Template CLI Tests + Publish Fix
 

@@ -106,6 +106,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verified in section XML; custom default font name verified in header XML.
 
 ### Changed
+- **Sprint 17 / S17-01**: Style template CLI tests extracted to `cli_style.rs`
+  with shared `run_to_hwpx_with_style` helper; `cli.rs` reduced from 924 to
+  751 lines.
 - **Sprint 16 / S16-02**: `benches/` removed from Cargo.toml `exclude` list,
   fixing "ignoring benchmark" warning during `cargo publish --dry-run`.
 - **Sprint 15 / S15-01**: README documentation refresh — stale "in progress"
@@ -152,6 +155,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Section` field rather than body.
 
 ### Fixed
+- **Sprint 17 / S17-02**: `lib.rs` README link corrected from
+  `CasterLink/hwp2md` to `hephaex/hwp2md`.
 - `serde_yaml` (deprecated) replaced with `serde_yml 0.0.12`.
 - `PageLayout` now derives `Copy` (all fields are `Option<u32>` or `bool`).
 - `StyleTemplate::validate()` rejects zero `width`, `height`, and `line_spacing`.
