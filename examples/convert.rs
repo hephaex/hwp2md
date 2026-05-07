@@ -9,10 +9,9 @@ use hwp2md::ir::{Block, Document, Inline, Metadata, Section, TableCell, TableRow
 use hwp2md::md::write_markdown;
 
 fn main() {
-    // -------------------------------------------------------------------------
-    // 1. ConvertOptions builder — shown as comments because file I/O requires
-    //    real HWP/HWPX files to be present at runtime.
+    // 1. ConvertOptions builder (requires real files at runtime):
     //
+    // ```rust,no_run
     // use std::path::Path;
     // use hwp2md::ConvertOptions;
     //
@@ -27,7 +26,7 @@ fn main() {
     //     .force(true)
     //     .execute()
     //     .expect("conversion failed");
-    // -------------------------------------------------------------------------
+    // ```
 
     // 2. Build a small Document programmatically using the IR types.
     let mut doc = Document::new();

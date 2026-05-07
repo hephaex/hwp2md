@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
 
-#[path = "context.rs"]
+#[path = "context/mod.rs"]
 mod context;
 pub(crate) use context::ParseContext;
 use context::{flush_paragraph_staged, group_list_paragraphs, StagedBlock};
