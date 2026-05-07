@@ -57,7 +57,7 @@
 //! | [`hwpx`] | HWPX reader and writer (ZIP/XML) |
 //! | [`md`] | Markdown reader and writer |
 //!
-//! See the [README](https://github.com/CasterLink/hwp2md#readme) for detailed
+//! See the [README](https://github.com/hephaex/hwp2md#readme) for detailed
 //! usage, CLI reference, and format support matrix.
 #![warn(missing_docs)]
 
