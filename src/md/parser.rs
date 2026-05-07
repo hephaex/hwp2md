@@ -2,6 +2,7 @@ use crate::ir;
 use comrak::nodes::{AstNode, ListType, NodeValue};
 use comrak::{parse_document, Arena, Options};
 
+#[must_use]
 pub fn parse_markdown(input: &str) -> ir::Document {
     let arena = Arena::new();
     let mut options = Options::default();

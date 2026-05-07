@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Top-level document produced by any reader and consumed by any writer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Document {
     /// Document-level metadata (title, author, dates, …).
     pub metadata: Metadata,
@@ -15,6 +15,7 @@ pub struct Document {
 
 impl Document {
     /// Create an empty document with default metadata.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metadata: Metadata::default(),
@@ -31,7 +32,7 @@ impl Default for Document {
 }
 
 /// Document-level metadata extracted from HWP/HWPX summary streams.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Metadata {
     /// Document title.
     pub title: Option<String>,
@@ -80,6 +81,7 @@ impl PageLayout {
     ///
     /// - Size: 210 × 297 mm (59528 × 84188 HWP units, 1 HWP unit = 1/7200 inch)
     /// - Margins: 20 mm header/footer, 30 mm left/right (5670 / 4252 HWP units)
+    #[must_use]
     pub fn a4_portrait() -> Self {
         Self {
             width: Some(59528),
@@ -114,6 +116,7 @@ pub enum HeaderFooterType {
 
 impl HeaderFooterType {
     /// Return the OWPML attribute string for this variant.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
             Self::Both => "both",
@@ -151,7 +154,7 @@ impl From<String> for HeaderFooterType {
 }
 
 /// A logical section of a document containing an ordered sequence of blocks.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Section {
     /// Content blocks in reading order.
     pub blocks: Vec<Block>,
@@ -180,7 +183,7 @@ pub struct Section {
 }
 
 /// A block-level content element within a section.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Block {
     /// ATX heading with a level in `1..=6`.
     Heading {
@@ -255,7 +258,7 @@ pub enum Block {
 }
 
 /// A run of inline text with optional formatting and annotations.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Inline {
     /// The raw text of this run.
     pub text: String,
@@ -291,6 +294,7 @@ pub struct Inline {
 
 impl Inline {
     /// Create a plain, unformatted inline run from `text`.
+    #[must_use]
     pub fn plain(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
@@ -299,6 +303,7 @@ impl Inline {
     }
 
     /// Create a bold inline run from `text`.
+    #[must_use]
     pub fn bold(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
@@ -313,6 +318,7 @@ impl Inline {
     /// newly-added fields.  The `link`, `footnote_ref`, `font_name`, `code`,
     /// and `ruby` fields are left at their defaults and can be set via chained
     /// builder methods (`with_ruby`, etc.).
+    #[must_use]
     #[allow(clippy::too_many_arguments)]
     pub fn with_formatting(
         text: String,
@@ -342,24 +348,28 @@ impl Inline {
     }
 
     /// Set the `link` field, returning the modified inline.
+    #[must_use]
     pub fn with_link(mut self, link: Option<String>) -> Self {
         self.link = link;
         self
     }
 
     /// Set the `ruby` annotation field, returning the modified inline.
+    #[must_use]
     pub fn with_ruby(mut self, ruby: Option<String>) -> Self {
         self.ruby = ruby;
         self
     }
 
     /// Set the `font_name` field, returning the modified inline.
+    #[must_use]
     pub fn with_font_name(mut self, font_name: Option<String>) -> Self {
         self.font_name = font_name;
         self
     }
 
     /// Create a footnote-reference inline with no visible text or formatting.
+    #[must_use]
     pub fn footnote_ref(id: impl Into<String>) -> Self {
         Self {
             footnote_ref: Some(id.into()),
@@ -369,7 +379,7 @@ impl Inline {
 }
 
 /// A single row in a [`Block::Table`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TableRow {
     /// Cells in left-to-right order.
     pub cells: Vec<TableCell>,
@@ -378,7 +388,7 @@ pub struct TableRow {
 }
 
 /// A single cell in a [`TableRow`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TableCell {
     /// Block content inside the cell.
     pub blocks: Vec<Block>,
@@ -399,7 +409,7 @@ impl Default for TableCell {
 }
 
 /// A single item in a [`Block::List`], optionally containing nested sub-lists.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ListItem {
     /// Block content of this item (typically one `Paragraph`).
     pub blocks: Vec<Block>,
@@ -416,6 +426,7 @@ pub struct ListItem {
 
 impl ListItem {
     /// Create a new unchecked list item with the given blocks and children.
+    #[must_use]
     pub fn new(blocks: Vec<Block>, children: Vec<ListItem>) -> Self {
         Self {
             blocks,
@@ -426,7 +437,7 @@ impl ListItem {
 }
 
 /// A binary asset (image, font, …) embedded in the document.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Asset {
     /// Original file name as recorded in the source archive.
     pub name: String,
@@ -504,11 +515,7 @@ mod tests {
 
     #[test]
     fn document_default_equals_new() {
-        let a = Document::new();
-        let b = Document::default();
-        // Both must be empty — compare structurally via their serialized form.
-        assert_eq!(a.sections.len(), b.sections.len());
-        assert_eq!(a.assets.len(), b.assets.len());
+        assert_eq!(Document::new(), Document::default());
     }
 
     #[test]

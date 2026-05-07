@@ -15,6 +15,7 @@ fn escape_html(s: &str) -> String {
     out
 }
 
+#[must_use]
 pub fn write_markdown(doc: &ir::Document, frontmatter: bool) -> String {
     let mut out = String::new();
 
