@@ -109,6 +109,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 19 / S19-02**: `context.rs` (723 lines) split into `context/`
+  submodule: `state.rs` (201), `flush.rs` (350), `mod.rs` (188).
+- **Sprint 19 / S19-01**: `examples/convert.rs` ConvertOptions demo wrapped
+  in `` ```rust,no_run `` doc-test fences for docs.rs rendering.
 - **Sprint 18 / S18-02**: `PROGRESS.md` roadmap section condensed — removed
   completed items from 중기/장기 sections, keeping only 3 genuinely pending items.
 - **Sprint 17 / S17-01**: Style template CLI tests extracted to `cli_style.rs`

@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 18 완료 (docs.rs example + roadmap cleanup)
+## 현재 상태: v0.5.0 Sprint 19 완료 (context.rs split + example doc-test fences)
 
 ### 완료
 
@@ -259,6 +259,27 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-08 — v0.5.0 Sprint 19: context.rs Split + Example Doc-Test Fences
+
+**S19-01: examples/convert.rs doc-test fences** (Sprint 18 review suggestion):
+- 주석 처리된 ConvertOptions 빌더 코드를 ` ```rust,no_run ` 펜스로 래핑
+- docs.rs에서 구문 강조 코드 블록으로 렌더링
+
+**S19-02: context.rs split into submodules**:
+- `context.rs` (723행) → `context/` 디렉토리 (3파일, 739행)
+- `state.rs` (201행): FormattingState, TableState, ListState, FootnoteState, HeaderFooterState, PageLayoutState
+- `flush.rs` (350행): apply_charpr_attrs, flush 함수들, StagedBlock, group_list_paragraphs
+- `mod.rs` (188행): ParseContext struct, RubyPart, dispatch 메서드, re-exports
+- `reader.rs`: `#[path = "context/mod.rs"]` 경로 업데이트
+
+**S19-03: cargo publish --dry-run**:
+- 경고 0건 통과
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 0 MEDIUM, 1 LOW):
+- L1: `#[path]` 불필요 제안 — 실제로는 file-based module이므로 필요
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures), publish dry-run 경고 0건 통과
 
 ### 2026-05-07 — v0.5.0 Sprint 18: docs.rs Example + Roadmap Cleanup
 
