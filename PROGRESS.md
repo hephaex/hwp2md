@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 17 완료 (CLI test split + lib.rs URL fix)
+## 현재 상태: v0.5.0 Sprint 18 완료 (docs.rs example + roadmap cleanup)
 
 ### 완료
 
@@ -259,6 +259,25 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-07 — v0.5.0 Sprint 18: docs.rs Example + Roadmap Cleanup
+
+**S18-01: examples/convert.rs** (docs.rs library showcase):
+- ConvertOptions builder API (commented-out demo, no file I/O)
+- IR Document 프로그래매틱 구성 (Heading + bold Paragraph + Table)
+- `write_markdown(&doc, false)` 렌더링 + 출력
+- zero unwrap, zero file I/O, `cargo run --example convert` 독립 실행
+
+**S18-02: PROGRESS.md roadmap cleanup**:
+- 중기/장기 섹션 ~65행 → ~15행 압축 (완료 항목 제거, 잔여 3건만 유지)
+
+**S18-03: cargo publish --dry-run**:
+- 104 files, 240.5 KiB, 경고 0건 통과
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 0 MEDIUM, 1 LOW):
+- L1: mut + push 패턴 — Rust 소유권 모델에서 안전하므로 조치 불필요
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures), publish dry-run 경고 0건 통과
 
 ### 2026-05-07 — v0.5.0 Sprint 17: CLI Test Split + lib.rs URL Fix
 

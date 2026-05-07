@@ -104,8 +104,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   HWPX section XML.
 - **Sprint 16 / S16-01**: Style template CLI tests — margin overrides
   verified in section XML; custom default font name verified in header XML.
+- **Sprint 18 / S18-01**: `examples/convert.rs` — library API example for
+  docs.rs; demonstrates `ConvertOptions` builder and programmatic IR
+  construction with Markdown rendering.
 
 ### Changed
+- **Sprint 18 / S18-02**: `PROGRESS.md` roadmap section condensed — removed
+  completed items from 중기/장기 sections, keeping only 3 genuinely pending items.
 - **Sprint 17 / S17-01**: Style template CLI tests extracted to `cli_style.rs`
   with shared `run_to_hwpx_with_style` helper; `cli.rs` reduced from 924 to
   751 lines.
