@@ -34,7 +34,7 @@ fn list_para(para_pr: &str, num_pr: Option<&str>, text: &str) -> String {
 
 /// Produce a plain paragraph XML fragment (no list attributes).
 fn plain_para(text: &str) -> String {
-    format!(r#"<hp:p><hp:run><hp:t>{text}</hp:t></hp:run></hp:p>"#)
+    format!(r"<hp:p><hp:run><hp:t>{text}</hp:t></hp:run></hp:p>")
 }
 
 /// Extract all top-level text from the first block if it is a `Block::List`.

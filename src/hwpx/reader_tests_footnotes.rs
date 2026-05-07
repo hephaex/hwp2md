@@ -148,7 +148,7 @@ fn image_inside_list_item_goes_to_list_item_blocks() {
 
 #[test]
 fn linebreak_inside_list_item_appends_newline() {
-    let xml = r#"<root><ul><li><hp:p><hp:run><hp:t>before</hp:t><hp:lineBreak/></hp:run></hp:p></li></ul></root>"#;
+    let xml = r"<root><ul><li><hp:p><hp:run><hp:t>before</hp:t><hp:lineBreak/></hp:run></hp:p></li></ul></root>";
     let s = section(xml);
     match &s.blocks[0] {
         ir::Block::List { items, .. } => {

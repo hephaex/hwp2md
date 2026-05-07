@@ -11,7 +11,7 @@ fn section(xml: &str) -> ir::Section {
 
 #[test]
 fn header_footer_parsed() {
-    let xml = r#"<root>
+    let xml = r"<root>
         <hp:p><hp:run><hp:t>body text</hp:t></hp:run></hp:p>
         <hp:headerFooter>
             <hp:header>
@@ -21,7 +21,7 @@ fn header_footer_parsed() {
                 <hp:p><hp:run><hp:t>Footer text</hp:t></hp:run></hp:p>
             </hp:footer>
         </hp:headerFooter>
-    </root>"#;
+    </root>";
     let s = section(xml);
 
     // Main body block still present.
@@ -52,13 +52,13 @@ fn header_footer_parsed() {
 
 #[test]
 fn header_only_no_footer() {
-    let xml = r#"<root>
+    let xml = r"<root>
         <hp:headerFooter>
             <hp:header>
                 <hp:p><hp:run><hp:t>Only header</hp:t></hp:run></hp:p>
             </hp:header>
         </hp:headerFooter>
-    </root>"#;
+    </root>";
     let s = section(xml);
 
     let header = s.header.as_ref().expect("section.header must be Some");
@@ -80,9 +80,9 @@ fn header_only_no_footer() {
 #[test]
 fn no_header_footer_remains_none() {
     // A section without <hp:headerFooter> must leave header/footer as None.
-    let xml = r#"<root>
+    let xml = r"<root>
         <hp:p><hp:run><hp:t>plain body</hp:t></hp:run></hp:p>
-    </root>"#;
+    </root>";
     let s = section(xml);
 
     assert!(
@@ -97,13 +97,13 @@ fn no_header_footer_remains_none() {
 
 #[test]
 fn footer_only_no_header() {
-    let xml = r#"<root>
+    let xml = r"<root>
         <hp:headerFooter>
             <hp:footer>
                 <hp:p><hp:run><hp:t>Only footer</hp:t></hp:run></hp:p>
             </hp:footer>
         </hp:headerFooter>
-    </root>"#;
+    </root>";
     let s = section(xml);
 
     assert!(
@@ -126,7 +126,7 @@ fn footer_only_no_header() {
 fn header_footer_body_text_not_mixed_into_header() {
     // Body paragraphs that appear outside <hp:headerFooter> must NOT end up
     // in section.header / section.footer.
-    let xml = r#"<root>
+    let xml = r"<root>
         <hp:p><hp:run><hp:t>body para 1</hp:t></hp:run></hp:p>
         <hp:headerFooter>
             <hp:header>
@@ -134,7 +134,7 @@ fn header_footer_body_text_not_mixed_into_header() {
             </hp:header>
         </hp:headerFooter>
         <hp:p><hp:run><hp:t>body para 2</hp:t></hp:run></hp:p>
-    </root>"#;
+    </root>";
     let s = section(xml);
 
     // Two body blocks.
@@ -155,13 +155,13 @@ fn header_footer_body_text_not_mixed_into_header() {
 #[test]
 fn header_footer_without_hp_prefix_also_parsed() {
     // The parser must accept bare element names (no namespace prefix).
-    let xml = r#"<root>
+    let xml = r"<root>
         <headerFooter>
             <header>
                 <p><run><t>bare header</t></run></p>
             </header>
         </headerFooter>
-    </root>"#;
+    </root>";
     let s = section(xml);
 
     let header = s
@@ -287,13 +287,13 @@ fn header_footer_type_odd_parsed() {
 #[test]
 fn header_footer_type_none_when_not_specified() {
     // Test that header_footer_type is None when type attribute is not present.
-    let xml = r#"<root>
+    let xml = r"<root>
         <hp:headerFooter>
             <hp:header>
                 <hp:p><hp:run><hp:t>Header</hp:t></hp:run></hp:p>
             </hp:header>
         </hp:headerFooter>
-    </root>"#;
+    </root>";
     let s = section(xml);
 
     assert!(

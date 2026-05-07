@@ -1,6 +1,7 @@
 use crate::error::Hwp2MdError;
 use crate::ir;
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 use super::ImageAssetMap;
 
@@ -380,9 +381,7 @@ pub(super) fn generate_content_hpf(doc: &ir::Document, resolved_assets: &[Resolv
     let section_count = doc.sections.len().max(1);
     let mut items = String::new();
     for i in 0..section_count {
-        items.push_str(&format!(
-            "    <hp:item href=\"section{i}.xml\" type=\"Section\"/>\n"
-        ));
+        let _ = writeln!(items, "    <hp:item href=\"section{i}.xml\" type=\"Section\"/>");
     }
 
     // Build optional <hp:docInfo> with title/author metadata.
@@ -392,18 +391,12 @@ pub(super) fn generate_content_hpf(doc: &ir::Document, resolved_assets: &[Resolv
         let mut info = String::from("  <hp:docInfo>\n");
         if let Some(title) = doc.metadata.title.as_deref() {
             if !title.is_empty() {
-                info.push_str(&format!(
-                    "    <hp:title>{}</hp:title>\n",
-                    xml_escape_content(title)
-                ));
+                let _ = writeln!(info, "    <hp:title>{}</hp:title>", xml_escape_content(title));
             }
         }
         if let Some(author) = doc.metadata.author.as_deref() {
             if !author.is_empty() {
-                info.push_str(&format!(
-                    "    <hp:author>{}</hp:author>\n",
-                    xml_escape_content(author)
-                ));
+                let _ = writeln!(info, "    <hp:author>{}</hp:author>", xml_escape_content(author));
             }
         }
         info.push_str("  </hp:docInfo>\n");
@@ -426,11 +419,12 @@ pub(super) fn generate_content_hpf(doc: &ir::Document, resolved_assets: &[Resolv
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| asset.entry_name.clone());
-        bin_data_entries.push_str(&format!(
-            "    <hp:binData itemId=\"{}\" file=\"BinData/{}\" type=\"EMBED\" compress=\"true\"/>\n",
+        let _ = writeln!(
+            bin_data_entries,
+            "    <hp:binData itemId=\"{}\" file=\"BinData/{}\" type=\"EMBED\" compress=\"true\"/>",
             xml_escape_content(&item_id),
             xml_escape_content(&asset.entry_name),
-        ));
+        );
     }
 
     format!(

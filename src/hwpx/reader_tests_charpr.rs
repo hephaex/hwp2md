@@ -19,9 +19,10 @@ fn section_with_faces(xml: &str, faces: &[&str]) -> ir::Section {
 // -----------------------------------------------------------------------
 
 fn make_bytes_start_with_attrs(tag: &str, attrs: &[(&str, &str)]) -> Vec<u8> {
+    use std::fmt::Write as _;
     let mut xml = format!("<{tag}");
     for (k, v) in attrs {
-        xml.push_str(&format!(" {k}=\"{v}\""));
+        let _ = write!(xml, " {k}=\"{v}\"");
     }
     xml.push('>');
     xml.into_bytes()

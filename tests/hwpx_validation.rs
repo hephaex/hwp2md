@@ -225,7 +225,7 @@ fn fixture_passes_polaris_dvc_parse() {
 
 #[test]
 fn markdown_to_hwpx_roundtrip_passes_validation() {
-    let markdown = r#"# 한글 문서 제목
+    let markdown = r"# 한글 문서 제목
 
 첫 번째 문단입니다.
 
@@ -237,7 +237,7 @@ fn markdown_to_hwpx_roundtrip_passes_validation() {
 | B    | 200 |
 
 **굵은 텍스트**와 *기울임 텍스트*가 있습니다.
-"#;
+";
 
     let ir_doc = md::parse_markdown(markdown);
     let tmp = tempfile::NamedTempFile::new().unwrap();

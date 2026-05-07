@@ -164,7 +164,7 @@ fn section_xml_with_style(style_yaml: &str) -> String {
 #[test]
 fn style_template_overrides_page_dimensions() {
     let xml = section_xml_with_style(
-        r#"
+        r"
 page:
   width: 70000
   height: 90000
@@ -174,7 +174,7 @@ page:
     right: 3000
     top: 2000
     bottom: 2000
-"#,
+",
     );
     assert!(xml.contains(r#"width="70000""#), "custom width: {xml}");
     assert!(xml.contains(r#"height="90000""#), "custom height: {xml}");
@@ -186,12 +186,12 @@ page:
 #[test]
 fn style_template_partial_overrides_keep_defaults() {
     let xml = section_xml_with_style(
-        r#"
+        r"
 page:
   width: 70000
   margin:
     left: 3000
-"#,
+",
     );
     assert!(xml.contains(r#"width="70000""#), "custom width: {xml}");
     assert!(
@@ -257,9 +257,9 @@ fn style_template_heading_line_spacing_in_header() {
         }],
         assets: Vec::new(),
     };
-    let style_yaml = r#"heading:
+    let style_yaml = r"heading:
   line_spacing: 220
-"#;
+";
     let style_path = tempfile::NamedTempFile::new().expect("style tmp");
     std::fs::write(style_path.path(), style_yaml).unwrap();
     write_hwpx(&doc, tmp.path(), Some(style_path.path())).expect("write_hwpx");
@@ -333,13 +333,13 @@ fn section_page_layout_takes_precedence_over_style() {
         assets: Vec::new(),
     };
     let style = StyleTemplate::from_yaml(
-        r#"
+        r"
 page:
   width: 70000
   height: 90000
   margin:
     left: 9999
-"#,
+",
     )
     .unwrap();
     let tables = RefTables::build(&doc, Some(style));

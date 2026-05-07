@@ -215,7 +215,7 @@ fn header_footer_type_none_not_emitted() {
     let xml = section_xml_with_hf(sec);
 
     assert!(
-        !xml.contains(r#"type="#),
+        !xml.contains(r"type="),
         "no type attribute should be present when header_footer_type is None: {xml}"
     );
 }

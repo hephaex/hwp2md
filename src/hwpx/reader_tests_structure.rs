@@ -199,7 +199,7 @@ fn ordered_list_without_li_produces_no_block() {
     // handler, so items will be empty.  The block is only pushed when
     // list_items is non-empty, so an empty ol must produce no block.
     // This test documents the current behaviour explicitly.
-    let xml = r#"<root><ol></ol></root>"#;
+    let xml = r"<root><ol></ol></root>";
     let s = section(xml);
     assert!(
         s.blocks.is_empty(),

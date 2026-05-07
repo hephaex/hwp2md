@@ -101,13 +101,13 @@ fn write_block(out: &mut String, block: &ir::Block, indent: usize) {
     match block {
         ir::Block::Heading { level, inlines } => {
             let hashes = "#".repeat(*level as usize);
-            out.push_str(&format!("{hashes} {}\n\n", render_inlines(inlines)));
+            let _ = writeln!(out, "{hashes} {}\n", render_inlines(inlines));
         }
         ir::Block::Paragraph { inlines } => {
             let text = render_inlines(inlines);
             if !text.trim().is_empty() {
                 let safe = escape_paragraph_line_start(&text);
-                out.push_str(&format!("{prefix}{safe}\n\n"));
+                let _ = writeln!(out, "{prefix}{safe}\n");
             }
         }
         ir::Block::Table { rows, col_count } => {
@@ -115,18 +115,18 @@ fn write_block(out: &mut String, block: &ir::Block, indent: usize) {
         }
         ir::Block::CodeBlock { language, code } => {
             let lang = language.as_deref().unwrap_or("");
-            out.push_str(&format!("{prefix}```{lang}\n"));
+            let _ = writeln!(out, "{prefix}```{lang}");
             for line in code.lines() {
-                out.push_str(&format!("{prefix}{line}\n"));
+                let _ = writeln!(out, "{prefix}{line}");
             }
-            out.push_str(&format!("{prefix}```\n\n"));
+            let _ = writeln!(out, "{prefix}```\n");
         }
         ir::Block::BlockQuote { blocks } => {
             for b in blocks {
                 let mut inner = String::new();
                 write_block(&mut inner, b, 0);
                 for line in inner.lines() {
-                    out.push_str(&format!("{prefix}> {line}\n"));
+                    let _ = writeln!(out, "{prefix}> {line}");
                 }
             }
             out.push('\n');
@@ -140,23 +140,23 @@ fn write_block(out: &mut String, block: &ir::Block, indent: usize) {
             out.push('\n');
         }
         ir::Block::Image { src, alt } => {
-            out.push_str(&format!("{prefix}![{alt}]({src})\n\n"));
+            let _ = writeln!(out, "{prefix}![{alt}]({src})\n");
         }
         ir::Block::HorizontalRule => {
-            out.push_str(&format!("{prefix}---\n\n"));
+            let _ = writeln!(out, "{prefix}---\n");
         }
         ir::Block::PageBreak => {
             // HTML comment is invisible in rendered Markdown but survives a
             // round-trip through the parser, which preserves the marker as a
             // `Block::PageBreak`.  See `md::parser::node_to_block` for the
             // matching detection.
-            out.push_str(&format!("{prefix}<!-- pagebreak -->\n\n"));
+            let _ = writeln!(out, "{prefix}<!-- pagebreak -->\n");
         }
         ir::Block::Footnote { id, content } => {
-            out.push_str(&format!("{prefix}[^{id}]: "));
+            let _ = write!(out, "{prefix}[^{id}]: ");
             for (i, b) in content.iter().enumerate() {
                 if i > 0 {
-                    out.push_str(&format!("{prefix}    "));
+                    let _ = write!(out, "{prefix}    ");
                 }
                 let mut inner = String::new();
                 write_block(&mut inner, b, 0);
@@ -167,9 +167,9 @@ fn write_block(out: &mut String, block: &ir::Block, indent: usize) {
         }
         ir::Block::Math { display, tex } => {
             if *display {
-                out.push_str(&format!("{prefix}$$\n{prefix}{tex}\n{prefix}$$\n\n"));
+                let _ = writeln!(out, "{prefix}$$\n{prefix}{tex}\n{prefix}$$\n");
             } else {
-                out.push_str(&format!("{prefix}${tex}$\n\n"));
+                let _ = writeln!(out, "{prefix}${tex}$\n");
             }
         }
     }
@@ -232,7 +232,7 @@ fn render_inlines(inlines: &[ir::Inline]) -> String {
     for inline in inlines {
         // Code spans: wrap raw text in backticks; no other escaping needed.
         if inline.code {
-            out.push_str(&format!("`{}`", inline.text));
+            let _ = write!(out, "`{}`", inline.text);
             continue;
         }
 
@@ -323,7 +323,7 @@ fn write_table(out: &mut String, rows: &[ir::TableRow], col_count: usize) {
             } else {
                 String::new()
             };
-            out.push_str(&format!(" {} |", cell_text));
+            let _ = write!(out, " {cell_text} |");
         }
         out.push('\n');
 
@@ -346,13 +346,13 @@ fn write_html_table(out: &mut String, rows: &[ir::TableRow]) {
         for cell in &row.cells {
             let mut attrs = String::new();
             if cell.colspan > 1 {
-                attrs.push_str(&format!(" colspan=\"{}\"", cell.colspan));
+                let _ = write!(attrs, " colspan=\"{}\"", cell.colspan);
             }
             if cell.rowspan > 1 {
-                attrs.push_str(&format!(" rowspan=\"{}\"", cell.rowspan));
+                let _ = write!(attrs, " rowspan=\"{}\"", cell.rowspan);
             }
             let text = escape_html(&cell_to_text(cell));
-            out.push_str(&format!("    <{tag}{attrs}>{text}</{tag}>\n"));
+            let _ = writeln!(out, "    <{tag}{attrs}>{text}</{tag}>");
         }
         out.push_str("  </tr>\n");
     }
@@ -408,10 +408,10 @@ fn write_list(out: &mut String, items: &[ir::ListItem], ordered: bool, start: u3
             write_block(&mut inner, block, 0);
             let inner = inner.trim_end();
             if bi == 0 {
-                out.push_str(&format!("{prefix_str}{marker} {inner}\n"));
+                let _ = writeln!(out, "{prefix_str}{marker} {inner}");
             } else {
                 let cont_indent = " ".repeat(marker.len() + 1);
-                out.push_str(&format!("{prefix_str}{cont_indent}{inner}\n"));
+                let _ = writeln!(out, "{prefix_str}{cont_indent}{inner}");
             }
         }
 

@@ -15,7 +15,7 @@ fn section(xml: &str) -> ir::Section {
 
 #[test]
 fn valid_xml_parses_normally() {
-    let xml = r#"<root><hp:p><hp:run><hp:t>Hello</hp:t></hp:run></hp:p></root>"#;
+    let xml = r"<root><hp:p><hp:run><hp:t>Hello</hp:t></hp:run></hp:p></root>";
     let s = section(xml);
     assert_eq!(s.blocks.len(), 1);
     match &s.blocks[0] {
@@ -36,7 +36,7 @@ fn valid_xml_parses_normally() {
 #[test]
 fn truncated_xml_returns_partial_result() {
     // XML that is truncated mid-stream (missing closing tags).
-    let xml = r#"<root><hp:p><hp:run><hp:t>partial content"#;
+    let xml = r"<root><hp:p><hp:run><hp:t>partial content";
     // Must not return Err — returns an empty-or-partial section.
     let result = parse_section_xml(xml);
     assert!(
@@ -54,7 +54,7 @@ fn truncated_xml_returns_partial_result() {
 #[test]
 fn xml_with_unclosed_element_returns_ok() {
     // Only the opening tag, no closing tag.
-    let xml = r#"<root><hp:p>"#;
+    let xml = r"<root><hp:p>";
     let result = parse_section_xml(xml);
     assert!(
         result.is_ok(),
@@ -131,7 +131,7 @@ fn celladdr_missing_rowspan_defaults_to_one() {
 /// `id` missing from footnote element — must default to empty string, no panic.
 #[test]
 fn footnote_missing_id_attribute_uses_empty_string() {
-    let xml = r#"<root><hp:fn><hp:p><hp:run><hp:t>no id</hp:t></hp:run></hp:p></hp:fn></root>"#;
+    let xml = r"<root><hp:fn><hp:p><hp:run><hp:t>no id</hp:t></hp:run></hp:p></hp:fn></root>";
     let s = section(xml);
     // The footnote block must still be emitted with the text preserved.
     let found = s.blocks.iter().any(|b| match b {
@@ -154,7 +154,7 @@ fn footnote_missing_id_attribute_uses_empty_string() {
 /// `styleIDRef` missing from paragraph → no heading, plain paragraph.
 #[test]
 fn paragraph_missing_style_id_ref_is_plain() {
-    let xml = r#"<root><hp:p><hp:run><hp:t>plain para</hp:t></hp:run></hp:p></root>"#;
+    let xml = r"<root><hp:p><hp:run><hp:t>plain para</hp:t></hp:run></hp:p></root>";
     let s = section(xml);
     assert_eq!(s.blocks.len(), 1);
     match &s.blocks[0] {

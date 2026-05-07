@@ -185,7 +185,7 @@ fn golden_comprehensive_document_structure() {
 
     // Verify table structure
     assert!(
-        section_xml.contains(r#"<hp:tbl"#),
+        section_xml.contains(r"<hp:tbl"),
         "table must emit <hp:tbl> element:\n{section_xml}"
     );
     assert!(
@@ -410,7 +410,7 @@ fn header_xml_para_pr_0_has_zero_left_margin() {
     // We verify that the first paraPr (id=0) has <hh:left value="0"/>.
     // Since id=0 comes first, the first occurrence of <hh:left is from id=0.
     let first_left_pos = header
-        .find(r#"<hh:left value="#)
+        .find(r"<hh:left value=")
         .expect("hh:left must exist");
     let first_left_slice = &header[first_left_pos..];
     assert!(

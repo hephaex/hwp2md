@@ -21,7 +21,7 @@ fn empty_document_produces_no_blocks() {
 #[test]
 fn empty_paragraph_produces_no_blocks() {
     // A paragraph element with no run content must be silently dropped.
-    let xml = r#"<root><hp:p></hp:p></root>"#;
+    let xml = r"<root><hp:p></hp:p></root>";
     let s = section(xml);
     assert!(
         s.blocks.is_empty(),
@@ -36,7 +36,7 @@ fn empty_paragraph_produces_no_blocks() {
 #[test]
 fn simple_paragraph_text() {
     // Compact XML -- no whitespace text nodes between tags (matches real HWPX).
-    let xml = r#"<root><hp:p><hp:run><hp:t>Hello World</hp:t></hp:run></hp:p></root>"#;
+    let xml = r"<root><hp:p><hp:run><hp:t>Hello World</hp:t></hp:run></hp:p></root>";
     let s = section(xml);
     assert_eq!(s.blocks.len(), 1);
     match &s.blocks[0] {
@@ -53,7 +53,7 @@ fn simple_paragraph_text() {
 #[test]
 fn paragraph_without_hp_prefix() {
     // Bare element names (no namespace prefix) must also parse correctly.
-    let xml = r#"<root><p><run><t>bare prefix</t></run></p></root>"#;
+    let xml = r"<root><p><run><t>bare prefix</t></run></p></root>";
     let s = section(xml);
     assert_eq!(s.blocks.len(), 1);
     match &s.blocks[0] {
@@ -66,7 +66,7 @@ fn paragraph_without_hp_prefix() {
 
 #[test]
 fn multiple_runs_in_one_paragraph_produce_multiple_inlines() {
-    let xml = r#"<root><hp:p><hp:run><hp:t>first</hp:t></hp:run><hp:run><hp:t>second</hp:t></hp:run></hp:p></root>"#;
+    let xml = r"<root><hp:p><hp:run><hp:t>first</hp:t></hp:run><hp:run><hp:t>second</hp:t></hp:run></hp:p></root>";
     let s = section(xml);
     assert_eq!(s.blocks.len(), 1);
     match &s.blocks[0] {
@@ -221,7 +221,7 @@ fn strikeout_via_empty_charpr() {
 fn line_break_appends_newline_to_inline_text() {
     // lineBreak is an empty element that appends \n to current_text.
     // It lives outside a <t> so flush_paragraph picks it up at paragraph end.
-    let xml = r#"<root><hp:p><hp:run><hp:t>line one</hp:t><hp:lineBreak/></hp:run></hp:p></root>"#;
+    let xml = r"<root><hp:p><hp:run><hp:t>line one</hp:t><hp:lineBreak/></hp:run></hp:p></root>";
     let s = section(xml);
     assert_eq!(s.blocks.len(), 1);
     match &s.blocks[0] {
@@ -270,7 +270,7 @@ fn image_with_empty_src_is_ignored() {
 
 #[test]
 fn equation_element_produces_math_block() {
-    let xml = r#"<root><hp:equation>x^2 + y^2</hp:equation></root>"#;
+    let xml = r"<root><hp:equation>x^2 + y^2</hp:equation></root>";
     let s = section(xml);
     assert_eq!(s.blocks.len(), 1);
     match &s.blocks[0] {
@@ -285,7 +285,7 @@ fn equation_element_produces_math_block() {
 #[test]
 fn empty_equation_produces_no_block() {
     // An equation element with no text content must be silently dropped.
-    let xml = r#"<root><hp:equation></hp:equation></root>"#;
+    let xml = r"<root><hp:equation></hp:equation></root>";
     let s = section(xml);
     assert!(
         s.blocks.is_empty(),
@@ -296,7 +296,7 @@ fn empty_equation_produces_no_block() {
 #[test]
 fn eqedit_alias_also_produces_math_block() {
     // The parser accepts both <hp:equation> and <hp:eqEdit>.
-    let xml = r#"<root><hp:eqEdit>a + b = c</hp:eqEdit></root>"#;
+    let xml = r"<root><hp:eqEdit>a + b = c</hp:eqEdit></root>";
     let s = section(xml);
     assert_eq!(s.blocks.len(), 1);
     match &s.blocks[0] {
