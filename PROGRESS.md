@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 20 완료 (test file splits + CHANGELOG Unreleased)
+## 현재 상태: v0.5.0 Sprint 21 완료 (API surface cleanup + PartialEq + #[must_use])
 
 ### 완료
 
@@ -259,6 +259,32 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-08 — v0.5.0 Sprint 21: API Surface Cleanup + PartialEq + #[must_use]
+
+**S21-01: Remove `pub use model::*` from hwp/mod.rs**:
+- HWP model types (HwpDocument, FileHeader, CharShape, etc.) no longer exported publicly
+- Only `read_hwp()` remains in public API — model types are internal implementation details
+- `#![allow(dead_code)]` added to model.rs (HWP spec fields for future use)
+
+**S21-02: Add `PartialEq` to 9 IR types**:
+- Document, Metadata, Section, Block, Inline, TableRow, TableCell, ListItem, Asset
+- Enables `assert_eq!` in downstream tests; recursive types (Block, ListItem) handled correctly
+- `document_default_equals_new` test simplified to use direct `assert_eq!`
+
+**S21-03: Add `#[must_use]` to pure functions and builders**:
+- ir.rs: Document::new, Inline::plain/bold/footnote_ref/with_formatting/with_link/with_ruby/with_font_name, ListItem::new, PageLayout::a4_portrait, HeaderFooterType::as_str
+- md/parser.rs: parse_markdown
+- md/writer.rs: write_markdown
+- Not added to Result-returning functions (Result already has #[must_use])
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 0 MEDIUM, 4 SUGGESTION):
+- S1: `#![allow(dead_code)]` blanket — acceptable for HWP spec module
+- S2: 4 missing `#[must_use]` on builders → 수정 완료
+- S3: Asset PartialEq byte comparison perf note → 현재 OK, 필요시 custom impl
+- S4: document_default_equals_new 테스트 단순화 → 수정 완료
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures), publish dry-run 경고 0건 통과
 
 ### 2026-05-08 — v0.5.0 Sprint 20: Test File Splits + CHANGELOG Unreleased
 

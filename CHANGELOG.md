@@ -109,6 +109,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 21 / S21-01**: `pub use model::*` removed from `hwp/mod.rs` —
+  internal HWP model types no longer exported; API surface reduced to
+  `read_hwp()` only.
+- **Sprint 21 / S21-02**: `PartialEq` derived on 9 IR types (Document,
+  Metadata, Section, Block, Inline, TableRow, TableCell, ListItem, Asset).
+- **Sprint 21 / S21-03**: `#[must_use]` added to 13 pure functions and
+  builder methods across `ir.rs`, `md/parser.rs`, `md/writer.rs`.
 - **Sprint 20 / S20-01**: `writer_tests_image.rs` (791 lines) split;
   `writer_tests_image_util.rs` (262 lines) extracted for base64, MIME, and
   dedup/collision tests.
