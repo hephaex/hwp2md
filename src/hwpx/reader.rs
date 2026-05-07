@@ -498,24 +498,21 @@ fn read_bin_asset(
 }
 
 fn guess_mime_from_name(name: &str) -> String {
-    let lower = name.to_lowercase();
-    if lower.ends_with(".png") {
-        "image/png".to_string()
-    } else if lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
-        "image/jpeg".to_string()
-    } else if lower.ends_with(".gif") {
-        "image/gif".to_string()
-    } else if lower.ends_with(".bmp") {
-        "image/bmp".to_string()
-    } else if lower.ends_with(".svg") {
-        "image/svg+xml".to_string()
-    } else if lower.ends_with(".wmf") {
-        "image/x-wmf".to_string()
-    } else if lower.ends_with(".emf") {
-        "image/x-emf".to_string()
-    } else {
-        "application/octet-stream".to_string()
+    let ext = std::path::Path::new(name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
+    match ext.to_ascii_lowercase().as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "bmp" => "image/bmp",
+        "svg" => "image/svg+xml",
+        "wmf" => "image/x-wmf",
+        "emf" => "image/x-emf",
+        _ => "application/octet-stream",
     }
+    .to_string()
 }
 
 #[cfg(test)]

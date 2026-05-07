@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 use crate::ir;
 use crate::url_util::is_safe_url_scheme;
 
@@ -64,23 +66,23 @@ fn write_section(out: &mut String, section: &ir::Section) {
 fn write_frontmatter(out: &mut String, meta: &ir::Metadata) {
     out.push_str("---\n");
     if let Some(ref title) = meta.title {
-        out.push_str(&format!("title: \"{}\"\n", escape_yaml(title)));
+        let _ = writeln!(out, "title: \"{}\"", escape_yaml(title));
     }
     if let Some(ref author) = meta.author {
-        out.push_str(&format!("author: \"{}\"\n", escape_yaml(author)));
+        let _ = writeln!(out, "author: \"{}\"", escape_yaml(author));
     }
     if let Some(ref created) = meta.created {
-        out.push_str(&format!("date: \"{created}\"\n"));
+        let _ = writeln!(out, "date: \"{created}\"");
     }
     if let Some(ref subject) = meta.subject {
-        out.push_str(&format!("subject: \"{}\"\n", escape_yaml(subject)));
+        let _ = writeln!(out, "subject: \"{}\"", escape_yaml(subject));
     }
     if let Some(ref desc) = meta.description {
-        out.push_str(&format!("description: \"{}\"\n", escape_yaml(desc)));
+        let _ = writeln!(out, "description: \"{}\"", escape_yaml(desc));
     }
     if !meta.keywords.is_empty() {
         let escaped: Vec<String> = meta.keywords.iter().map(|k| escape_yaml(k)).collect();
-        out.push_str(&format!("keywords: [{}]\n", escaped.join(", ")));
+        let _ = writeln!(out, "keywords: [{}]", escaped.join(", "));
     }
     out.push_str("---\n\n");
 }

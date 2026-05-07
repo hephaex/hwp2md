@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Top-level document produced by any reader and consumed by any writer.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Document {
     /// Document-level metadata (title, author, dates, …).
     pub metadata: Metadata,
@@ -32,7 +32,7 @@ impl Default for Document {
 }
 
 /// Document-level metadata extracted from HWP/HWPX summary streams.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Metadata {
     /// Document title.
     pub title: Option<String>,
@@ -100,7 +100,7 @@ impl PageLayout {
 /// The OWPML specification defines three known values; any other value that
 /// appears in the wild is preserved via the [`Other`][HeaderFooterType::Other]
 /// variant so that round-trip fidelity is not lost for non-standard documents.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum HeaderFooterType {
     /// Applies to all pages (`type="both"`).
@@ -154,7 +154,7 @@ impl From<String> for HeaderFooterType {
 }
 
 /// A logical section of a document containing an ordered sequence of blocks.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Section {
     /// Content blocks in reading order.
     pub blocks: Vec<Block>,
@@ -183,7 +183,7 @@ pub struct Section {
 }
 
 /// A block-level content element within a section.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Block {
     /// ATX heading with a level in `1..=6`.
     Heading {
@@ -258,7 +258,7 @@ pub enum Block {
 }
 
 /// A run of inline text with optional formatting and annotations.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Inline {
     /// The raw text of this run.
     pub text: String,
@@ -379,7 +379,7 @@ impl Inline {
 }
 
 /// A single row in a [`Block::Table`].
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableRow {
     /// Cells in left-to-right order.
     pub cells: Vec<TableCell>,
@@ -388,7 +388,7 @@ pub struct TableRow {
 }
 
 /// A single cell in a [`TableRow`].
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableCell {
     /// Block content inside the cell.
     pub blocks: Vec<Block>,
@@ -409,7 +409,7 @@ impl Default for TableCell {
 }
 
 /// A single item in a [`Block::List`], optionally containing nested sub-lists.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ListItem {
     /// Block content of this item (typically one `Paragraph`).
     pub blocks: Vec<Block>,
@@ -437,7 +437,7 @@ impl ListItem {
 }
 
 /// A binary asset (image, font, …) embedded in the document.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Asset {
     /// Original file name as recorded in the source archive.
     pub name: String,
