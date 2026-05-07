@@ -85,6 +85,9 @@ fn doc_with_section(blocks: Vec<Block>) -> Document {
 #[path = "writer_tests_section.rs"]
 mod tests_section;
 
+#[path = "writer_tests_section_adv.rs"]
+mod tests_section_adv;
+
 #[path = "writer_tests_charpr.rs"]
 mod tests_charpr;
 
@@ -105,6 +108,9 @@ mod tests_footnote;
 
 #[path = "writer_tests_image.rs"]
 mod tests_image;
+
+#[path = "writer_tests_image_util.rs"]
+mod tests_image_util;
 
 #[path = "writer_tests_list.rs"]
 mod tests_list;
