@@ -109,6 +109,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 26 / S26-01**: Identical match arms combined with `|`
+  patterns across 5 files (8 arms merged).
+- **Sprint 26 / S26-02**: 2 `match` → `if let`, 2 boolean-not swaps,
+  3 items-before-statements reordering.
+- **Sprint 26 / S26-03**: Case-sensitive file extension comparisons
+  in test files replaced with `Path::extension()`.
 - **Sprint 25 / S25-01**: Single-character string patterns replaced with
   char literals in 3 test files (7 instances).
 - **Sprint 25 / S25-02**: `map().unwrap_or()` chains replaced with

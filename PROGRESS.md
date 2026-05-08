@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 25 완료 (map_or + clone_from + char patterns)
+## 현재 상태: v0.5.0 Sprint 26 완료 (match arms + control flow + ext comparison)
 
 ### 완료
 
@@ -259,6 +259,29 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-08 — v0.5.0 Sprint 26: Match Arms + Control Flow + Ext Comparison
+
+**S26-01: identical match arms** (8 instances):
+- `eqedit.rs`: "inf"|"infty" 통합, `shapes.rs`: redundant arm 제거
+- `reader.rs`: control char ranges 통합, `handlers.rs`: fieldBegin 제거 (wildcard 커버)
+- `hwpx/reader.rs`: Eof|Err break 통합, `roundtrip_stability.rs`: 중복 arm 제거
+- 수동 수정: `1|_` → `_`, `HorizontalRule|_` → `_` (wildcard covers 경고)
+
+**S26-02: control flow cleanup** (7 instances):
+- `reader.rs`: match → if-let, bool-not 스왑
+- `handlers.rs`: bool-not 스왑
+- `parser.rs`: enum 정의 문 앞으로 이동
+- `roundtrip.rs`: fn 정의 문 앞으로 이동 (2건)
+
+**S26-03: case-sensitive extension comparison** (3 instances):
+- `convert_tests_ir.rs`, `writer_tests_image.rs`: `.ends_with(".png")` → `Path::extension()` + `eq_ignore_ascii_case()`
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 0 MEDIUM, 2 SUGGESTION):
+- S1: reader.rs 인접 범위 `0x01..=0x02|0x03..=0x08` → `0x01..=0x08` 합치기 가능
+- S2: extension 검사 테스트 헬퍼 추출 가능
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures)
 
 ### 2026-05-08 — v0.5.0 Sprint 25: map_or + clone_from + Char Patterns
 
