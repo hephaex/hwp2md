@@ -62,8 +62,7 @@ pub fn make_doc(blocks: Vec<hwp2md::ir::Block>) -> hwp2md::ir::Document {
 pub fn first_blocks(doc: &hwp2md::ir::Document) -> &[hwp2md::ir::Block] {
     doc.sections
         .first()
-        .map(|s| s.blocks.as_slice())
-        .unwrap_or(&[])
+        .map_or(&[], |s| s.blocks.as_slice())
 }
 
 // ---------------------------------------------------------------------------

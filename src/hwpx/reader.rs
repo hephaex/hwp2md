@@ -78,8 +78,7 @@ fn build_bin_map(bin_files: &[String]) -> HashMap<String, String> {
             let filename = path.rsplit('/').next()?;
             let stem = filename
                 .rsplit_once('.')
-                .map(|(s, _)| s)
-                .unwrap_or(filename);
+                .map_or(filename, |(s, _)| s);
             Some((stem.to_string(), path.clone()))
         })
         .collect()

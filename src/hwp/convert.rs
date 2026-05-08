@@ -81,8 +81,7 @@ fn is_ordered_prefix(text: &str) -> bool {
             .char_indices()
             .take_while(|(_, c)| c.is_ascii_digit())
             .last()
-            .map(|(i, c)| i + c.len_utf8())
-            .unwrap_or(0);
+            .map_or(0, |(i, c)| i + c.len_utf8());
         let digit_count = digit_end; // ASCII digits: byte length == char count
         if digit_count == 0 || digit_count > 3 {
             return false;
@@ -213,10 +212,10 @@ fn group_list_paragraphs(staged: Vec<StagedBlock>) -> Vec<ir::Block> {
 pub(crate) fn hwp_to_ir(hwp: &HwpDocument) -> ir::Document {
     let mut doc = ir::Document::new();
 
-    doc.metadata.title = hwp.summary_title.clone();
-    doc.metadata.author = hwp.summary_author.clone();
-    doc.metadata.subject = hwp.summary_subject.clone();
-    doc.metadata.keywords = hwp.summary_keywords.clone();
+    doc.metadata.title.clone_from(&hwp.summary_title);
+    doc.metadata.author.clone_from(&hwp.summary_author);
+    doc.metadata.subject.clone_from(&hwp.summary_subject);
+    doc.metadata.keywords.clone_from(&hwp.summary_keywords);
 
     let mut footnote_counter: u32 = 0;
     let mut endnote_counter: u32 = 0;
@@ -408,8 +407,7 @@ pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<
                     // Fall back to row_idx == 0 for empty rows (no cells parsed).
                     let row_is_header = row_cells
                         .first()
-                        .map(|c| c.is_header)
-                        .unwrap_or(row_idx == 0);
+                        .map_or(row_idx == 0, |c| c.is_header);
                     let mut sorted = row_cells;
                     sorted.sort_by_key(|c| c.col);
                     let ir_cells: Vec<ir::TableCell> = sorted

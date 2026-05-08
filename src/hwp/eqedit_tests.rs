@@ -239,7 +239,7 @@ fn left_right_braces() {
 fn over_without_groups_is_passed_through() {
     let result = eqedit_to_latex("a over b");
     assert!(
-        result.contains("over") || result.contains("a"),
+        result.contains("over") || result.contains('a'),
         "bare 'a over b' (no group braces) must pass through as-is; got: {result:?}"
     );
     assert!(

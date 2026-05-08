@@ -192,8 +192,7 @@ fn hwpx_roundtrip_hyperlink_preserves_url_and_text() {
     let blocks = read_back
         .sections
         .first()
-        .map(|s| s.blocks.as_slice())
-        .unwrap_or(&[]);
+        .map_or([].as_slice(), |s| s.blocks.as_slice());
 
     let inlines = match blocks.first() {
         Some(ir::Block::Paragraph { inlines }) => inlines,

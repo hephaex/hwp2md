@@ -104,11 +104,10 @@ pub(super) fn collect_image_assets(doc: &ir::Document) -> (ImageAssetMap, Vec<Re
     for asset in &doc.assets {
         let entry_name = std::path::Path::new(&asset.name)
             .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| {
+            .map_or_else(|| {
                 counter += 1;
                 format!("asset_{counter}")
-            });
+            }, |n| n.to_string_lossy().into_owned());
         // Only register if not already mapped (src key == asset.name for
         // pre-existing assets coming from the reader).
         asset_map
@@ -200,11 +199,10 @@ pub(super) fn collect_images_from_blocks(
                             Ok(bytes) => {
                                 let bare = std::path::Path::new(path)
                                     .file_name()
-                                    .map(|n| n.to_string_lossy().into_owned())
-                                    .unwrap_or_else(|| {
+                                    .map_or_else(|| {
                                         *counter += 1;
                                         format!("image_{counter}")
-                                    });
+                                    }, |n| n.to_string_lossy().into_owned());
                                 let mime = mime_from_extension(path).to_owned();
                                 // Deduplicate: if the bare filename is already
                                 // occupied by a different asset, append a
@@ -417,8 +415,7 @@ pub(super) fn generate_content_hpf(doc: &ir::Document, resolved_assets: &[Resolv
     for asset in resolved_assets {
         let item_id = std::path::Path::new(&asset.entry_name)
             .file_stem()
-            .map(|s| s.to_string_lossy().into_owned())
-            .unwrap_or_else(|| asset.entry_name.clone());
+            .map_or_else(|| asset.entry_name.clone(), |s| s.to_string_lossy().into_owned());
         let _ = writeln!(
             bin_data_entries,
             "    <hp:binData itemId=\"{}\" file=\"BinData/{}\" type=\"EMBED\" compress=\"true\"/>",

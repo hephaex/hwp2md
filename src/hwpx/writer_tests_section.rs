@@ -153,8 +153,8 @@ fn section_xml_nested_inlines_bold_then_italic() {
     // Each formatting variant gets a distinct charPrIDRef; bold and italic
     // runs are separate so they must have different IDs (both non-zero).
     assert!(xml.contains("charPrIDRef="), "{xml}");
-    assert!(xml.contains("B"));
-    assert!(xml.contains("I"));
+    assert!(xml.contains('B'));
+    assert!(xml.contains('I'));
 }
 
 #[test]
@@ -223,8 +223,8 @@ fn section_xml_table_2x2() {
     assert!(xml.contains("</hp:tbl>"), "tbl close: {xml}");
     assert_eq!(xml.matches("<hp:tr>").count(), 2, "two rows: {xml}");
     assert_eq!(xml.matches("<hp:tc>").count(), 4, "four cells: {xml}");
-    assert!(xml.contains("A"), "{xml}");
-    assert!(xml.contains("D"), "{xml}");
+    assert!(xml.contains('A'), "{xml}");
+    assert!(xml.contains('D'), "{xml}");
 }
 
 #[test]

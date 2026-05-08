@@ -307,6 +307,6 @@ fn section_xml_adjacent_link_inlines_different_urls_produce_two_field_groups() {
     );
     assert!(xml.contains("https://a.com"), "first URL: {xml}");
     assert!(xml.contains("https://b.com"), "second URL: {xml}");
-    assert!(xml.contains("A"), "first link text: {xml}");
-    assert!(xml.contains("B"), "second link text: {xml}");
+    assert!(xml.contains('A'), "first link text: {xml}");
+    assert!(xml.contains('B'), "second link text: {xml}");
 }

@@ -263,8 +263,7 @@ fn write_block<W: Write>(
             // For remote URLs (not in the map) the original src is used as-is.
             let bin_ref: &str = asset_map
                 .get(src.as_str())
-                .map(String::as_str)
-                .unwrap_or(src);
+                .map_or(src, String::as_str);
 
             let id_str = para_id.to_string();
             *para_id += 1;
