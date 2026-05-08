@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 26 완료 (match arms + control flow + ext comparison)
+## 현재 상태: v0.5.0 Sprint 27 완료 (error docs + option_option + range merge)
 
 ### 완료
 

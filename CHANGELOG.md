@@ -109,6 +109,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 27 / S27-01**: `match` → `if let` in `main.rs` and
+  `hwpx/context/mod.rs`; `#[allow(clippy::option_option)]` for intentional
+  `Option<Option<T>>`; items-after-statements reordered in test files;
+  redundant assertions simplified.
+- **Sprint 27 / S27-02**: `# Errors` doc sections added to 7 public
+  `Result`-returning functions (`convert_auto`, `check`, `read_hwp`,
+  `read_hwpx`, `write_hwpx`, `StyleTemplate::from_file`,
+  `StyleTemplate::from_yaml`).
+- **Sprint 27 / S27-03**: Contiguous byte-tag ranges merged in
+  `hwp/reader.rs` dispatch (`0x0001..=0x0002 | 0x0003..=0x0008` →
+  `0x0001..=0x0008`).
 - **Sprint 26 / S26-01**: Identical match arms combined with `|`
   patterns across 5 files (8 arms merged).
 - **Sprint 26 / S26-02**: 2 `match` → `if let`, 2 boolean-not swaps,
