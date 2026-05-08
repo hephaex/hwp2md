@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 22 완료 (MIME refactor + writeln! + Eq derives)
+## 현재 상태: v0.5.0 Sprint 23 완료 (writeln! migration + raw string cleanup)
 
 ### 완료
 
@@ -259,6 +259,26 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-08 — v0.5.0 Sprint 23: writeln! Migration + Raw String Cleanup
+
+**S23-01: write!/writeln! migration in md/writer.rs** (20 instances):
+- `write_block`, `render_inlines`, `write_table`, `write_html_table`, `write_list` 전체 마이그레이션
+- Sprint 22에서 시작한 `write_frontmatter` 마이그레이션 완성 — writer.rs에 `push_str(&format!())` 0건
+- `writeln!` for `\n`/`\n\n` endings, `write!` for inline continuations
+
+**S23-02: write!/writeln! migration in hwpx/writer_content.rs** (5 instances):
+- `use std::fmt::Write as _;` 추가
+- `generate_content_hpf` 함수 내 4건 + `reader_tests_charpr.rs` 1건
+
+**S23-03: unnecessary raw string hashes** (31 instances):
+- 10개 테스트 파일에서 `r#"..."#` → `r"..."` (내부에 `"` 없는 경우만)
+- XML 속성에 `"` 포함된 문자열은 올바르게 `r#"..."#` 유지
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 0 MEDIUM, 1 SUGGESTION):
+- S1: 22개 추가 simplifiable raw string 잔존 (다른 파일) — 향후 스프린트 후보
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures)
 
 ### 2026-05-08 — v0.5.0 Sprint 22: MIME Refactor + writeln! + Eq Derives
 

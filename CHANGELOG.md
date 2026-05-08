@@ -109,6 +109,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 23 / S23-01**: `write_block`, `render_inlines`, `write_table`,
+  `write_html_table`, `write_list` migrated from `push_str(&format!())`
+  to `write!`/`writeln!` — eliminates 20 intermediate String allocations
+  in `md/writer.rs`.
+- **Sprint 23 / S23-02**: Same `write!`/`writeln!` migration applied to
+  `hwpx/writer_content.rs` (4 instances) and `reader_tests_charpr.rs` (1).
+- **Sprint 23 / S23-03**: Removed 31 unnecessary raw string hashes
+  (`r#"..."#` → `r"..."`) across 10 test files.
 - **Sprint 22 / S22-01**: `guess_mime_from_name` refactored to use
   `Path::extension()` + `to_ascii_lowercase()` match (idiomatic, avoids
   clippy pedantic warning).
