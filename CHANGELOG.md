@@ -109,6 +109,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 28 / S28-01**: 73 `doc_markdown` backtick warnings fixed across
+  22 files — identifiers in doc comments wrapped with backticks.
+- **Sprint 28 / S28-02**: 11 wildcard imports (`use module::*`) replaced
+  with explicit named imports in `hwp/control/`, `convert.rs`, `reader.rs`,
+  `shapes.rs`; `record::*` kept with `#[allow]` annotation.
+- **Sprint 28 / S28-03**: 7 `needless_pass_by_value` warnings fixed —
+  `Vec<Token>` → `&[Token]` in `eqedit.rs`, `Section` → `&Section` in
+  test helpers, `InlineStyle` → `&InlineStyle` in `parser.rs`.
 - **Sprint 27 / S27-01**: `match` → `if let` in `main.rs` and
   `hwpx/context/mod.rs`; `#[allow(clippy::option_option)]` for intentional
   `Option<Option<T>>`; items-after-statements reordered in test files;

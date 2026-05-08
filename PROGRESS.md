@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 27 완료 (error docs + option_option + range merge)
+## 현재 상태: v0.5.0 Sprint 28 완료 (doc backticks + wildcard imports + pass-by-value)
 
 ### 완료
 
