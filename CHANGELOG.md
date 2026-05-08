@@ -109,6 +109,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 25 / S25-01**: Single-character string patterns replaced with
+  char literals in 3 test files (7 instances).
+- **Sprint 25 / S25-02**: `map().unwrap_or()` chains replaced with
+  `map_or()`/`map_or_else()` across 8 files (11 instances).
+- **Sprint 25 / S25-03**: `clone()` assignments replaced with
+  `clone_from()` in `hwp/convert.rs` (4 metadata fields).
 - **Sprint 24 / S24-01**: Unnested 5 or-patterns in `hwp/convert.rs`;
   inlined 4 format variables in `hwp/reader.rs` and `hwp/record.rs`.
 - **Sprint 24 / S24-02**: Removed 8 redundant `continue` expressions

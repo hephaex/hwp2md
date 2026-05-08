@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 24 완료 (or-patterns + control flow + misc pedantic)
+## 현재 상태: v0.5.0 Sprint 25 완료 (map_or + clone_from + char patterns)
 
 ### 완료
 
@@ -259,6 +259,24 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-08 — v0.5.0 Sprint 25: map_or + clone_from + Char Patterns
+
+**S25-01: single-char string patterns** (7 instances):
+- `eqedit_tests.rs`, `writer_tests_section.rs`, `writer_tests_hyperlink.rs`
+- `.contains("x")` → `.contains('x')` — char 매칭이 더 효율적
+
+**S25-02: map().unwrap_or() → map_or()** (11 instances):
+- 8개 파일에서 `map(f).unwrap_or(v)` → `map_or(v, f)` 변환
+- `hwpx_roundtrip.rs`: `&[]` 타입 추론 실패 → `[].as_slice()` 사용
+
+**S25-03: clone() → clone_from()** (4 instances):
+- `hwp/convert.rs`: metadata 필드 복사 시 기존 할당 재사용 가능
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 0 MEDIUM, 0 SUGGESTION):
+- `map_or`의 인자 순서 `(default, f)` 주의 (학습 포인트)
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures)
 
 ### 2026-05-08 — v0.5.0 Sprint 24: Or-Patterns + Control Flow + Misc Pedantic
 
