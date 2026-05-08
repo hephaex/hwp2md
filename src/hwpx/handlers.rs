@@ -522,7 +522,7 @@ pub(crate) fn parse_heading_style(style_ref: &str) -> Option<u8> {
         let num_str: String = style_ref
             .chars()
             .rev()
-            .take_while(|c| c.is_ascii_digit())
+            .take_while(char::is_ascii_digit)
             .collect::<String>()
             .chars()
             .rev()

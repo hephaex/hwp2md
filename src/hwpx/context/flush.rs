@@ -18,15 +18,15 @@ pub(crate) fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut Pa
         match key {
             "bold" | "hp:bold" => ctx.fmt.bold = val.as_ref() == "true" || val.as_ref() == "1",
             "italic" | "hp:italic" => {
-                ctx.fmt.italic = val.as_ref() == "true" || val.as_ref() == "1"
+                ctx.fmt.italic = val.as_ref() == "true" || val.as_ref() == "1";
             }
             "underline" | "hp:underline" => {
                 ctx.fmt.underline =
-                    !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0"
+                    !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0";
             }
             "strikeout" | "hp:strikeout" => {
                 ctx.fmt.strike =
-                    !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0"
+                    !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0";
             }
             "supscript" | "hp:supscript" => {
                 ctx.fmt.superscript = val.as_ref() == "superscript";

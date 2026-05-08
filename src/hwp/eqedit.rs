@@ -555,7 +555,7 @@ fn strip_trailing_right(s: &str) -> (&str, bool) {
 }
 
 fn reassemble(tokens: &[Token]) -> String {
-    tokens.iter().map(|t| t.as_str()).collect::<String>()
+    tokens.iter().map(Token::as_str).collect::<String>()
 }
 
 #[cfg(test)]

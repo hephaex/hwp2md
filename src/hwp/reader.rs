@@ -447,7 +447,7 @@ fn read_bin_data(
             } else {
                 (idx + 1) as u16
             };
-            let path = format!("BinData/BIN{:04X}", id);
+            let path = format!("BinData/BIN{id:04X}");
             if let Ok(stream) = cfb.open_stream(&path) {
                 let mut data = Vec::new();
                 stream.take(MAX_CFB_STREAM).read_to_end(&mut data)?;
@@ -457,7 +457,7 @@ fn read_bin_data(
     } else {
         // Fallback: sequential probe with a conservative upper limit.
         for i in 1..=100u16 {
-            let path = format!("BinData/BIN{:04X}", i);
+            let path = format!("BinData/BIN{i:04X}");
             match cfb.open_stream(&path) {
                 Ok(stream) => {
                     let mut data = Vec::new();

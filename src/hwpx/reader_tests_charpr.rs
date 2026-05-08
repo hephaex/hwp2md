@@ -9,7 +9,7 @@ fn section(xml: &str) -> ir::Section {
 }
 
 fn section_with_faces(xml: &str, faces: &[&str]) -> ir::Section {
-    let face_names: Vec<String> = faces.iter().map(|s| s.to_string()).collect();
+    let face_names: Vec<String> = faces.iter().map(|s| (*s).to_string()).collect();
     parse_section_xml_with_face_names(xml, &face_names)
         .expect("parse_section_xml_with_face_names must not fail")
 }

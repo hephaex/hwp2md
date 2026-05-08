@@ -426,19 +426,16 @@ fn collect_inlines_recursive<'a>(
                 if tag.eq_ignore_ascii_case("<ruby>") {
                     if in_ruby {
                         tracing::warn!("nested <ruby> not supported, ignoring inner");
-                        continue;
+                    } else {
+                        in_ruby = true;
+                        in_rt = false;
+                        ruby_annotation.clear();
+                        ruby_base_start = inlines.len();
                     }
-                    in_ruby = true;
-                    in_rt = false;
-                    ruby_annotation.clear();
-                    ruby_base_start = inlines.len();
-                    continue;
                 } else if tag.eq_ignore_ascii_case("<rt>") {
                     in_rt = true;
-                    continue;
                 } else if tag.eq_ignore_ascii_case("</rt>") {
                     in_rt = false;
-                    continue;
                 } else if tag.eq_ignore_ascii_case("</ruby>") {
                     // Attach the accumulated annotation to every inline that
                     // was emitted as part of the ruby base span.
@@ -451,19 +448,14 @@ fn collect_inlines_recursive<'a>(
                     in_ruby = false;
                     in_rt = false;
                     ruby_annotation.clear();
-                    continue;
                 } else if tag.eq_ignore_ascii_case("<u>") {
                     current_style.underline = true;
-                    continue;
                 } else if tag.eq_ignore_ascii_case("</u>") {
                     current_style.underline = style.underline;
-                    continue;
                 } else if tag.eq_ignore_ascii_case("<sub>") {
                     current_style.subscript = true;
-                    continue;
                 } else if tag.eq_ignore_ascii_case("</sub>") {
                     current_style.subscript = style.subscript;
-                    continue;
                 } else {
                     inlines.push(ir::Inline::plain(html.clone()));
                 }

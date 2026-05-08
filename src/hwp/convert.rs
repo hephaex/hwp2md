@@ -89,9 +89,9 @@ fn is_ordered_prefix(text: &str) -> bool {
         }
         let rest = &s[digit_end..];
         let sep = rest.chars().next();
-        if matches!(sep, Some('.') | Some(')')) {
+        if matches!(sep, Some('.' | ')')) {
             let after_sep = &rest[1..]; // separator is ASCII, 1 byte
-            return matches!(after_sep.chars().next(), Some(' ') | Some('\t') | None);
+            return matches!(after_sep.chars().next(), Some(' ' | '\t') | None);
         }
         return false;
     }
@@ -99,9 +99,9 @@ fn is_ordered_prefix(text: &str) -> bool {
     if first.is_ascii_alphabetic() {
         let rest = &s[1..]; // letter is ASCII, 1 byte
         let sep = rest.chars().next();
-        if matches!(sep, Some('.') | Some(')')) {
+        if matches!(sep, Some('.' | ')')) {
             let after_sep = &rest[1..];
-            return matches!(after_sep.chars().next(), Some(' ') | Some('\t') | None);
+            return matches!(after_sep.chars().next(), Some(' ' | '\t') | None);
         }
     }
 
@@ -131,7 +131,7 @@ fn detect_list_kind_from_text(text: &str) -> Option<ListKind> {
         let mut chars = text.chars();
         chars.next(); // consume bullet
         let next = chars.next();
-        if matches!(next, Some(' ') | Some('\t') | None) {
+        if matches!(next, Some(' ' | '\t') | None) {
             return Some(ListKind::Unordered);
         }
     }

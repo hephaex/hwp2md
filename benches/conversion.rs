@@ -39,14 +39,14 @@ fn main() {
 
 fn bench_md_to_ir(c: &mut Criterion) {
     c.bench_function("md_to_ir", |b| {
-        b.iter(|| hwp2md::md::parse_markdown(black_box(SAMPLE_MD)))
+        b.iter(|| hwp2md::md::parse_markdown(black_box(SAMPLE_MD)));
     });
 }
 
 fn bench_ir_to_md(c: &mut Criterion) {
     let doc = hwp2md::md::parse_markdown(SAMPLE_MD);
     c.bench_function("ir_to_md", |b| {
-        b.iter(|| hwp2md::md::write_markdown(black_box(&doc), false))
+        b.iter(|| hwp2md::md::write_markdown(black_box(&doc), false));
     });
 }
 
@@ -56,7 +56,7 @@ fn bench_ir_to_hwpx(c: &mut Criterion) {
     c.bench_function("ir_to_hwpx", |b| {
         b.iter(|| {
             hwp2md::hwpx::write_hwpx(black_box(&doc), tmp.path(), None).expect("write_hwpx failed");
-        })
+        });
     });
 }
 
@@ -67,7 +67,7 @@ fn bench_hwpx_to_ir(c: &mut Criterion) {
     hwp2md::hwpx::write_hwpx(&doc, tmp.path(), None).expect("write_hwpx failed");
 
     c.bench_function("hwpx_to_ir", |b| {
-        b.iter(|| hwp2md::hwpx::read_hwpx(black_box(tmp.path())).expect("read_hwpx failed"))
+        b.iter(|| hwp2md::hwpx::read_hwpx(black_box(tmp.path())).expect("read_hwpx failed"));
     });
 }
 
@@ -79,7 +79,7 @@ fn bench_roundtrip(c: &mut Criterion) {
             hwp2md::hwpx::write_hwpx(&doc, tmp.path(), None).expect("write_hwpx failed");
             let doc2 = hwp2md::hwpx::read_hwpx(tmp.path()).expect("read_hwpx failed");
             hwp2md::md::write_markdown(black_box(&doc2), false)
-        })
+        });
     });
 }
 

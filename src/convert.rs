@@ -111,7 +111,7 @@ pub fn to_hwpx(
     let doc = md::parse_markdown(&content);
 
     let out_path = output
-        .map(|p| p.to_path_buf())
+        .map(std::path::Path::to_path_buf)
         .unwrap_or_else(|| input.with_extension("hwpx"));
 
     if let Some(parent) = out_path.parent() {

@@ -92,16 +92,14 @@ pub fn parse_records<R: Read>(reader: &mut R) -> Result<Vec<Record>, Hwp2MdError
 
         if size > MAX_RECORD_SIZE {
             return Err(Hwp2MdError::InvalidRecord(format!(
-                "record size {} exceeds maximum allowed {} (tag={})",
-                size, MAX_RECORD_SIZE, tag_id
+                "record size {size} exceeds maximum allowed {MAX_RECORD_SIZE} (tag={tag_id})"
             )));
         }
 
         let mut data = vec![0u8; size];
         reader.read_exact(&mut data).map_err(|e| {
             Hwp2MdError::InvalidRecord(format!(
-                "record data read (tag={}, size={}): {}",
-                tag_id, size, e
+                "record data read (tag={tag_id}, size={size}): {e}"
             ))
         })?;
 
