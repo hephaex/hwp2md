@@ -23,7 +23,7 @@ fn extract_paragraph_text_basic_korean() {
 
 #[test]
 fn extract_paragraph_text_ascii() {
-    let data = encode_u16s(&[b'H' as u16, b'i' as u16]);
+    let data = encode_u16s(&[u16::from(b'H'), u16::from(b'i')]);
     assert_eq!(extract_paragraph_text(&data), "Hi");
 }
 
@@ -41,7 +41,7 @@ fn extract_paragraph_text_newline() {
 
 #[test]
 fn extract_paragraph_text_paragraph_break_skipped() {
-    let data = encode_u16s(&[b'A' as u16, 0x000D, b'B' as u16]);
+    let data = encode_u16s(&[u16::from(b'A'), 0x000D, u16::from(b'B')]);
     assert_eq!(extract_paragraph_text(&data), "AB");
 }
 
@@ -49,7 +49,7 @@ fn extract_paragraph_text_paragraph_break_skipped() {
 fn extract_paragraph_text_control_chars_skip_14_bytes() {
     let mut units: Vec<u16> = vec![0x0003];
     units.extend_from_slice(&[0u16; 7]);
-    units.push(b'X' as u16);
+    units.push(u16::from(b'X'));
     let data = encode_u16s(&units);
     assert_eq!(extract_paragraph_text(&data), "X");
 }
@@ -74,7 +74,7 @@ fn extract_paragraph_text_empty_input() {
 
 #[test]
 fn extract_paragraph_text_null_code_unit_skipped() {
-    let data = encode_u16s(&[0x0000, b'Z' as u16]);
+    let data = encode_u16s(&[0x0000, u16::from(b'Z')]);
     assert_eq!(extract_paragraph_text(&data), "Z");
 }
 
@@ -221,7 +221,7 @@ fn parse_char_shape_bold_and_superscript() {
 
 fn make_para_shape_with_heading(head_type: u8, para_level: u8) -> Vec<u8> {
     let mut data = vec![0u8; 24];
-    let attr1 = ((head_type as u32) << 24) | ((para_level as u32) << 26);
+    let attr1 = (u32::from(head_type) << 24) | (u32::from(para_level) << 26);
     data[0..4].copy_from_slice(&attr1.to_le_bytes());
     data
 }

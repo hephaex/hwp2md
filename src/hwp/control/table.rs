@@ -181,8 +181,8 @@ mod tests {
 
     #[test]
     fn parse_table_ctrl_with_cells() {
-        let text_a = encode_u16s_test(&[b'A' as u16]);
-        let text_b = encode_u16s_test(&[b'B' as u16]);
+        let text_a = encode_u16s_test(&[u16::from(b'A')]);
+        let text_b = encode_u16s_test(&[u16::from(b'B')]);
 
         let mut para_header_data = vec![0u8; 6];
         para_header_data[4] = 0;

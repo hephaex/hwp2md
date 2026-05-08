@@ -643,7 +643,7 @@ mod tests {
     fn header_footer_type_from_empty_string() {
         // Empty string should become Other(""), not panic or match a known variant.
         let result = HeaderFooterType::from("");
-        assert_eq!(result, HeaderFooterType::Other("".to_string()));
+        assert_eq!(result, HeaderFooterType::Other(String::new()));
     }
 
     #[test]

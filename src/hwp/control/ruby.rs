@@ -72,7 +72,7 @@ pub(crate) fn fixup_ruby_base_text(para: &mut HwpParagraph) {
     // Now match the collected ranges to Ruby controls in order.
     let mut ruby_iter = base_ranges.into_iter();
 
-    for ctrl in para.controls.iter_mut() {
+    for ctrl in &mut para.controls {
         if let HwpControl::Ruby { base_text, .. } = ctrl {
             if let Some((start, end)) = ruby_iter.next() {
                 if start < end && end <= raw.len() {
@@ -94,7 +94,7 @@ fn decode_utf16le_text_run(bytes: &[u8]) -> String {
         units.push(u16::from_le_bytes([bytes[i], bytes[i + 1]]));
         i += 2;
     }
-    String::from_utf16_lossy(&units).to_owned()
+    String::from_utf16_lossy(&units)
 }
 
 /// Parse a `ruby` `CTRL_HEADER` record into the ruby annotation text.

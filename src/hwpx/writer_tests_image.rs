@@ -552,7 +552,7 @@ fn base64_encode_test(data: &[u8]) -> String {
     let mut out = String::new();
     let mut i = 0;
     while i + 2 < data.len() {
-        let n = ((data[i] as u32) << 16) | ((data[i + 1] as u32) << 8) | (data[i + 2] as u32);
+        let n = (u32::from(data[i]) << 16) | (u32::from(data[i + 1]) << 8) | u32::from(data[i + 2]);
         out.push(CHARS[((n >> 18) & 0x3f) as usize] as char);
         out.push(CHARS[((n >> 12) & 0x3f) as usize] as char);
         out.push(CHARS[((n >> 6) & 0x3f) as usize] as char);
@@ -561,13 +561,13 @@ fn base64_encode_test(data: &[u8]) -> String {
     }
     let rem = data.len() - i;
     if rem == 1 {
-        let n = (data[i] as u32) << 16;
+        let n = u32::from(data[i]) << 16;
         out.push(CHARS[((n >> 18) & 0x3f) as usize] as char);
         out.push(CHARS[((n >> 12) & 0x3f) as usize] as char);
         out.push('=');
         out.push('=');
     } else if rem == 2 {
-        let n = ((data[i] as u32) << 16) | ((data[i + 1] as u32) << 8);
+        let n = (u32::from(data[i]) << 16) | (u32::from(data[i + 1]) << 8);
         out.push(CHARS[((n >> 18) & 0x3f) as usize] as char);
         out.push(CHARS[((n >> 12) & 0x3f) as usize] as char);
         out.push(CHARS[((n >> 6) & 0x3f) as usize] as char);

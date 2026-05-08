@@ -150,13 +150,13 @@ mod tests {
     fn make_header(tag_id: u16, level: u16, size: u32) -> [u8; 4] {
         let size_field = if size < 0xFFF { size } else { 0xFFF };
         let word: u32 =
-            (tag_id as u32 & 0x3FF) | ((level as u32 & 0x3FF) << 10) | (size_field << 20);
+            (u32::from(tag_id) & 0x3FF) | ((u32::from(level) & 0x3FF) << 10) | (size_field << 20);
         word.to_le_bytes()
     }
 
     /// Build an extended-size record (`size_field` = 0xFFF + 4-byte actual size).
     fn make_ext_header(tag_id: u16, size: u32) -> Vec<u8> {
-        let word: u32 = (tag_id as u32 & 0x3FF) | (0xFFF << 20);
+        let word: u32 = (u32::from(tag_id) & 0x3FF) | (0xFFF << 20);
         let mut v = word.to_le_bytes().to_vec();
         v.extend_from_slice(&size.to_le_bytes());
         v

@@ -331,7 +331,7 @@ mod tests {
 
     #[test]
     fn extract_paragraphs_from_range_single_paragraph() {
-        let text_data = encode_u16s_test(&[b'H' as u16, b'i' as u16]);
+        let text_data = encode_u16s_test(&[u16::from(b'H'), u16::from(b'i')]);
         let mut ph_data = vec![0u8; 6];
         ph_data[4] = 0;
         ph_data[5] = 0;
@@ -347,8 +347,8 @@ mod tests {
 
     #[test]
     fn extract_paragraphs_from_range_multiple_paragraphs() {
-        let text_a = encode_u16s_test(&[b'A' as u16]);
-        let text_b = encode_u16s_test(&[b'B' as u16]);
+        let text_a = encode_u16s_test(&[u16::from(b'A')]);
+        let text_b = encode_u16s_test(&[u16::from(b'B')]);
         let ph_data = vec![0u8; 6];
 
         let records = vec![

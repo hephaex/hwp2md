@@ -257,7 +257,7 @@ mod tests {
         // If size < 0xFFF, size_field == size; otherwise 0xFFF + extended u32.
         let size_field = if size < 0xFFF { size } else { 0xFFF };
         let raw: u32 =
-            (tag_id as u32 & 0x3FF) | ((level as u32 & 0x3FF) << 10) | (size_field << 20);
+            (u32::from(tag_id) & 0x3FF) | ((u32::from(level) & 0x3FF) << 10) | (size_field << 20);
         raw.to_le_bytes().to_vec()
     }
 
@@ -312,7 +312,7 @@ mod tests {
         // size_field == 0xFFF means the next u32 is the actual size.
         let size: u32 = 8;
         // Build header with size_field = 0xFFF.
-        let raw: u32 = (HWPTAG_PARA_HEADER as u32 & 0x3FF)
+        let raw: u32 = (u32::from(HWPTAG_PARA_HEADER) & 0x3FF)
             | (0u32 << 10) // level = 0
             | (0xFFF << 20);
         let mut data = raw.to_le_bytes().to_vec();

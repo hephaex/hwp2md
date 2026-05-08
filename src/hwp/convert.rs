@@ -70,9 +70,8 @@ pub(crate) fn detect_list_kind(para: &HwpParagraph, doc_info: &DocInfo) -> Optio
 fn is_ordered_prefix(text: &str) -> bool {
     let s = text.trim_start_matches(' ');
 
-    let first = match s.chars().next() {
-        Some(c) => c,
-        None => return false,
+    let Some(first) = s.chars().next() else {
+        return false;
     };
 
     if first.is_ascii_digit() {
@@ -418,8 +417,8 @@ pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<
                                 .iter()
                                 .flat_map(|p| paragraph_to_blocks(p, doc_info))
                                 .collect(),
-                            colspan: cell.col_span as u32,
-                            rowspan: cell.row_span as u32,
+                            colspan: u32::from(cell.col_span),
+                            rowspan: u32::from(cell.row_span),
                         })
                         .collect();
                     ir::TableRow {

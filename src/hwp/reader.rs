@@ -381,14 +381,14 @@ pub(crate) fn extract_paragraph_text(data: &[u8]) -> String {
                 result.push('\n');
             }
             _ => {
-                if let Some(c) = char::from_u32(ch as u32) {
+                if let Some(c) = char::from_u32(u32::from(ch)) {
                     result.push(c);
                 } else if (0xD800..=0xDBFF).contains(&ch) && i + 1 < len {
                     let low = u16::from_le_bytes([data[i], data[i + 1]]);
                     i += 2;
                     if (0xDC00..=0xDFFF).contains(&low) {
                         let codepoint =
-                            0x10000 + ((ch as u32 - 0xD800) << 10) + (low as u32 - 0xDC00);
+                            0x10000 + ((u32::from(ch) - 0xD800) << 10) + (u32::from(low) - 0xDC00);
                         if let Some(c) = char::from_u32(codepoint) {
                             result.push(c);
                         }

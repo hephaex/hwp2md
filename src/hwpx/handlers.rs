@@ -193,10 +193,8 @@ pub(super) fn handle_end_element(
                 flush_cell_paragraph(ctx);
             } else if ctx.list.in_item {
                 flush_list_item_paragraph(ctx);
-            } else {
-                if let Some(sb) = flush_paragraph_staged(ctx) {
-                    staged.push(sb);
-                }
+            } else if let Some(sb) = flush_paragraph_staged(ctx) {
+                staged.push(sb);
             }
             ctx.in_paragraph = false;
         }

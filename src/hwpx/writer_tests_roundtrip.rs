@@ -32,11 +32,10 @@ fn roundtrip_inlines(inlines: Vec<Inline>) -> Vec<Inline> {
         .sections
         .into_iter()
         .flat_map(|s| s.blocks)
-        .filter_map(|b| match b {
+        .find_map(|b| match b {
             Block::Paragraph { inlines } => Some(inlines),
             _ => None,
         })
-        .next()
         .unwrap_or_default()
 }
 
