@@ -62,7 +62,6 @@ pub(crate) fn parse_para_shape(data: &[u8]) -> ParaShape {
     let alignment_val = attr1 & 0x07;
     shape.alignment = match alignment_val {
         0 => Alignment::Justify,
-        1 => Alignment::Left,
         2 => Alignment::Right,
         3 => Alignment::Center,
         _ => Alignment::Left,

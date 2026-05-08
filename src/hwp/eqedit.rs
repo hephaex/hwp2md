@@ -421,8 +421,7 @@ fn map_keyword(word: &str) -> String {
         "int" => "\\int".into(),
         "oint" => "\\oint".into(),
         "lim" => "\\lim".into(),
-        "inf" => "\\infty".into(),
-        "infty" => "\\infty".into(),
+        "inf" | "infty" => "\\infty".into(),
         "partial" => "\\partial".into(),
         "nabla" => "\\nabla".into(),
         // Arrows

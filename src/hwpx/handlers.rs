@@ -299,7 +299,6 @@ pub(super) fn handle_end_element(
             ctx.in_hyperlink = false;
             ctx.hyperlink_url = None;
         }
-        "fieldBegin" | "hp:fieldBegin" => {}
         "header" | "hp:header" => {
             ctx.header_footer.in_header = false;
         }
@@ -338,12 +337,12 @@ pub(super) fn handle_end_element(
         }
         "fn" | "hp:fn" | "footnote" | "hp:footnote" | "en" | "hp:en" | "endnote" | "hp:endnote" => {
             flush_footnote_paragraph(ctx);
-            if !ctx.footnote.blocks.is_empty() {
+            if ctx.footnote.blocks.is_empty() {
+                ctx.footnote.id.clear();
+            } else {
                 let id = std::mem::take(&mut ctx.footnote.id);
                 let content = std::mem::take(&mut ctx.footnote.blocks);
                 staged.push(StagedBlock::Plain(ir::Block::Footnote { id, content }));
-            } else {
-                ctx.footnote.id.clear();
             }
             ctx.footnote.active = false;
         }

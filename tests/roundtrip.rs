@@ -496,33 +496,6 @@ fn roundtrip_ir_to_md_to_ir_image_block() {
 
 #[test]
 fn roundtrip_ir_to_md_to_ir_nested_list() {
-    // A list with one top-level item that has a sub-list child.
-    let original = make_doc(vec![ir::Block::List {
-        ordered: false,
-        start: 1,
-        items: vec![ir::ListItem {
-            blocks: vec![ir::Block::Paragraph {
-                inlines: vec![plain("parent")],
-            }],
-            children: vec![ir::ListItem {
-                blocks: vec![ir::Block::Paragraph {
-                    inlines: vec![plain("child")],
-                }],
-                children: Vec::new(),
-                checked: None,
-            }],
-            checked: None,
-        }],
-    }]);
-
-    let md = write_markdown(&original, false);
-
-    // Both "parent" and "child" text must appear in the markdown output.
-    assert!(md.contains("parent"), "parent text missing; md: {md:?}");
-    assert!(md.contains("child"), "child text missing; md: {md:?}");
-
-    let parsed = parse_markdown(&md);
-
     // The parser nests the child list inside the parent item's blocks.
     // Accept any structure that carries both text values.
     fn collect_text(blocks: &[ir::Block]) -> String {
@@ -553,6 +526,33 @@ fn roundtrip_ir_to_md_to_ir_nested_list() {
         }
         out
     }
+
+    // A list with one top-level item that has a sub-list child.
+    let original = make_doc(vec![ir::Block::List {
+        ordered: false,
+        start: 1,
+        items: vec![ir::ListItem {
+            blocks: vec![ir::Block::Paragraph {
+                inlines: vec![plain("parent")],
+            }],
+            children: vec![ir::ListItem {
+                blocks: vec![ir::Block::Paragraph {
+                    inlines: vec![plain("child")],
+                }],
+                children: Vec::new(),
+                checked: None,
+            }],
+            checked: None,
+        }],
+    }]);
+
+    let md = write_markdown(&original, false);
+
+    // Both "parent" and "child" text must appear in the markdown output.
+    assert!(md.contains("parent"), "parent text missing; md: {md:?}");
+    assert!(md.contains("child"), "child text missing; md: {md:?}");
+
+    let parsed = parse_markdown(&md);
 
     let all_text = collect_text(first_blocks(&parsed));
     assert!(

@@ -182,8 +182,7 @@ fn parse_metadata(xml: &str) -> Result<ir::Metadata, Hwp2MdError> {
                 in_subject = false;
                 in_description = false;
             }
-            Ok(Event::Eof) => break,
-            Err(_) => break,
+            Ok(Event::Eof) | Err(_) => break,
             _ => {}
         }
         buf.clear();
@@ -290,8 +289,7 @@ fn find_section_files(archive: &mut zip::ZipArchive<std::fs::File>) -> Vec<Strin
                         }
                     }
                 }
-                Ok(Event::Eof) => break,
-                Err(_) => break,
+                Ok(Event::Eof) | Err(_) => break,
                 _ => {}
             }
             buf.clear();

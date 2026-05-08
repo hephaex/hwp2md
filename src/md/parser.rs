@@ -4,6 +4,18 @@ use comrak::{parse_document, Arena, Options};
 
 #[must_use]
 pub fn parse_markdown(input: &str) -> ir::Document {
+    // Walk the AST nodes and route them into body, header, or footer
+    // depending on the surrounding `<!-- header -->` / `<!-- /header -->` and
+    // `<!-- footer -->` / `<!-- /footer -->` marker pairs.  The markers are
+    // detected at the comrak AST level (before `node_to_block` is called) so
+    // that they never appear as IR blocks themselves.
+    #[derive(PartialEq, Debug)]
+    enum Region {
+        Body,
+        Header,
+        Footer,
+    }
+
     let arena = Arena::new();
     let mut options = Options::default();
     options.extension.table = true;
@@ -17,18 +29,6 @@ pub fn parse_markdown(input: &str) -> ir::Document {
 
     let mut doc = ir::Document::new();
     doc.metadata = extract_frontmatter(input);
-
-    // Walk the AST nodes and route them into body, header, or footer
-    // depending on the surrounding `<!-- header -->` / `<!-- /header -->` and
-    // `<!-- footer -->` / `<!-- /footer -->` marker pairs.  The markers are
-    // detected at the comrak AST level (before `node_to_block` is called) so
-    // that they never appear as IR blocks themselves.
-    #[derive(PartialEq, Debug)]
-    enum Region {
-        Body,
-        Header,
-        Footer,
-    }
 
     let mut region = Region::Body;
     let mut header_blocks: Vec<ir::Block> = Vec::new();

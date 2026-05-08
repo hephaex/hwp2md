@@ -163,7 +163,6 @@ fn roundtrip_empty_document() {
     // Either the section is empty or contains only empty paragraphs.
     let non_empty = first_blocks(&parsed).iter().any(|b| match b {
         ir::Block::Paragraph { inlines } => !inlines.is_empty(),
-        ir::Block::HorizontalRule => true,
         _ => true,
     });
     // For an empty document, we expect no meaningful content.

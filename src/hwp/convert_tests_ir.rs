@@ -86,7 +86,13 @@ fn hwp_to_ir_bin_data_becomes_asset() {
     let doc = hwp_to_ir(&hwp);
     assert_eq!(doc.assets.len(), 1);
     assert_eq!(doc.assets[0].mime_type, "image/png");
-    assert!(doc.assets[0].name.ends_with(".png"));
+    assert_eq!(
+        std::path::Path::new(&doc.assets[0].name)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.eq_ignore_ascii_case("png")),
+        Some(true)
+    );
     assert_eq!(doc.assets[0].data, png_header);
 }
 

@@ -359,14 +359,8 @@ pub(crate) fn extract_paragraph_text(data: &[u8]) -> String {
         i += 2;
 
         match ch {
-            0x0000 => {}
-            0x0001..=0x0002 => {
-                if i + 14 > len {
-                    break;
-                }
-                i += 14;
-            }
-            0x0003..=0x0008 => {
+            0x0000 | 0x000D | 0x000E..=0x001F => {}
+            0x0001..=0x0002 | 0x0003..=0x0008 | 0x000B..=0x000C => {
                 if i + 14 > len {
                     break;
                 }
@@ -378,16 +372,6 @@ pub(crate) fn extract_paragraph_text(data: &[u8]) -> String {
             0x000A => {
                 result.push('\n');
             }
-            0x000B..=0x000C => {
-                if i + 14 > len {
-                    break;
-                }
-                i += 14;
-            }
-            0x000D => {
-                // paragraph break
-            }
-            0x000E..=0x001F => {}
             _ => {
                 if let Some(c) = char::from_u32(ch as u32) {
                     result.push(c);
@@ -439,7 +423,24 @@ fn read_bin_data(
 ) -> Result<HashMap<u16, Vec<u8>>, Hwp2MdError> {
     let mut bin_data = HashMap::new();
 
-    if !doc_info.bin_data_entries.is_empty() {
+    if doc_info.bin_data_entries.is_empty() {
+        // Fallback: sequential probe with a conservative upper limit.
+        for i in 1..=100u16 {
+            let path = format!("BinData/BIN{i:04X}");
+            if let Ok(stream) = cfb.open_stream(&path) {
+                let mut data = Vec::new();
+                stream.take(MAX_CFB_STREAM).read_to_end(&mut data)?;
+                bin_data.insert(i, data);
+            } else {
+                if i > 10 && bin_data.is_empty() {
+                    break;
+                }
+                if i > bin_data.len() as u16 + 20 {
+                    break;
+                }
+            }
+        }
+    } else {
         // Probe only the IDs recorded in DocInfo — avoids scanning up to 999 entries.
         for (idx, entry) in doc_info.bin_data_entries.iter().enumerate() {
             let id = if entry.id > 0 {
@@ -452,26 +453,6 @@ fn read_bin_data(
                 let mut data = Vec::new();
                 stream.take(MAX_CFB_STREAM).read_to_end(&mut data)?;
                 bin_data.insert(id, data);
-            }
-        }
-    } else {
-        // Fallback: sequential probe with a conservative upper limit.
-        for i in 1..=100u16 {
-            let path = format!("BinData/BIN{i:04X}");
-            match cfb.open_stream(&path) {
-                Ok(stream) => {
-                    let mut data = Vec::new();
-                    stream.take(MAX_CFB_STREAM).read_to_end(&mut data)?;
-                    bin_data.insert(i, data);
-                }
-                Err(_) => {
-                    if i > 10 && bin_data.is_empty() {
-                        break;
-                    }
-                    if i > bin_data.len() as u16 + 20 {
-                        break;
-                    }
-                }
             }
         }
     }

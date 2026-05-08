@@ -114,7 +114,11 @@ fn collect_image_assets_data_uri_decodes_base64() {
 
     let entry_name = map.get(&src).expect("entry name");
     assert!(
-        entry_name.ends_with(".png"),
+        std::path::Path::new(entry_name)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.eq_ignore_ascii_case("png"))
+            .unwrap_or(false),
         "data URI entry must have .png extension: {entry_name}"
     );
 
@@ -302,7 +306,14 @@ fn write_hwpx_data_uri_image_creates_bindata_entry() {
 
     let has_bindata = entries
         .iter()
-        .any(|e| e.starts_with("BinData/image_") && e.ends_with(".png"));
+        .any(|e| {
+            e.starts_with("BinData/image_")
+                && std::path::Path::new(e)
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .map(|ext| ext.eq_ignore_ascii_case("png"))
+                    .unwrap_or(false)
+        });
     assert!(
         has_bindata,
         "BinData/image_N.png must be present for data URI image; entries: {entries:?}"
