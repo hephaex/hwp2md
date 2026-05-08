@@ -109,6 +109,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 29 / S29-01**: 6 miscellaneous pedantic fixes — `let...else`,
+  collapsed `else if`, `find_map`, removed redundant `.to_owned()`,
+  `String::new()`, `&mut` loop.
+- **Sprint 29 / S29-02**: 38 infallible `as` casts replaced with
+  `u32::from()` / `u16::from()` across 10 files.
 - **Sprint 28 / S28-01**: 73 `doc_markdown` backtick warnings fixed across
   22 files — identifiers in doc comments wrapped with backticks.
 - **Sprint 28 / S28-02**: 11 wildcard imports (`use module::*`) replaced
