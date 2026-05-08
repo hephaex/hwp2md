@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 23 완료 (writeln! migration + raw string cleanup)
+## 현재 상태: v0.5.0 Sprint 24 완료 (or-patterns + control flow + misc pedantic)
 
 ### 완료
 
@@ -259,6 +259,26 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-08 — v0.5.0 Sprint 24: Or-Patterns + Control Flow + Misc Pedantic
+
+**S24-01: unnested or-patterns + inline format vars** (hwp/):
+- `src/hwp/convert.rs`: 5 or-patterns unnested (`Some('.') | Some(')')` → `Some('.' | ')')`)
+- `src/hwp/reader.rs` + `record.rs`: 4 format vars inlined (`format!("{}", var)` → `format!("{var}")`)
+
+**S24-02: redundant continue + else** (md/parser.rs):
+- 8 redundant `continue;` 제거 (if/else 체인 끝에서 불필요)
+- 1 redundant `else` 블록 제거 (guard clause 패턴)
+
+**S24-03: semicolons + redundant closures**:
+- `flush.rs` (3) + `benches/conversion.rs` (5): trailing `;` 추가
+- 4 redundant closures → method references (`|x| func(x)` → `func`)
+- 벤치마크 roundtrip closure에서 `write_markdown` 반환값 보존 (수동 수정)
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 0 MEDIUM, 0 SUGGESTION):
+- 벤치마크 `;` 추가 시 `#[must_use]` 반환값 보존 주의 (학습 포인트)
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures)
 
 ### 2026-05-08 — v0.5.0 Sprint 23: writeln! Migration + Raw String Cleanup
 

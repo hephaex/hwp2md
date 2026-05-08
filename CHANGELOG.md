@@ -109,6 +109,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 24 / S24-01**: Unnested 5 or-patterns in `hwp/convert.rs`;
+  inlined 4 format variables in `hwp/reader.rs` and `hwp/record.rs`.
+- **Sprint 24 / S24-02**: Removed 8 redundant `continue` expressions
+  and 1 redundant `else` block in `md/parser.rs`.
+- **Sprint 24 / S24-03**: Added 8 trailing semicolons for consistency;
+  replaced 4 redundant closures with method references.
 - **Sprint 23 / S23-01**: `write_block`, `render_inlines`, `write_table`,
   `write_html_table`, `write_list` migrated from `push_str(&format!())`
   to `write!`/`writeln!` — eliminates 20 intermediate String allocations
