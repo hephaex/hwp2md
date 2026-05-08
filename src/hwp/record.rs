@@ -19,7 +19,7 @@ pub const HWPTAG_CTRL_HEADER: u16 = HWPTAG_BEGIN + 54;
 pub const HWPTAG_LIST_HEADER: u16 = HWPTAG_BEGIN + 55;
 pub const HWPTAG_TABLE: u16 = HWPTAG_BEGIN + 57;
 pub const HWPTAG_EQEDIT: u16 = HWPTAG_BEGIN + 71;
-/// GSOType record — contains picture/OLE shape specifics including BinData reference.
+/// `GSOType` record — contains picture/OLE shape specifics including `BinData` reference.
 pub const HWPTAG_GSOTYPE: u16 = HWPTAG_BEGIN + 67;
 
 pub const CTRL_TABLE: u32 = ctrl_id(b"tbl ");
@@ -31,6 +31,7 @@ pub const CTRL_COL_BREAK: u32 = ctrl_id(b"clbk");
 pub const CTRL_HYPERLINK: u32 = ctrl_id(b"hyln");
 pub const CTRL_RUBY: u32 = ctrl_id(b"ruby");
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 const fn ctrl_id(b: &[u8; 4]) -> u32 {
     (b[0] as u32) | ((b[1] as u32) << 8) | ((b[2] as u32) << 16) | ((b[3] as u32) << 24)
 }

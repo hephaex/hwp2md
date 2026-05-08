@@ -70,7 +70,7 @@ pub fn read_hwpx(path: &Path) -> Result<ir::Document, Hwp2MdError> {
     Ok(doc)
 }
 
-/// Build a map from bare BinData stem (e.g. `"BIN0001"`) to the full ZIP path
+/// Build a map from bare `BinData` stem (e.g. `"BIN0001"`) to the full ZIP path
 /// (e.g. `"BinData/BIN0001.png"`).
 ///
 /// When a section XML references `binaryItemIDRef="BIN0001"`, the parser stores

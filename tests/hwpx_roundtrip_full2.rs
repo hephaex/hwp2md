@@ -1,10 +1,10 @@
 /// HWPX full-roundtrip tests — Phase D-1 (part 2).
 ///
-/// Covers: HorizontalRule, BlockQuote, Image, Footnote,
+/// Covers: `HorizontalRule`, `BlockQuote`, Image, Footnote,
 ///         inline formatting (bold/italic), metadata body survival,
 ///         and the grand combined document.
 ///
-/// Part 1 (Paragraph, Heading, List, Table, CodeBlock) lives in
+/// Part 1 (Paragraph, Heading, List, Table, `CodeBlock`) lives in
 /// `hwpx_roundtrip_full.rs`.
 use hwp2md::hwpx::{read_hwpx, write_hwpx};
 use hwp2md::ir;

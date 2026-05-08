@@ -1,7 +1,7 @@
 use super::common::find_children_end;
 use super::dispatcher::extract_paragraphs_from_range;
-use crate::hwp::model::*;
-use crate::hwp::record::*;
+use crate::hwp::model::HwpTableCell;
+use crate::hwp::record::{Record, HWPTAG_LIST_HEADER, HWPTAG_TABLE};
 
 /// Parse a `CTRL_TABLE` subtree starting at `ctrl_idx` in `records`.
 ///
@@ -111,7 +111,8 @@ mod tests {
     use super::*;
     use crate::hwp::reader::encode_u16s_test;
     use crate::hwp::record::{
-        HWPTAG_CTRL_HEADER, HWPTAG_LIST_HEADER, HWPTAG_PARA_HEADER, HWPTAG_PARA_TEXT, HWPTAG_TABLE,
+        CTRL_TABLE, HWPTAG_CTRL_HEADER, HWPTAG_LIST_HEADER, HWPTAG_PARA_HEADER, HWPTAG_PARA_TEXT,
+        HWPTAG_TABLE,
     };
 
     fn make_record_with_data(tag_id: u16, level: u16, data: Vec<u8>) -> Record {

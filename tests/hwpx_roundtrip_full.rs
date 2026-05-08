@@ -6,10 +6,10 @@
 /// and verifies that text content and block type semantics survive.
 ///
 /// This file covers: Paragraph, Heading (H1–H6), List (unordered/ordered/nested),
-/// Table, and CodeBlock.
+/// Table, and `CodeBlock`.
 ///
-/// Part 2 (HorizontalRule, BlockQuote, Image, Footnote, inline formatting,
-/// metadata, combined document) lives in `hwpx_roundtrip_full2.rs`.
+/// Part 2 (`HorizontalRule`, `BlockQuote`, Image, Footnote, inline formatting,
+/// metadata, combined document) lives in `hwpx_roundtrip_full2` module.
 use hwp2md::hwpx::{read_hwpx, write_hwpx};
 use hwp2md::ir;
 

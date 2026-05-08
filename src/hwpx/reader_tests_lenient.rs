@@ -165,7 +165,7 @@ fn paragraph_missing_style_id_ref_is_plain() {
     }
 }
 
-/// faceNameIDRef out of range → font_name stays None, no panic.
+/// `faceNameIDRef` out of range → `font_name` stays None, no panic.
 #[test]
 fn charpr_out_of_range_face_name_id_ref_ignored() {
     // faceNameIDRef=9999 — way beyond any populated face table.
@@ -184,7 +184,7 @@ fn charpr_out_of_range_face_name_id_ref_ignored() {
     }
 }
 
-/// Non-numeric faceNameIDRef → font_name stays None, no panic.
+/// Non-numeric `faceNameIDRef` → `font_name` stays None, no panic.
 #[test]
 fn charpr_non_numeric_face_name_id_ref_ignored() {
     let xml = r#"<root><hp:p><hp:run><hp:charPr faceNameIDRef="notanumber"/><hp:t>text</hp:t></hp:run></hp:p></root>"#;

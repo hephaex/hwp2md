@@ -3,7 +3,7 @@
 //! HWP "배포용" (distribution/read-only) documents encrypt their body text with
 //! AES-128 ECB.  The decryption pipeline is:
 //!
-//! 1. Locate the `DISTRIBUTE_DOC_DATA` record (`tag_id` 0x0026) in DocInfo.
+//! 1. Locate the `DISTRIBUTE_DOC_DATA` record (`tag_id` 0x0026) in `DocInfo`.
 //! 2. XOR the 256-byte seed payload with the output of the MSVC LCG (`rand()`).
 //! 3. Extract a 16-byte AES key from the decrypted seed.
 //! 4. Decrypt each `ViewText/Section{N}` stream with AES-128 ECB.
@@ -151,10 +151,10 @@ mod tests {
     // ------------------------------------------------------------------
 
     /// Verify the first few outputs of the MSVC LCG match the known sequence
-    /// produced by seeding with 0 and calling rand() repeatedly.
+    /// produced by seeding with 0 and calling `rand()` repeatedly.
     ///
     /// Reference values computed from MSVC CRT:
-    ///   seed 0 → rand() sequence: 38, 7719, 21238, 2437, ...
+    ///   seed 0 → `rand()` sequence: 38, 7719, 21238, 2437, ...
     #[test]
     fn msvc_lcg_seed_zero_known_sequence() {
         let mut lcg = MsvcLcg::new(0);
@@ -210,9 +210,9 @@ mod tests {
         assert_eq!(out[0], expected_byte);
     }
 
-    /// Round-trip: applying decrypt_seed twice with the same seed must yield
+    /// Round-trip: applying `decrypt_seed` twice with the same seed must yield
     /// the original data (XOR is its own inverse only when the LCG is
-    /// re-seeded identically — which decrypt_seed always does from bytes 0-3).
+    /// re-seeded identically — which `decrypt_seed` always does from bytes 0-3).
     #[test]
     fn decrypt_seed_is_not_its_own_inverse() {
         // This test documents intentional behaviour: the LCG is seeded from
@@ -227,7 +227,7 @@ mod tests {
         assert_ne!(decrypted[0], original[0]);
     }
 
-    /// Known-value test: manually compute what decrypt_seed should produce for
+    /// Known-value test: manually compute what `decrypt_seed` should produce for
     /// a carefully chosen seed payload.
     #[test]
     fn decrypt_seed_known_vector() {

@@ -3,9 +3,13 @@ use super::hyperlink::parse_hyperlink_url;
 use super::image::parse_gshape_ctrl;
 use super::ruby::{fixup_ruby_base_text, parse_ruby_ctrl};
 use super::table::parse_table_ctrl;
-use crate::hwp::model::*;
+use crate::hwp::model::{HwpControl, HwpParagraph};
 use crate::hwp::reader::{extract_paragraph_text_with_raw, parse_char_shape_refs};
-use crate::hwp::record::*;
+use crate::hwp::record::{
+    read_utf16le_str, Record, CTRL_COL_BREAK, CTRL_ENDNOTE, CTRL_FOOTNOTE, CTRL_GSHAPE,
+    CTRL_HYPERLINK, CTRL_PAGE_BREAK, CTRL_RUBY, CTRL_TABLE, HWPTAG_CTRL_HEADER, HWPTAG_EQEDIT,
+    HWPTAG_PARA_CHAR_SHAPE, HWPTAG_PARA_HEADER, HWPTAG_PARA_TEXT,
+};
 
 /// Extract `HwpParagraph`s from records in `[start, end)`, treating them as a
 /// self-contained sub-stream (e.g. a table cell or footnote body).

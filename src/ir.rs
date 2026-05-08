@@ -283,7 +283,7 @@ pub struct Inline {
     /// CSS hex color string (e.g. `"#FF0000"`) when text color is non-black.
     /// `None` means default/black text, which is not rendered in output.
     pub color: Option<String>,
-    /// Font name resolved from the DocInfo face_names table.
+    /// Font name resolved from the `DocInfo` `face_names` table.
     /// Not rendered in Markdown output; preserved for HWPX round-trip fidelity.
     pub font_name: Option<String>,
     /// Ruby annotation text.  When `Some`, the inline's `text` is the base

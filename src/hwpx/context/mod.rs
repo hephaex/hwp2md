@@ -130,7 +130,7 @@ impl ParseContext {
 
     /// Returns a mutable reference to the active text buffer.
     ///
-    /// Priority: header/footer > footnote > list_item > cell > default paragraph buffer.
+    /// Priority: header/footer > footnote > `list_item` > cell > default paragraph buffer.
     pub(crate) fn active_text_buf(&mut self) -> &mut String {
         if self.header_footer.active
             && (self.header_footer.in_header || self.header_footer.in_footer)

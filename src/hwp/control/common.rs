@@ -1,4 +1,4 @@
-use crate::hwp::record::*;
+use crate::hwp::record::Record;
 
 /// Returns the index one past the last child of `records[parent_idx]`.
 ///

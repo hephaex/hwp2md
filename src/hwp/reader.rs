@@ -5,7 +5,10 @@ use crate::hwp::crypto::{
     decrypt_seed, decrypt_viewtext, extract_aes_key, HWPTAG_DISTRIBUTE_DOC_DATA,
 };
 use crate::hwp::lenient;
-use crate::hwp::model::*;
+use crate::hwp::model::{DocInfo, FileHeader, HwpDocument, HwpSection, HwpVersion};
+// record::* is intentionally kept as a glob: it re-exports many tag/ctrl
+// constants that are matched on throughout this module.
+#[allow(clippy::wildcard_imports)]
 use crate::hwp::record::*;
 use crate::hwp::summary::read_summary_info;
 use crate::ir;

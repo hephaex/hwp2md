@@ -3,7 +3,7 @@ use crate::ir::{self, Block, Document, Inline, Metadata, Section};
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
-fn section_xml_with_hf(section: Section) -> String {
+fn section_xml_with_hf(section: &Section) -> String {
     let doc = Document {
         metadata: Metadata::default(),
         sections: vec![section.clone()],
@@ -11,7 +11,7 @@ fn section_xml_with_hf(section: Section) -> String {
     };
     let tables = RefTables::build(&doc, None);
     let empty_asset_map = ImageAssetMap::new();
-    generate_section_xml(&section, 0, &tables, &empty_asset_map)
+    generate_section_xml(section, 0, &tables, &empty_asset_map)
         .expect("generate_section_xml failed")
 }
 
@@ -32,7 +32,7 @@ fn header_footer_emitted_in_section_xml() {
         footer: Some(vec![plain_para("Footer line")]),
         header_footer_type: None,
     };
-    let xml = section_xml_with_hf(sec);
+    let xml = section_xml_with_hf(&sec);
 
     // Both wrapper elements must be present.
     assert!(
@@ -76,7 +76,7 @@ fn header_footer_emitted_before_sec_pr() {
         footer: None,
         header_footer_type: None,
     };
-    let xml = section_xml_with_hf(sec);
+    let xml = section_xml_with_hf(&sec);
 
     let hf_pos = xml
         .find("<hp:headerFooter>")
@@ -98,7 +98,7 @@ fn no_header_footer_when_both_none() {
         footer: None,
         header_footer_type: None,
     };
-    let xml = section_xml_with_hf(sec);
+    let xml = section_xml_with_hf(&sec);
 
     assert!(
         !xml.contains("<hp:headerFooter>"),
@@ -117,7 +117,7 @@ fn no_header_footer_when_both_empty_vecs() {
         footer: Some(vec![]),
         header_footer_type: None,
     };
-    let xml = section_xml_with_hf(sec);
+    let xml = section_xml_with_hf(&sec);
 
     assert!(
         !xml.contains("<hp:headerFooter>"),
@@ -135,7 +135,7 @@ fn header_only_no_footer_element() {
         footer: None,
         header_footer_type: None,
     };
-    let xml = section_xml_with_hf(sec);
+    let xml = section_xml_with_hf(&sec);
 
     assert!(
         xml.contains("<hp:header>"),
@@ -158,7 +158,7 @@ fn header_footer_type_both() {
         footer: None,
         header_footer_type: Some(ir::HeaderFooterType::Both),
     };
-    let xml = section_xml_with_hf(sec);
+    let xml = section_xml_with_hf(&sec);
 
     assert!(
         xml.contains(r#"<hp:headerFooter type="both">"#) || xml.contains(r#"type="both"#),
@@ -176,7 +176,7 @@ fn header_footer_type_even() {
         footer: Some(vec![plain_para("Footer")]),
         header_footer_type: Some(ir::HeaderFooterType::Even),
     };
-    let xml = section_xml_with_hf(sec);
+    let xml = section_xml_with_hf(&sec);
 
     assert!(
         xml.contains(r#"type="even"#),
@@ -194,7 +194,7 @@ fn header_footer_type_odd() {
         footer: Some(vec![plain_para("Footer")]),
         header_footer_type: Some(ir::HeaderFooterType::Odd),
     };
-    let xml = section_xml_with_hf(sec);
+    let xml = section_xml_with_hf(&sec);
 
     assert!(
         xml.contains(r#"type="odd"#),
@@ -212,7 +212,7 @@ fn header_footer_type_none_not_emitted() {
         footer: None,
         header_footer_type: None,
     };
-    let xml = section_xml_with_hf(sec);
+    let xml = section_xml_with_hf(&sec);
 
     assert!(
         !xml.contains(r"type="),

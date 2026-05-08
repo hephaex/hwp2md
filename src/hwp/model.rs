@@ -120,7 +120,7 @@ pub struct ParaShape {
     pub line_spacing: i32,
     pub line_spacing_type: u8,
     /// Numbering definition ID (>0 indicates this paragraph belongs to a list).
-    /// Parsed from ParaShape record bytes 26-27 when the record is long enough.
+    /// Parsed from `ParaShape` record bytes 26-27 when the record is long enough.
     pub numbering_id: Option<u16>,
 }
 
@@ -153,7 +153,7 @@ pub struct HwpParagraph {
     pub char_shape_ids: Vec<(u32, u16)>,
     pub para_shape_id: u16,
     pub controls: Vec<HwpControl>,
-    /// Raw UTF-16LE bytes from the PARA_TEXT record, used during Ruby base-text
+    /// Raw UTF-16LE bytes from the `PARA_TEXT` record, used during Ruby base-text
     /// fixup and cleared (set to `None`) once fixup is complete.
     pub(crate) raw_para_text: Option<Vec<u8>>,
 }

@@ -343,7 +343,8 @@ fn collect_alt_text<'a>(node: &'a AstNode<'a>) -> String {
 
 fn collect_inlines<'a>(node: &'a AstNode<'a>) -> Vec<ir::Inline> {
     let mut inlines = Vec::new();
-    collect_inlines_recursive(node, &mut inlines, InlineStyle::default());
+    let default_style = InlineStyle::default();
+    collect_inlines_recursive(node, &mut inlines, &default_style);
     inlines
 }
 
@@ -361,7 +362,7 @@ struct InlineStyle {
 fn collect_inlines_recursive<'a>(
     node: &'a AstNode<'a>,
     inlines: &mut Vec<ir::Inline>,
-    style: InlineStyle,
+    style: &InlineStyle,
 ) {
     let mut current_style = style.clone();
 
@@ -466,27 +467,27 @@ fn collect_inlines_recursive<'a>(
                 // For ruby base spans that contain rich content (e.g. bold),
                 // recurse and then patch the newly-added inlines with the ruby
                 // annotation when </ruby> is encountered later.
-                collect_inlines_recursive(child, inlines, s);
+                collect_inlines_recursive(child, inlines, &s);
             }
             NodeValue::Emph => {
                 let mut s = current_style.clone();
                 s.italic = true;
-                collect_inlines_recursive(child, inlines, s);
+                collect_inlines_recursive(child, inlines, &s);
             }
             NodeValue::Strikethrough => {
                 let mut s = current_style.clone();
                 s.strikethrough = true;
-                collect_inlines_recursive(child, inlines, s);
+                collect_inlines_recursive(child, inlines, &s);
             }
             NodeValue::Superscript => {
                 let mut s = current_style.clone();
                 s.superscript = true;
-                collect_inlines_recursive(child, inlines, s);
+                collect_inlines_recursive(child, inlines, &s);
             }
             NodeValue::Link(link) => {
                 let mut s = current_style.clone();
                 s.link = Some(link.url.clone());
-                collect_inlines_recursive(child, inlines, s);
+                collect_inlines_recursive(child, inlines, &s);
             }
             NodeValue::Image(link) => {
                 let alt = collect_alt_text(child);
@@ -500,7 +501,7 @@ fn collect_inlines_recursive<'a>(
                 inlines.push(ir::Inline::plain(format!("{delim}{}{delim}", math.literal)));
             }
             _ => {
-                collect_inlines_recursive(child, inlines, current_style.clone());
+                collect_inlines_recursive(child, inlines, &current_style);
             }
         }
     }

@@ -1,8 +1,8 @@
-use crate::hwp::record::*;
+use crate::hwp::record::{read_utf16le_str, Record};
 
-/// Parse the URL from a `hyln` (CTRL_HYPERLINK) CTRL_HEADER record.
+/// Parse the URL from a `hyln` (`CTRL_HYPERLINK`) `CTRL_HEADER` record.
 ///
-/// Layout (observed): bytes 0-3 = ctrl_id (`hyln`), bytes 4-5 = UTF-16LE
+/// Layout (observed): bytes 0-3 = `ctrl_id` (`hyln`), bytes 4-5 = UTF-16LE
 /// char count, followed by that many UTF-16LE code units.  The exact
 /// field layout may vary across HWP versions; we apply a plausibility
 /// check on the decoded URL and return empty on garbage.

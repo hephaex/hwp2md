@@ -1,7 +1,7 @@
 use crate::hwp::model::{HwpControl, HwpParagraph};
 use crate::hwp::record::{read_utf16le_str, Record};
 
-/// Control characters in HWP PARA_TEXT that occupy a 2-byte code unit plus a
+/// Control characters in HWP `PARA_TEXT` that occupy a 2-byte code unit plus a
 /// 14-byte inline parameter block.  The range 0x0001..=0x001F covers all such
 /// extended control code units.
 const CTRL_CHAR_LOW: u16 = 0x0001;
@@ -12,23 +12,23 @@ const CTRL_CHAR_HIGH: u16 = 0x001F;
 const CTRL_MARKER: u16 = 0x0003;
 
 /// Byte count of the inline parameter block that immediately follows each
-/// extended control code unit in the PARA_TEXT stream.
+/// extended control code unit in the `PARA_TEXT` stream.
 const CTRL_PARAM_BYTES: usize = 14;
 
 /// Fix up the `base_text` field of every `Ruby` control inside `para`.
 ///
 /// HWP stores the base text -- the characters that the ruby annotation covers --
-/// in the PARA_TEXT byte stream, immediately before the `0x0003` control
+/// in the `PARA_TEXT` byte stream, immediately before the `0x0003` control
 /// marker.  The `base_text` field is left empty by the initial parser because
-/// that information lives outside the CTRL_HEADER record.  This function
+/// that information lives outside the `CTRL_HEADER` record.  This function
 /// reconstructs it from the raw UTF-16LE bytes stored in `para.raw_para_text`.
 ///
 /// The algorithm walks the raw byte stream and collects an ordered list of
-/// (start_byte_index, end_byte_index_exclusive) ranges that hold the normal
+/// (`start_byte_index`, `end_byte_index_exclusive`) ranges that hold the normal
 /// text characters preceding each `0x0003` marker.  Those ranges are decoded
-/// and matched -- in order -- to the Ruby controls in `para.controls`.
+/// and matched -- in order -- to the `Ruby` controls in `para.controls`.
 ///
-/// If `raw_para_text` is `None` (e.g. the paragraph has no PARA_TEXT record)
+/// If `raw_para_text` is `None` (e.g. the paragraph has no `PARA_TEXT` record)
 /// the function returns immediately without modification.
 pub(crate) fn fixup_ruby_base_text(para: &mut HwpParagraph) {
     let raw = match para.raw_para_text.as_deref() {
@@ -97,9 +97,9 @@ fn decode_utf16le_text_run(bytes: &[u8]) -> String {
     String::from_utf16_lossy(&units).to_owned()
 }
 
-/// Parse a `ruby` CTRL_HEADER record into the ruby annotation text.
+/// Parse a `ruby` `CTRL_HEADER` record into the ruby annotation text.
 ///
-/// Ruby control data layout (after the 4-byte ctrl_id at offset 0):
+/// Ruby control data layout (after the 4-byte `ctrl_id` at offset 0):
 /// - Bytes 4..6: ruby text length as u16 LE (count of UTF-16 code units)
 /// - Bytes 6..:  ruby text in UTF-16LE
 ///
@@ -150,7 +150,7 @@ mod tests {
         buf
     }
 
-    /// Build a `HwpParagraph` with one Ruby control and raw_para_text set to
+    /// Build a `HwpParagraph` with one Ruby control and `raw_para_text` set to
     /// the given bytes.
     fn make_para_with_ruby(raw: Vec<u8>, ruby_text: &str) -> HwpParagraph {
         HwpParagraph {
@@ -220,8 +220,8 @@ mod tests {
     // fixup_ruby_base_text
     // -----------------------------------------------------------------------
 
-    /// Build a PARA_TEXT byte stream: `base_chars` in UTF-16LE, then one
-    /// CTRL_MARKER (0x0003) code unit, then 14 zero bytes for the parameter
+    /// Build a `PARA_TEXT` byte stream: `base_chars` in UTF-16LE, then one
+    /// `CTRL_MARKER` (0x0003) code unit, then 14 zero bytes for the parameter
     /// block.
     fn make_raw_with_base(base_chars: &str) -> Vec<u8> {
         let units: Vec<u16> = base_chars.encode_utf16().collect();

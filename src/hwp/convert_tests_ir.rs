@@ -1,4 +1,5 @@
 use super::*;
+use crate::hwp::model::{DocInfo, FileHeader, HwpControl, HwpDocument, HwpParagraph, HwpSection, ParaShape};
 
 // -----------------------------------------------------------------------
 // Helpers

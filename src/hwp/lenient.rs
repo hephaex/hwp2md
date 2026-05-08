@@ -146,7 +146,7 @@ mod tests {
     // Helpers
     // -----------------------------------------------------------------------
 
-    /// Build a 4-byte record header word (tag_id, level, size_field).
+    /// Build a 4-byte record header word (`tag_id`, `level`, `size_field`).
     fn make_header(tag_id: u16, level: u16, size: u32) -> [u8; 4] {
         let size_field = if size < 0xFFF { size } else { 0xFFF };
         let word: u32 =
@@ -154,7 +154,7 @@ mod tests {
         word.to_le_bytes()
     }
 
-    /// Build an extended-size record (size_field = 0xFFF + 4-byte actual size).
+    /// Build an extended-size record (`size_field` = 0xFFF + 4-byte actual size).
     fn make_ext_header(tag_id: u16, size: u32) -> Vec<u8> {
         let word: u32 = (tag_id as u32 & 0x3FF) | (0xFFF << 20);
         let mut v = word.to_le_bytes().to_vec();
@@ -172,7 +172,7 @@ mod tests {
         buf
     }
 
-    /// Build a minimal byte buffer with SCAN_SKIP_BYTES of padding followed by
+    /// Build a minimal byte buffer with `SCAN_SKIP_BYTES` of padding followed by
     /// the provided records.
     fn padded(records: &[u8]) -> Vec<u8> {
         let mut buf = vec![0u8; SCAN_SKIP_BYTES];

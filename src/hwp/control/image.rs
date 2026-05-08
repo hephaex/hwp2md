@@ -1,19 +1,19 @@
 use super::common::find_children_end;
-use crate::hwp::record::*;
+use crate::hwp::record::{Record, HWPTAG_GSOTYPE};
 
-/// Parse the GShapeObject CTRL_HEADER subtree starting at `ctrl_idx`.
+/// Parse the `GShapeObject` `CTRL_HEADER` subtree starting at `ctrl_idx`.
 ///
 /// Returns `(bin_data_id, width, height)`.  All values are 0 when unavailable.
 ///
-/// The CTRL_HEADER data for `gso ` layout:
-///   bytes  0- 3: ctrl_id (already validated by caller)
+/// The `CTRL_HEADER` data for `gso ` layout:
+///   bytes  0- 3: `ctrl_id` (already validated by caller)
 ///   bytes  4- 7: ctrl header properties (u32)
 ///   bytes  8-11: y offset (i32)  — ignored
 ///   bytes 12-15: x offset (i32)  — ignored
 ///   bytes 16-19: width (hwp unit, 1/7200 inch)
 ///   bytes 20-23: height (hwp unit)
 ///
-/// The BinData reference lives in a child `HWPTAG_GSOTYPE` record.
+/// The `BinData` reference lives in a child `HWPTAG_GSOTYPE` record.
 pub(crate) fn parse_gshape_ctrl(records: &[Record], ctrl_idx: usize) -> (u16, u32, u32) {
     let rec = &records[ctrl_idx];
 
@@ -36,13 +36,13 @@ pub(crate) fn parse_gshape_ctrl(records: &[Record], ctrl_idx: usize) -> (u16, u3
 }
 
 /// Scan `records[start..end]` for a `HWPTAG_GSOTYPE` record and extract the
-/// BinData ID.  The ID is a `u16` embedded at a known offset in the record data.
+/// `BinData` ID.  The ID is a `u16` embedded at a known offset in the record data.
 ///
-/// HWP 5.0 GSOTYPE (picture kind = 0) body layout relevant fields:
-///   bytes  0- 3: GSOType kind (u32) — 0 = picture, 1 = OLE, ...
-/// For kind 0 (picture), the BinData index follows at the end of a fixed-size
+/// HWP 5.0 `GSOTYPE` (picture kind = 0) body layout relevant fields:
+///   bytes  0- 3: `GSOType` kind (u32) — 0 = picture, 1 = OLE, ...
+/// For kind 0 (picture), the `BinData` index follows at the end of a fixed-size
 /// header.  In practice the ID is stored at offset 2 inside a nested
-/// `HWPTAG_BEGIN + 68` (GSOPicture) record.  We fall back to scanning for
+/// `HWPTAG_BEGIN` + 68 (`GSOPicture`) record.  We fall back to scanning for
 /// a plausible non-zero u16 at known candidate offsets.
 pub(crate) fn find_gsotype_bin_id(records: &[Record], start: usize, end: usize) -> u16 {
     for rec in records.iter().skip(start).take(end.saturating_sub(start)) {

@@ -108,7 +108,7 @@ fn mime_from_extension_unknown_falls_back() {
 
 /// When two images on disk share the same bare filename the second one must
 /// be assigned a deduplicated entry name with a `_2` suffix (not silently
-/// share the first image's BinData entry).
+/// share the first image's `BinData` entry).
 #[test]
 fn collect_image_assets_filename_collision_dedup_counter_suffix() {
     let dir = tempfile::tempdir().expect("tmp dir");
@@ -201,7 +201,7 @@ fn collect_image_assets_filename_collision_dedup_counter_suffix() {
     assert_eq!(bytes2, JPEG_MAGIC, "second asset bytes must match path2");
 }
 
-/// Three-way collision: photo.png / photo_2.png already taken → third gets photo_3.png.
+/// Three-way collision: photo.png / `photo_2.png` already taken → third gets `photo_3.png`.
 #[test]
 fn collect_image_assets_three_way_collision_increments_counter() {
     let dir = tempfile::tempdir().expect("tmp dir");

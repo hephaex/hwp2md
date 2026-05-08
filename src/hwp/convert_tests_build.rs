@@ -1,4 +1,5 @@
 use super::*;
+use crate::hwp::model::{CharShape, DocInfo, HwpParagraph};
 
 // -----------------------------------------------------------------------
 // Helpers

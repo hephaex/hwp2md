@@ -1,7 +1,7 @@
-/// HWPX validation tests using polaris_dvc as a dev-dependency.
+/// HWPX validation tests using `polaris_dvc` as a dev-dependency.
 ///
 /// These tests verify that hwp2md's HWPX writer produces output that passes
-/// polaris_dvc's container and structural integrity checks (JID 11000-12999).
+/// `polaris_dvc`'s container and structural integrity checks (JID 11000-12999).
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 
@@ -264,7 +264,7 @@ fn markdown_to_hwpx_roundtrip_passes_validation() {
 
 /// Verify that an empty document produces no OWPML schema violations.
 ///
-/// Schema violations use error codes in the 13000-13999 range (polaris_dvc
+/// Schema violations use error codes in the 13000-13999 range (`polaris_dvc`
 /// convention).  This test is marked `#[ignore]` if schema checks reveal
 /// violations that require additional writer work beyond Phase 6 scope.
 /// Remove the `#[ignore]` attribute once all schema violations are resolved.

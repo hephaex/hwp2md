@@ -12,7 +12,7 @@ use super::ImageAssetMap;
 /// A resolved image asset ready to be written into the HWPX ZIP.
 #[derive(Debug)]
 pub(super) struct ResolvedAsset {
-    /// The bare filename used as the BinData entry (e.g. `"photo.png"`).
+    /// The bare filename used as the `BinData` entry (e.g. `"photo.png"`).
     pub(super) entry_name: String,
     /// Raw bytes of the image.
     pub(super) data: Vec<u8>,

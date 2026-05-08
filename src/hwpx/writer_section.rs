@@ -550,7 +550,7 @@ fn write_sec_pr<W: Write>(
 /// is set and the text is empty, a `<hp:noteRef>` element is emitted instead.
 ///
 /// Returns immediately without emitting anything when the inline has no
-/// meaningful content (empty text, no ruby, no footnote_ref).
+/// meaningful content (empty text, no ruby, no `footnote_ref`).
 fn write_inline_run<W: Write>(
     writer: &mut Writer<W>,
     inline: &ir::Inline,

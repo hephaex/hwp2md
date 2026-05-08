@@ -372,10 +372,10 @@ fn header_xml_font_name_registered_in_fontface() {
 
 // ── default font / edge case roundtrip ──────────────────────────────────
 
-/// An inline with NO font_name set (default "batang" at index 0) must
-/// roundtrip with font_name remaining None.  The writer does not emit
-/// faceNameIDRef for the default font, and the reader leaves font_name
-/// as None when no faceNameIDRef attribute is present.
+/// An inline with NO `font_name` set (default "batang" at index 0) must
+/// roundtrip with `font_name` remaining None.  The writer does not emit
+/// `faceNameIDRef` for the default font, and the reader leaves `font_name`
+/// as None when no `faceNameIDRef` attribute is present.
 #[test]
 fn roundtrip_default_font_no_font_name_preserved() {
     let input = Inline {
@@ -398,12 +398,12 @@ fn roundtrip_default_font_no_font_name_preserved() {
     );
 }
 
-/// When an inline carries a font_name that is NOT registered in the fontface
-/// table, write_inline_charpr silently omits the faceNameIDRef attribute.
-/// On read-back the font_name will therefore be None.
+/// When an inline carries a `font_name` that is NOT registered in the fontface
+/// table, `write_inline_charpr` silently omits the `faceNameIDRef` attribute.
+/// On read-back the `font_name` will therefore be None.
 ///
 /// This scenario cannot happen through normal document construction (since
-/// RefTables::build calls collect_from_inlines which registers every font),
+/// `RefTables::build` calls `collect_from_inlines` which registers every font),
 /// but the test documents the expected graceful degradation if it somehow did.
 #[test]
 fn roundtrip_unknown_font_name_not_in_table() {

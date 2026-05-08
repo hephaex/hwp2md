@@ -1,5 +1,5 @@
 use crate::hwp::eqedit::eqedit_to_latex;
-use crate::hwp::model::*;
+use crate::hwp::model::{DocInfo, HwpControl, HwpDocument, HwpParagraph, HwpTableCell};
 use crate::ir;
 use crate::url_util::is_safe_url_scheme;
 
@@ -24,7 +24,7 @@ pub(crate) enum ListKind {
 ///
 /// # Detection strategy (two-tier)
 ///
-/// **Tier 1 — binary numbering_id** (preferred):
+/// **Tier 1 — binary `numbering_id`** (preferred):
 /// When the paragraph's `ParaShape` record carries a non-zero `numbering_id`
 /// the paragraph is formally defined as a list item by the HWP document model.
 /// We inspect the paragraph text to heuristically decide whether it is ordered

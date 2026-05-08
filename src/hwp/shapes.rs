@@ -1,4 +1,4 @@
-use crate::hwp::model::*;
+use crate::hwp::model::{Alignment, BinDataEntry, CharShape, ParaShape};
 use crate::hwp::record::read_utf16le_str;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::Cursor;

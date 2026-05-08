@@ -1,4 +1,5 @@
 use super::*;
+use crate::hwp::model::{DocInfo, HwpControl, HwpParagraph, HwpTableCell};
 
 // -----------------------------------------------------------------------
 // control_to_block (IR conversion)

@@ -5,10 +5,10 @@
 /// The reader must recognise these attributes and fold consecutive list-paragraph
 /// sentinels into proper `Block::List { items }` structures.
 ///
-/// Attribute conventions (matching writer_header.rs constants):
-/// - `paraPrIDRef="2"` (PARA_PR_LIST_D0) → depth-0 list item
-/// - `paraPrIDRef="3"` (PARA_PR_LIST_D1) → depth-1 nested list item
-/// - `numPrIDRef="1"`  (NUM_PR_DIGIT)    → ordered list (absent = unordered)
+/// Attribute conventions (matching `writer_header.rs` constants):
+/// - `paraPrIDRef="2"` (`PARA_PR_LIST_D0`) → depth-0 list item
+/// - `paraPrIDRef="3"` (`PARA_PR_LIST_D1`) → depth-1 nested list item
+/// - `numPrIDRef="1"`  (`NUM_PR_DIGIT`)    → ordered list (absent = unordered)
 use super::*;
 
 // ── helpers ─────────────────────────────────────────────────────────────────

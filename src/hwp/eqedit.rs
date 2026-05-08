@@ -2,7 +2,7 @@
 ///
 /// HWP stores equations in a proprietary keyword-based scripting language
 /// called EQEDIT.  This module converts the most common EQEDIT patterns to
-/// valid LaTeX so that downstream renderers (MathJax, KaTeX, pandoc) can
+/// valid LaTeX so that downstream renderers (`MathJax`, `KaTeX`, pandoc) can
 /// display them correctly.
 ///
 /// # Supported Patterns
@@ -34,11 +34,11 @@ fn convert_with_depth(script: &str, depth: usize) -> String {
     }
 
     let tokens = tokenise(script);
-    let tokens = transform_over(tokens, depth);
-    let tokens = transform_root(tokens, depth);
-    let tokens = transform_matrix(tokens, depth);
+    let tokens = transform_over(&tokens, depth);
+    let tokens = transform_root(&tokens, depth);
+    let tokens = transform_matrix(&tokens, depth);
     let tokens = expand_keywords(tokens, depth);
-    let tokens = expand_left_right(tokens, depth);
+    let tokens = expand_left_right(&tokens, depth);
     reassemble(&tokens)
 }
 
@@ -161,11 +161,11 @@ fn consume_brace_group(chars: &[char], start: usize) -> (String, usize) {
 // Step 2 – Transform `over`
 // ---------------------------------------------------------------------------
 
-fn transform_over(tokens: Vec<Token>, depth: usize) -> Vec<Token> {
+fn transform_over(tokens: &[Token], depth: usize) -> Vec<Token> {
     let mut out: Vec<Token> = Vec::with_capacity(tokens.len());
     let mut i = 0;
     while i < tokens.len() {
-        if let Some(m) = try_match_over(&tokens, i, depth) {
+        if let Some(m) = try_match_over(tokens, i, depth) {
             out.push(Token::Word(m.latex));
             i = m.next_idx;
         } else {
@@ -215,11 +215,11 @@ fn try_match_over(tokens: &[Token], i: usize, depth: usize) -> Option<OverMatch>
 // Step 2b – Transform `root`
 // ---------------------------------------------------------------------------
 
-fn transform_root(tokens: Vec<Token>, depth: usize) -> Vec<Token> {
+fn transform_root(tokens: &[Token], depth: usize) -> Vec<Token> {
     let mut out: Vec<Token> = Vec::with_capacity(tokens.len());
     let mut i = 0;
     while i < tokens.len() {
-        if let Some(m) = try_match_root(&tokens, i, depth) {
+        if let Some(m) = try_match_root(tokens, i, depth) {
             out.push(Token::Word(m.latex));
             i = m.next_idx;
         } else {
@@ -267,11 +267,11 @@ fn try_match_root(tokens: &[Token], i: usize, depth: usize) -> Option<RootMatch>
 // Step 2c – Transform `matrix` / `pile`
 // ---------------------------------------------------------------------------
 
-fn transform_matrix(tokens: Vec<Token>, depth: usize) -> Vec<Token> {
+fn transform_matrix(tokens: &[Token], depth: usize) -> Vec<Token> {
     let mut out: Vec<Token> = Vec::with_capacity(tokens.len());
     let mut i = 0;
     while i < tokens.len() {
-        if let Some(m) = try_match_matrix(&tokens, i, depth) {
+        if let Some(m) = try_match_matrix(tokens, i, depth) {
             out.push(Token::Word(m.latex));
             i = m.next_idx;
         } else {
@@ -455,7 +455,7 @@ fn map_keyword(word: &str) -> String {
 /// - `left(` → `Word("left")` + `Word("(")`  → `\left(`
 /// - `left[` → `Word("left")` + `Word("[")`  → `\left[`
 /// - `left{ … }` → `Word("left")` + `Group("{…}")` → `\left\{…\right\}`
-fn expand_left_right(tokens: Vec<Token>, depth: usize) -> Vec<Token> {
+fn expand_left_right(tokens: &[Token], depth: usize) -> Vec<Token> {
     let mut out: Vec<Token> = Vec::with_capacity(tokens.len());
     let mut i = 0;
 
