@@ -117,8 +117,7 @@ fn collect_image_assets_data_uri_decodes_base64() {
         std::path::Path::new(entry_name)
             .extension()
             .and_then(|ext| ext.to_str())
-            .map(|ext| ext.eq_ignore_ascii_case("png"))
-            .unwrap_or(false),
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("png")),
         "data URI entry must have .png extension: {entry_name}"
     );
 
@@ -311,8 +310,7 @@ fn write_hwpx_data_uri_image_creates_bindata_entry() {
                 && std::path::Path::new(e)
                     .extension()
                     .and_then(|ext| ext.to_str())
-                    .map(|ext| ext.eq_ignore_ascii_case("png"))
-                    .unwrap_or(false)
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("png"))
         });
     assert!(
         has_bindata,

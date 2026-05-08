@@ -236,13 +236,12 @@ fn run_batch(
             continue;
         }
 
-        let stem = match path.file_stem().and_then(|s| s.to_str()) {
-            Some(s) => s.to_owned(),
-            None => {
-                tracing::warn!("Skipping file with non-UTF-8 stem: {:?}", path);
-                failed += 1;
-                continue;
-            }
+        let stem = if let Some(s) = path.file_stem().and_then(|s| s.to_str()) {
+            s.to_owned()
+        } else {
+            tracing::warn!("Skipping file with non-UTF-8 stem: {:?}", path);
+            failed += 1;
+            continue;
         };
 
         let out_path = out_dir.join(format!("{stem}.md"));

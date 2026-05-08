@@ -24,6 +24,11 @@ pub(crate) use shapes::{parse_bin_data_entry, parse_char_shape, parse_para_shape
 /// a lenient raw-scan fallback is attempted automatically.  The fallback
 /// document carries `metadata.title = Some("(recovered)")` to signal partial
 /// content.
+///
+/// # Errors
+///
+/// Returns [`Hwp2MdError::DrmProtected`] for DRM-locked files.
+/// Other I/O or parse failures are returned as [`Hwp2MdError`] variants.
 pub fn read_hwp(path: &Path) -> Result<ir::Document, Hwp2MdError> {
     match parse_hwp_file(path) {
         Ok(hwp_doc) => Ok(hwp_to_ir(&hwp_doc)),
@@ -360,7 +365,7 @@ pub(crate) fn extract_paragraph_text(data: &[u8]) -> String {
 
         match ch {
             0x0000 | 0x000D | 0x000E..=0x001F => {}
-            0x0001..=0x0002 | 0x0003..=0x0008 | 0x000B..=0x000C => {
+            0x0001..=0x0008 | 0x000B..=0x000C => {
                 if i + 14 > len {
                     break;
                 }

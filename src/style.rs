@@ -86,6 +86,11 @@ pub struct HeadingStyle {
 
 impl StyleTemplate {
     /// Load a style template from a YAML file.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Hwp2MdError::StyleLoad`] if the file cannot be read or
+    /// contains invalid YAML / out-of-range values.
     pub fn from_file(path: &Path) -> Result<Self, Hwp2MdError> {
         let content = std::fs::read_to_string(path).map_err(|e| {
             Hwp2MdError::StyleLoad(format!("failed to read style file {}: {e}", path.display()))
@@ -94,6 +99,11 @@ impl StyleTemplate {
     }
 
     /// Parse a style template from a YAML string.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Hwp2MdError::StyleLoad`] if the YAML is malformed or
+    /// values fail validation.
     pub fn from_yaml(yaml: &str) -> Result<Self, Hwp2MdError> {
         let t: Self = serde_yml::from_str(yaml)
             .map_err(|e| Hwp2MdError::StyleLoad(format!("invalid style YAML: {e}")))?;

@@ -51,8 +51,7 @@ fn list_item_texts(block: &ir::Block) -> Vec<String> {
                         }
                         _ => None,
                     })
-                    .collect::<Vec<_>>()
-                    .join("")
+                    .collect::<String>()
             })
             .collect(),
         other => panic!("expected Block::List, got {other:?}"),
@@ -172,8 +171,7 @@ fn nested_list_two_levels_produces_children() {
                             }
                             _ => None,
                         })
-                        .collect::<Vec<_>>()
-                        .join("")
+                        .collect::<String>()
                 })
                 .collect();
             assert_eq!(child_texts, ["child-a1", "child-a2"]);
@@ -315,7 +313,7 @@ fn heading_with_para_pr_id_is_not_a_list_item() {
 fn orphan_depth1_item_promoted_to_top_level() {
     // A depth-1 item with no preceding depth-0 item must be promoted
     // defensively to avoid a panic.
-    let xml = format!("<root>{}</root>", list_para("3", None, "orphan-child"),);
+    let xml = format!("<root>{}</root>", list_para("3", None, "orphan-child"));
     let s = section(&xml);
     assert_eq!(
         s.blocks.len(),

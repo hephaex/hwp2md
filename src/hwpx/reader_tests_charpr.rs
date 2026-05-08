@@ -35,7 +35,7 @@ fn apply_attrs_via_xml(tag: &str, attrs: &[(&str, &str)]) -> super::context::Par
     let start_bytes = xml_bytes
         .iter()
         .take_while(|&&b| b != b'>')
-        .cloned()
+        .copied()
         .collect::<Vec<_>>();
     let e = BytesStart::from_content(
         std::str::from_utf8(&start_bytes[1..]).unwrap(), // strip leading '<'

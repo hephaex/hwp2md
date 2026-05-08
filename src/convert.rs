@@ -178,6 +178,13 @@ pub fn show_info(input: &Path) -> Result<(), Hwp2MdError> {
 /// When `force` is `false` and `output` already exists the function
 /// returns [`Hwp2MdError::OutputExists`] instead of silently overwriting.
 /// Pass `true` to permit overwriting.
+///
+/// # Errors
+///
+/// Returns [`Hwp2MdError::OutputExists`] when `force` is `false` and
+/// `output` already exists.  Returns [`Hwp2MdError::UnsupportedFormat`]
+/// for unrecognised extension pairs.  I/O and parse errors from the
+/// underlying readers are propagated as-is.
 pub fn convert_auto(input: &Path, output: &Path, force: bool) -> Result<(), Hwp2MdError> {
     if !force && output.exists() {
         return Err(Hwp2MdError::OutputExists {
@@ -235,6 +242,11 @@ fn classify_format(ext: &str) -> FormatKind {
 /// with details if the file cannot be read or is structurally invalid.
 ///
 /// Supported extensions: `.hwp`, `.hwpx`, `.md`, `.markdown`.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read, the extension is
+/// unrecognised, or the content fails structural validation.
 pub fn check(input: &Path) -> Result<(), Hwp2MdError> {
     let ext = input
         .extension()

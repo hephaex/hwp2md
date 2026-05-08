@@ -17,6 +17,12 @@ mod handlers;
 pub(crate) use handlers::parse_heading_style;
 use handlers::{handle_empty_element, handle_end_element, handle_start_element, handle_text};
 
+/// Read an HWPX (OWPML ZIP+XML) file and return an IR [`ir::Document`].
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be opened, the ZIP archive is
+/// invalid, or required XML entries are missing or malformed.
 pub fn read_hwpx(path: &Path) -> Result<ir::Document, Hwp2MdError> {
     let file = std::fs::File::open(path)?;
     let mut archive =

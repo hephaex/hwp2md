@@ -71,6 +71,8 @@ pub(crate) struct ParseContext {
     /// `numPrIDRef` value read from the current `<hp:p>` open tag.
     pub(crate) current_num_pr_id: Option<String>,
     /// When `Some`, the next paragraph flushed should be a `CodeBlock`.
+    /// Inner `Option<String>` distinguishes between code blocks with/without language.
+    #[allow(clippy::option_option)]
     pub(crate) pending_code_lang: Option<Option<String>>,
 
     // ── Page layout ────────────────────────────────────────────────

@@ -325,6 +325,12 @@ fn collect_from_inlines(
 // Public entry point
 // ---------------------------------------------------------------------------
 
+/// Write an IR document to an HWPX (OWPML ZIP) file.
+///
+/// # Errors
+///
+/// Returns an error if the output file cannot be created, ZIP writing
+/// fails, or the optional style template is invalid.
 pub fn write_hwpx(
     doc: &ir::Document,
     output: &Path,
