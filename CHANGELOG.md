@@ -109,6 +109,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 31**: `#[allow]` annotations in 11 test files/modules — `cargo clippy --all-targets
+  -- -W clippy::pedantic` reaches 0 warnings (production + test code). `cast_possible_truncation`
+  suppressed in 7 `#[cfg(test)] mod tests` blocks; `too_many_lines` suppressed in 4 test functions.
 - **Sprint 30**: `#[allow]` annotation sweep — `cargo clippy --lib -- -W clippy::pedantic`
   reaches 0 warnings. Annotated: cast_possible_truncation (24), struct_excessive_bools (8),
   too_many_lines (8), unnecessary_wraps (3), many_single_char_names (1), fn_params/too_many_arguments (2).

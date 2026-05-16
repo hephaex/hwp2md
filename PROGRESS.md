@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 30 완료 (pedantic clippy 0 warnings in production lib)
+## 현재 상태: v0.5.0 Sprint 31 완료 (pedantic clippy 0 warnings across all targets)
 
 ### 완료
 
@@ -259,6 +259,23 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-17 — v0.5.0 Sprint 31: Pedantic Clippy Zero Warnings (All Targets)
+
+**S31: `#[allow]` annotations for test code (11 files)**:
+- `#[cfg(test)] #[allow(clippy::cast_possible_truncation)] mod tests` added to 7 production files:
+  - `hwp/control/{dispatcher,hyperlink,ruby}.rs` — usize→u16 in test data builders
+  - `hwp/crypto.rs` — usize→u8 in test key/data helpers
+  - `hwp/lenient.rs` — 8 × usize→u32 in synthetic HWP record constructors
+  - `hwp/record.rs` — usize→u16 in record builders
+  - `hwp/summary.rs` — 4 × usize→u32 in OLE2 byte-buffer helpers
+- `#[allow(clippy::too_many_lines)]` on 4 test functions:
+  - `writer_tests_golden.rs`: `golden_comprehensive_document_structure` (274L)
+  - `reader_tests_list.rs`: `roundtrip_nested_list_md_to_hwpx_to_md` (107L)
+  - `tests/hwpx_roundtrip_full2.rs`: `full_roundtrip_combined_all_block_types_text_preserved` (140L)
+  - `writer_tests_image_util.rs`: `collect_image_assets_three_way_collision_increments_counter` (cast)
+
+**검증**: `cargo clippy --all-targets -- -W clippy::pedantic` **0 warnings** (전체 마일스톤), 1219 테스트 (0 failures)
 
 ### 2026-05-16 — v0.5.0 Sprint 30: Pedantic Clippy Zero Warnings
 
