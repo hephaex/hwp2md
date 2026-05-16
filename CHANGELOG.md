@@ -109,6 +109,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 30**: `#[allow]` annotation sweep — `cargo clippy --lib -- -W clippy::pedantic`
+  reaches 0 warnings. Annotated: cast_possible_truncation (24), struct_excessive_bools (8),
+  too_many_lines (8), unnecessary_wraps (3), many_single_char_names (1), fn_params/too_many_arguments (2).
+  `u16::try_from` pattern used in `read_bin_data` and `parse_char_shape_refs` instead of
+  function-level suppression.
 - **Sprint 29 / S29-01**: 6 miscellaneous pedantic fixes — `let...else`,
   collapsed `else if`, `find_map`, removed redundant `.to_owned()`,
   `String::new()`, `&mut` loop.

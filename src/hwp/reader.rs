@@ -401,7 +401,6 @@ pub(crate) fn extract_paragraph_text(data: &[u8]) -> String {
     result
 }
 
-#[allow(clippy::cast_possible_truncation)]
 pub(crate) fn parse_char_shape_refs(data: &[u8]) -> Vec<(u32, u16)> {
     let mut refs = Vec::new();
     let mut i = 0;
@@ -418,7 +417,8 @@ pub(crate) fn parse_char_shape_refs(data: &[u8]) -> Vec<(u32, u16)> {
         while i + 8 <= data.len() {
             let pos = u32::from_le_bytes([data[i], data[i + 1], data[i + 2], data[i + 3]]);
             let id = u32::from_le_bytes([data[i + 4], data[i + 5], data[i + 6], data[i + 7]]);
-            refs.push((pos, id as u16));
+            // HWP char-shape IDs are always < 65536; malformed files get u16::MAX.
+            refs.push((pos, u16::try_from(id).unwrap_or(u16::MAX)));
             i += 8;
         }
     }
@@ -456,7 +456,8 @@ fn read_bin_data(
             let id = if entry.id > 0 {
                 entry.id
             } else {
-                (idx + 1) as u16
+                // bin_data_entries len is bounded by u16::MAX in the HWP format.
+                u16::try_from(idx + 1).unwrap_or(u16::MAX)
             };
             let path = format!("BinData/BIN{id:04X}");
             if let Ok(stream) = cfb.open_stream(&path) {

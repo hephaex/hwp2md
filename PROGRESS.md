@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 29 완료 (infallible From casts + small pedantic fixes)
+## 현재 상태: v0.5.0 Sprint 30 완료 (pedantic clippy 0 warnings in production lib)
 
 ### 완료
 
@@ -259,6 +259,75 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-16 — v0.5.0 Sprint 30: Pedantic Clippy Zero Warnings
+
+**S30-01/02: `#[allow]` annotation sweep across 16 files**:
+- `cast_possible_truncation` / `cast_sign_loss`: shapes.rs, reader.rs (×2), writer_header.rs, writer_content.rs (base64), parser.rs
+- `struct_excessive_bools`: model.rs (FileHeader, CharShape), context/state.rs, context/mod.rs, hwpx/writer.rs, ir.rs, md/parser.rs
+- `fn_params_excessive_bools` + `too_many_arguments`: ir.rs (Inline::with_formatting)
+- `too_many_lines`: convert.rs, eqedit.rs, handlers.rs (×3), writer_section.rs, parser.rs (×2)
+- `unnecessary_wraps`: crypto.rs (decrypt_viewtext), hwpx/reader.rs (parse_metadata, parse_section_xml_with_face_names)
+- `many_single_char_names`: writer_content.rs (base64 a/b/c/d)
+
+**리뷰 수정 (HIGH)**:
+- `parse_char_shape_refs`: `id as u16` → `u16::try_from(id).unwrap_or(u16::MAX)`, 함수 레벨 `#[allow]` 제거
+- `read_bin_data`: `(idx + 1) as u16` → `u16::try_from(idx + 1).unwrap_or(u16::MAX)`
+
+**검증**: `cargo clippy --lib -- -W clippy::pedantic` 0 warnings, `--all-targets` 24 warnings (test code only), 1219 테스트 (0 failures)
+
+### 2026-05-09 — v0.5.0 Sprint 29: Infallible From Casts + Small Pedantic Fixes
+
+**S29-01: 6 small pedantic fixes**:
+- `ruby.rs`: `iter_mut()` → `&mut`, redundant `.to_owned()` 제거
+- `convert.rs`: `match` → `let...else` (early-return pattern)
+- `handlers.rs`: `else { if let }` → `else if let` (collapsed)
+- `roundtrip tests`: `.filter_map().next()` → `.find_map()`
+- `ir.rs`: `"".to_string()` → `String::new()`
+
+**S29-02: 38 infallible `as` casts → `From::from()`**:
+- `dispatcher.rs`, `table.rs`: `b'H' as u16` 등 byte literal casts (6건)
+- `convert.rs`: `col_span as u32`, `row_span as u32` → `u32::from()`
+- `lenient.rs`: `tag_id as u32`, `level as u32` → `u32::from()`
+- `reader.rs`: `ch as u32`, `low as u32` (UTF-16 surrogate pair) → `u32::from()`
+- `record.rs`: tag/level/HWPTAG casts → `u32::from()`
+- `reader_tests.rs`, `writer_tests_image*.rs`: 테스트 내 casts (14건)
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures)
+
+### 2026-05-09 — v0.5.0 Sprint 28: Doc Backticks + Wildcard Imports + Pass-By-Value
+
+**S28-01: 73 `doc_markdown` backtick warnings**:
+- 22개 파일에서 doc 주석 내 CamelCase/SCREAMING_SNAKE_CASE 식별자에 backtick 추가
+- `CTRL_HYPERLINK`, `GShapeObject`, `PARA_TEXT`, `DocInfo`, `MathJax`, `KaTeX` 등
+
+**S28-02: 11 wildcard imports → explicit**:
+- `hwp/control/{common,hyperlink,image,dispatcher,table}.rs`: `use crate::hwp::record::*` → 명시적
+- `hwp/convert.rs`, `shapes.rs`, `reader.rs`: `use crate::hwp::model::*` → 명시적
+- test 파일 4건: `super::*`에 의존하던 model imports 직접 추가
+
+**S28-03: 7 `needless_pass_by_value` fixes**:
+- `eqedit.rs`: 4 functions `Vec<Token>` → `&[Token]`
+- `parser.rs`: `InlineStyle` → `&InlineStyle`
+- `record.rs`: `ctrl_id` `#[allow(clippy::trivially_copy_pass_by_ref)]`
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures)
+
+### 2026-05-09 — v0.5.0 Sprint 27: #Errors Docs + If-Let + Range Merge
+
+**S27-01: control flow + items-before-statements**:
+- `main.rs`, `context/mod.rs`: `match` → `if let`
+- `#[allow(clippy::option_option)]` for intentional `Option<Option<T>>`
+- test 파일 재정렬, redundant assertions 제거
+
+**S27-02: `# Errors` doc sections (7 functions)**:
+- `convert_auto`, `check`, `read_hwp`, `read_hwpx`, `write_hwpx`
+- `StyleTemplate::from_file`, `StyleTemplate::from_yaml`
+
+**S27-03: contiguous byte-tag range merge**:
+- `hwp/reader.rs`: `0x0001..=0x0002 | 0x0003..=0x0008` → `0x0001..=0x0008`
+
+**검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1219 테스트 (0 failures)
 
 ### 2026-05-08 — v0.5.0 Sprint 26: Match Arms + Control Flow + Ext Comparison
 
