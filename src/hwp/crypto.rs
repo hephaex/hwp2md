@@ -144,6 +144,7 @@ pub(crate) fn decrypt_viewtext(data: &[u8], key: &[u8; 16]) -> Result<Vec<u8>, H
 }
 
 #[cfg(test)]
+#[allow(clippy::cast_possible_truncation)]
 mod tests {
     use super::*;
 

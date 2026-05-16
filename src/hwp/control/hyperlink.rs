@@ -18,6 +18,7 @@ pub(crate) fn parse_hyperlink_url(rec: &Record) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::cast_possible_truncation)]
 mod tests {
     use super::*;
     use crate::hwp::record::{CTRL_HYPERLINK, HWPTAG_CTRL_HEADER};

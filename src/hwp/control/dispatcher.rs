@@ -172,6 +172,7 @@ pub(crate) fn parse_ctrl_header_at(records: &[Record], ctrl_idx: usize) -> Optio
 }
 
 #[cfg(test)]
+#[allow(clippy::cast_possible_truncation)]
 mod tests {
     use super::*;
     use crate::hwp::reader::encode_u16s_test;

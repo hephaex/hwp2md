@@ -136,6 +136,7 @@ pub fn read_utf16le_str(data: &[u8], offset: usize) -> (String, usize) {
 }
 
 #[cfg(test)]
+#[allow(clippy::cast_possible_truncation)]
 mod tests {
     use super::*;
     use std::io::Cursor;

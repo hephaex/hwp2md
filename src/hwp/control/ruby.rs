@@ -118,6 +118,7 @@ pub(crate) fn parse_ruby_ctrl(rec: &Record) -> Option<String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::cast_possible_truncation)]
 mod tests {
     use super::*;
     use crate::hwp::record::{CTRL_RUBY, HWPTAG_CTRL_HEADER};

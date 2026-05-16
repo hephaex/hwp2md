@@ -402,6 +402,7 @@ fn full_roundtrip_metadata_document_body_survives_with_metadata_set() {
 
 /// The grand combined test: a document containing every block type must
 /// survive the full MD→HWPX→IR→MD pipeline with all key text present.
+#[allow(clippy::too_many_lines)]
 #[test]
 fn full_roundtrip_combined_all_block_types_text_preserved() {
     // Build via IR to have precise control over every block type.

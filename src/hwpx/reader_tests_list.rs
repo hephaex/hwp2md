@@ -391,6 +391,7 @@ fn group_list_paragraphs_consecutive_list_paras_collapsed() {
 ///
 /// This exercises both the writer's OWPML list emission and the reader's
 /// flat-paragraph grouping.
+#[allow(clippy::too_many_lines)]
 #[test]
 fn roundtrip_nested_list_md_to_hwpx_to_md() {
     use crate::hwpx::write_hwpx;

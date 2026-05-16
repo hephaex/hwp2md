@@ -8,6 +8,7 @@ use super::*;
 /// rather than relying on roundtrip fidelity.  Builds a comprehensive IR document
 /// (heading, bold paragraph, italic paragraph, table, list), writes it to HWPX,
 /// then inspects specific XML files inside the ZIP for expected patterns.
+#[allow(clippy::too_many_lines)]
 #[test]
 fn golden_comprehensive_document_structure() {
     use std::io::Read as _;

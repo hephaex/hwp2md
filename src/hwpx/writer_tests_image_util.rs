@@ -202,6 +202,7 @@ fn collect_image_assets_filename_collision_dedup_counter_suffix() {
 }
 
 /// Three-way collision: photo.png / `photo_2.png` already taken → third gets `photo_3.png`.
+#[allow(clippy::cast_possible_truncation)]
 #[test]
 fn collect_image_assets_three_way_collision_increments_counter() {
     let dir = tempfile::tempdir().expect("tmp dir");

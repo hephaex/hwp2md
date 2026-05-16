@@ -138,6 +138,7 @@ pub(crate) fn scan_records(data: &[u8]) -> Vec<(u16, Vec<u8>)> {
 }
 
 #[cfg(test)]
+#[allow(clippy::cast_possible_truncation)]
 mod tests {
     use super::*;
     use crate::hwp::record::{HWPTAG_PARA_HEADER, HWPTAG_PARA_TEXT};
