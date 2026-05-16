@@ -401,6 +401,7 @@ pub(crate) fn extract_paragraph_text(data: &[u8]) -> String {
     result
 }
 
+#[allow(clippy::cast_possible_truncation)]
 pub(crate) fn parse_char_shape_refs(data: &[u8]) -> Vec<(u32, u16)> {
     let mut refs = Vec::new();
     let mut i = 0;
@@ -425,6 +426,7 @@ pub(crate) fn parse_char_shape_refs(data: &[u8]) -> Vec<(u32, u16)> {
     refs
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn read_bin_data(
     cfb: &mut cfb::CompoundFile<std::fs::File>,
     doc_info: &DocInfo,

@@ -3,6 +3,7 @@ use crate::ir;
 // ── Sub-struct definitions ──────────────────────────────────────────────
 
 /// Character-level formatting state for the current XML run.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Default)]
 pub(crate) struct FormattingState {
     pub(crate) bold: bool,

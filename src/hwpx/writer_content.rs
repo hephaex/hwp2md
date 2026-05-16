@@ -263,6 +263,9 @@ pub(super) fn collect_images_from_blocks(
 ///
 /// No external crate is required — the `base64` crate is not in the dependency
 /// tree.  The implementation handles the standard RFC 4648 alphabet and padding.
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
+#[allow(clippy::many_single_char_names)]
 pub(super) fn base64_decode(input: &str) -> Result<Vec<u8>, Hwp2MdError> {
     const TABLE: [i8; 256] = {
         let mut t = [-1i8; 256];

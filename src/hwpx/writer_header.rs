@@ -167,6 +167,7 @@ fn write_border_fills<W: Write>(
     Ok(())
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn write_char_properties<W: Write>(
     w: &mut Writer<W>,
     tables: &RefTables,

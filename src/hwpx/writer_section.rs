@@ -116,6 +116,7 @@ pub(super) fn generate_section_xml(
 ///
 /// `asset_map` maps image `src` values to the resolved `BinData/` entry name
 /// used as `binaryItemIDRef` in the emitted `<hp:img>` element.
+#[allow(clippy::too_many_lines)]
 fn write_block<W: Write>(
     writer: &mut Writer<W>,
     block: &ir::Block,

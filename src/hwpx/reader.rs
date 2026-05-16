@@ -143,6 +143,7 @@ fn resolve_block_bin_refs(block: &mut ir::Block, bin_map: &HashMap<String, Strin
 /// Parse document metadata (title, author, subject, description) from the
 /// text of a header.xml entry.  Returns a default `Metadata` if parsing fails
 /// or the XML contains none of the recognised elements.
+#[allow(clippy::unnecessary_wraps)]
 fn parse_metadata(xml: &str) -> Result<ir::Metadata, Hwp2MdError> {
     let mut meta = ir::Metadata::default();
 
@@ -350,6 +351,7 @@ fn read_section_xml(
 /// indices on `<charPr>` elements to be resolved to human-readable font names
 /// stored on `ir::Inline::font_name`.  Pass an empty slice when no header is
 /// available (e.g. in unit tests that work with raw section XML snippets).
+#[allow(clippy::unnecessary_wraps)]
 pub(crate) fn parse_section_xml_with_face_names(
     xml: &str,
     face_names: &[String],

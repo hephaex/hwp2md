@@ -6,6 +6,7 @@ use super::context::{
     flush_paragraph_staged, ParseContext, RubyPart, StagedBlock,
 };
 
+#[allow(clippy::too_many_lines)]
 pub(super) fn handle_start_element(
     local: &str,
     e: &quick_xml::events::BytesStart,
@@ -176,6 +177,7 @@ pub(super) fn handle_start_element(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 pub(super) fn handle_end_element(
     local: &str,
     ctx: &mut ParseContext,
@@ -366,6 +368,7 @@ pub(super) fn handle_text(text: &str, ctx: &mut ParseContext) {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 pub(super) fn handle_empty_element(
     local: &str,
     e: &quick_xml::events::BytesStart,

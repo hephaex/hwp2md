@@ -332,6 +332,7 @@ fn expand_group(group: &str, depth: usize) -> String {
     format!("{{{converted}}}")
 }
 
+#[allow(clippy::too_many_lines)]
 fn map_keyword(word: &str) -> String {
     match word {
         // Greek (lowercase)

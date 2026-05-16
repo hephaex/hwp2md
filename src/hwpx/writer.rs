@@ -51,6 +51,7 @@ pub(crate) const LANG_SLOTS: [&str; 7] = [
 ///
 /// `id=0` is always the plain/default entry (all fields false, no color, no
 /// custom font).  Additional entries are assigned IDs starting at 1.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct CharPrKey {
     pub(crate) bold: bool,

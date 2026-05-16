@@ -124,7 +124,8 @@ pub(crate) fn extract_aes_key(decrypted_seed: &[u8]) -> Result<[u8; 16], Hwp2MdE
 /// malformed or truncated stream).
 ///
 /// # Errors
-/// Returns an error if `key` cannot initialise the AES cipher.
+/// Currently infallible; the `Result` wrapper is kept for API stability.
+#[allow(clippy::unnecessary_wraps)]
 pub(crate) fn decrypt_viewtext(data: &[u8], key: &[u8; 16]) -> Result<Vec<u8>, Hwp2MdError> {
     let cipher = Aes128::new(GenericArray::from_slice(key));
 

@@ -371,6 +371,7 @@ pub(crate) fn paragraph_to_blocks(para: &HwpParagraph, doc_info: &DocInfo) -> Ve
 
 /// Convert a single `HwpControl` to an `ir::Block`.  Returns `None` for
 /// controls that have no direct IR representation (e.g. page-break hints).
+#[allow(clippy::too_many_lines)]
 pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<ir::Block> {
     match ctrl {
         HwpControl::Table {

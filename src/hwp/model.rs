@@ -14,6 +14,7 @@ pub struct HwpDocument {
     pub summary_keywords: Vec<String>,
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Default)]
 pub struct FileHeader {
     pub version: HwpVersion,
@@ -97,6 +98,7 @@ pub struct DocProperties {
     pub section_count: u16,
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Default, Clone)]
 pub struct CharShape {
     pub face_id: u16,

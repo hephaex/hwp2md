@@ -26,6 +26,7 @@ use crate::ir;
 /// Fields are grouped into sub-structs by concern:
 /// [`FormattingState`], [`TableState`], [`ListState`], [`FootnoteState`],
 /// [`PageLayoutState`].
+#[allow(clippy::struct_excessive_bools)]
 pub(crate) struct ParseContext {
     // ── Paragraph / run state ──────────────────────────────────────
     pub(crate) in_paragraph: bool,

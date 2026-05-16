@@ -3,6 +3,7 @@ use comrak::nodes::{AstNode, ListType, NodeValue};
 use comrak::{parse_document, Arena, Options};
 
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn parse_markdown(input: &str) -> ir::Document {
     // Walk the AST nodes and route them into body, header, or footer
     // depending on the surrounding `<!-- header -->` / `<!-- /header -->` and
@@ -150,6 +151,8 @@ fn extract_frontmatter(input: &str) -> ir::Metadata {
     meta
 }
 
+#[allow(clippy::too_many_lines)]
+#[allow(clippy::cast_possible_truncation)]
 fn node_to_block<'a>(node: &'a AstNode<'a>) -> Option<ir::Block> {
     let data = node.data.borrow();
     match &data.value {
@@ -348,6 +351,7 @@ fn collect_inlines<'a>(node: &'a AstNode<'a>) -> Vec<ir::Inline> {
     inlines
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Default, Clone)]
 struct InlineStyle {
     bold: bool,
@@ -359,6 +363,7 @@ struct InlineStyle {
     link: Option<String>,
 }
 
+#[allow(clippy::too_many_lines)]
 fn collect_inlines_recursive<'a>(
     node: &'a AstNode<'a>,
     inlines: &mut Vec<ir::Inline>,

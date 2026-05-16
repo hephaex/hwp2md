@@ -3,6 +3,7 @@ use crate::hwp::record::read_utf16le_str;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::Cursor;
 
+#[allow(clippy::cast_sign_loss)]
 pub(crate) fn parse_char_shape(data: &[u8]) -> CharShape {
     // HWP 5.0 CharShape record layout:
     //   bytes  0-13: face_id array (7 × u16 = 14 bytes)
