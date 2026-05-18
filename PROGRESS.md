@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 31 완료 (pedantic clippy 0 warnings across all targets)
+## 현재 상태: v0.5.0 Sprint 32 완료 (try_from in tests + allow justification comments)
 
 ### 완료
 
@@ -259,6 +259,25 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-19 — v0.5.0 Sprint 32: Test Cast Hardening + Allow Justifications
+
+**S32-01: Replace module-level `#[allow]` with `try_from().unwrap()` in 8 test files**:
+- `hwp/control/{dispatcher,hyperlink,ruby}.rs` — `usize as u16` → `u16::try_from(x).unwrap()`
+- `hwp/crypto.rs` — `usize as u8` → `u8::try_from(x).unwrap()` (3 casts)
+- `hwp/lenient.rs` — 8 × `text_bytes.len() as u32` → `u32::try_from(x).unwrap()`
+- `hwp/record.rs` — `units.len() as u16` → `u16::try_from(x).unwrap()` (2 casts)
+- `hwp/summary.rs` — 4 × `x as u32` → `u32::try_from(x).unwrap()`
+- `hwpx/writer_tests_image_util.rs` — `i as u8` → `u8::try_from(i).unwrap()`
+- All 8 module/function-level `#[allow(clippy::cast_possible_truncation)]` removed
+
+**S32-02: Justification comments on all production `#[allow]` attributes (16 files)**:
+- One-line comment before each allow explaining why the lint is suppressed
+- Covers: cast_sign_loss, cast_possible_truncation, struct_excessive_bools,
+  fn_params_excessive_bools, too_many_arguments, too_many_lines, unnecessary_wraps,
+  many_single_char_names, trivially_copy_pass_by_ref
+
+**검증**: `cargo clippy --all-targets -- -W clippy::pedantic` **0 warnings**, 1082 테스트 (0 failures)
 
 ### 2026-05-17 — v0.5.0 Sprint 31: Pedantic Clippy Zero Warnings (All Targets)
 

@@ -109,6 +109,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 32**: Replace module-level `#[allow(cast_possible_truncation)]` in 8 test files/functions
+  with `try_from().unwrap()` — eliminates broad suppression, makes each cast explicit and verifiable.
+  Add one-line justification comments to all 20+ production `#[allow]` attributes across 16 files.
 - **Sprint 31**: `#[allow]` annotations in 11 test files/modules — `cargo clippy --all-targets
   -- -W clippy::pedantic` reaches 0 warnings (production + test code). `cast_possible_truncation`
   suppressed in 7 `#[cfg(test)] mod tests` blocks; `too_many_lines` suppressed in 4 test functions.
