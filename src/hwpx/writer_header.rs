@@ -167,6 +167,7 @@ fn write_border_fills<W: Write>(
     Ok(())
 }
 
+// Sequential IDs are bounded by the HWPX font/color table size limits (max 65535 entries).
 #[allow(clippy::cast_possible_truncation)]
 fn write_char_properties<W: Write>(
     w: &mut Writer<W>,

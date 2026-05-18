@@ -202,7 +202,6 @@ fn collect_image_assets_filename_collision_dedup_counter_suffix() {
 }
 
 /// Three-way collision: photo.png / `photo_2.png` already taken → third gets `photo_3.png`.
-#[allow(clippy::cast_possible_truncation)]
 #[test]
 fn collect_image_assets_three_way_collision_increments_counter() {
     let dir = tempfile::tempdir().expect("tmp dir");
@@ -221,7 +220,7 @@ fn collect_image_assets_three_way_collision_increments_counter() {
         .map(|(i, d)| {
             let p = d.join("img.png");
             // Use different byte patterns to tell assets apart.
-            std::fs::write(&p, vec![i as u8; 4]).expect("write");
+            std::fs::write(&p, vec![u8::try_from(i).unwrap(); 4]).expect("write");
             p
         })
         .collect();

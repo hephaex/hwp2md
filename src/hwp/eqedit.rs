@@ -332,6 +332,7 @@ fn expand_group(group: &str, depth: usize) -> String {
     format!("{{{converted}}}")
 }
 
+// Exhaustive match over all eqedit keyword tokens; splitting would scatter related arms.
 #[allow(clippy::too_many_lines)]
 fn map_keyword(word: &str) -> String {
     match word {

@@ -31,6 +31,7 @@ pub const CTRL_COL_BREAK: u32 = ctrl_id(b"clbk");
 pub const CTRL_HYPERLINK: u32 = ctrl_id(b"hyln");
 pub const CTRL_RUBY: u32 = ctrl_id(b"ruby");
 
+// `const fn` cannot take [u8; 4] by value because arrays aren't Copy in const context pre-1.66.
 #[allow(clippy::trivially_copy_pass_by_ref)]
 const fn ctrl_id(b: &[u8; 4]) -> u32 {
     (b[0] as u32) | ((b[1] as u32) << 8) | ((b[2] as u32) << 16) | ((b[3] as u32) << 24)

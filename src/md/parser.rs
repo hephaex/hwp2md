@@ -3,6 +3,7 @@ use comrak::nodes::{AstNode, ListType, NodeValue};
 use comrak::{parse_document, Arena, Options};
 
 #[must_use]
+// Top-level parser walks all CommonMark node kinds; splitting would lose structural coherence.
 #[allow(clippy::too_many_lines)]
 pub fn parse_markdown(input: &str) -> ir::Document {
     // Walk the AST nodes and route them into body, header, or footer
@@ -352,6 +353,7 @@ fn collect_inlines<'a>(node: &'a AstNode<'a>) -> Vec<ir::Inline> {
     inlines
 }
 
+// Bool fields track independent Markdown inline format states (bold, italic, code, strikethrough).
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Default, Clone)]
 struct InlineStyle {
