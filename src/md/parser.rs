@@ -393,18 +393,18 @@ fn collect_inlines_recursive<'a>(
                     ruby_annotation.push_str(text);
                     continue;
                 }
+                let fmt = crate::ir::InlineFormat {
+                    bold: current_style.bold,
+                    italic: current_style.italic,
+                    underline: current_style.underline,
+                    strikethrough: current_style.strikethrough,
+                    superscript: current_style.superscript,
+                    subscript: current_style.subscript,
+                    color: None,
+                };
                 inlines.push(
-                    ir::Inline::with_formatting(
-                        text.clone(),
-                        current_style.bold,
-                        current_style.italic,
-                        current_style.underline,
-                        current_style.strikethrough,
-                        current_style.superscript,
-                        current_style.subscript,
-                        None,
-                    )
-                    .with_link(current_style.link.clone()),
+                    ir::Inline::with_formatting(text.clone(), &fmt)
+                        .with_link(current_style.link.clone()),
                 );
             }
             NodeValue::SoftBreak | NodeValue::LineBreak => {

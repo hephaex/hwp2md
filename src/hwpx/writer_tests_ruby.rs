@@ -1,4 +1,5 @@
 use super::*;
+use crate::ir::InlineFormat;
 
 // ── Phase 10 tests: ruby annotation writer ──────────────────────────────
 
@@ -196,13 +197,13 @@ fn reader_ruby_with_italic_and_color_preserves_formatting() {
 fn inline_with_formatting_sets_all_fields() {
     let i = Inline::with_formatting(
         "hello".into(),
-        true,
-        false,
-        true,
-        false,
-        true,
-        false,
-        Some("#FF0000".into()),
+        &InlineFormat {
+            bold: true,
+            underline: true,
+            superscript: true,
+            color: Some("#FF0000".into()),
+            ..InlineFormat::default()
+        },
     );
     assert_eq!(i.text, "hello");
     assert!(i.bold);
@@ -222,17 +223,8 @@ fn inline_with_formatting_sets_all_fields() {
 
 #[test]
 fn inline_with_formatting_chained_with_link() {
-    let i = Inline::with_formatting(
-        "click".into(),
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        None,
-    )
-    .with_link(Some("https://example.com".into()));
+    let i = Inline::with_formatting("click".into(), &InlineFormat::default())
+        .with_link(Some("https://example.com".into()));
 
     assert_eq!(i.text, "click");
     assert_eq!(i.link.as_deref(), Some("https://example.com"));
@@ -240,8 +232,11 @@ fn inline_with_formatting_chained_with_link() {
 
 #[test]
 fn inline_with_formatting_chained_with_ruby() {
-    let i = Inline::with_formatting("base".into(), true, false, false, false, false, false, None)
-        .with_ruby(Some("annotation".into()));
+    let i = Inline::with_formatting(
+        "base".into(),
+        &InlineFormat { bold: true, ..InlineFormat::default() },
+    )
+    .with_ruby(Some("annotation".into()));
 
     assert_eq!(i.text, "base");
     assert!(i.bold);

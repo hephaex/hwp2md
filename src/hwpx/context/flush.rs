@@ -63,17 +63,8 @@ fn flush_inlines_to_blocks(
     if !text.is_empty() {
         let t = std::mem::take(text);
         inlines.push(
-            ir::Inline::with_formatting(
-                t,
-                fmt.bold,
-                fmt.italic,
-                fmt.underline,
-                fmt.strike,
-                fmt.superscript,
-                fmt.subscript,
-                fmt.color.clone(),
-            )
-            .with_font_name(fmt.font_name.clone()),
+            ir::Inline::with_formatting(t, &crate::ir::InlineFormat::from(fmt))
+                .with_font_name(fmt.font_name.clone()),
         );
     }
     if !inlines.is_empty() {
@@ -84,17 +75,8 @@ fn flush_inlines_to_blocks(
 
 /// Build an `ir::Inline` from the current formatting state.
 fn make_inline(text: String, fmt: &FormattingState) -> ir::Inline {
-    ir::Inline::with_formatting(
-        text,
-        fmt.bold,
-        fmt.italic,
-        fmt.underline,
-        fmt.strike,
-        fmt.superscript,
-        fmt.subscript,
-        fmt.color.clone(),
-    )
-    .with_font_name(fmt.font_name.clone())
+    ir::Inline::with_formatting(text, &crate::ir::InlineFormat::from(fmt))
+        .with_font_name(fmt.font_name.clone())
 }
 
 /// Flush any pending paragraph inlines to `section.blocks` (test-only).

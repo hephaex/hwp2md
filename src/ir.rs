@@ -257,6 +257,27 @@ pub enum Block {
     },
 }
 
+/// Formatting attributes for an inline text run.
+// Bool fields track independent text decoration flags; struct grouping replaces a 7-arg constructor.
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct InlineFormat {
+    /// Bold weight.
+    pub bold: bool,
+    /// Italic style.
+    pub italic: bool,
+    /// Underline decoration.
+    pub underline: bool,
+    /// Strikethrough decoration.
+    pub strikethrough: bool,
+    /// Superscript (`<sup>`).
+    pub superscript: bool,
+    /// Subscript (`<sub>`).
+    pub subscript: bool,
+    /// CSS hex color string (e.g. `"#FF0000"`) when text color is non-black.
+    pub color: Option<String>,
+}
+
 /// A run of inline text with optional formatting and annotations.
 // Bool fields represent format flags (bold, italic, underline, etc.) that are independent.
 #[allow(clippy::struct_excessive_bools)]
@@ -314,35 +335,22 @@ impl Inline {
         }
     }
 
-    /// Construct an inline with all formatting fields set explicitly.
+    /// Construct an inline with all formatting fields set from an [`InlineFormat`].
     ///
-    /// This avoids the `..Default::default()` pattern which silently drops
-    /// newly-added fields.  The `link`, `footnote_ref`, `font_name`, `code`,
-    /// and `ruby` fields are left at their defaults and can be set via chained
-    /// builder methods (`with_ruby`, etc.).
+    /// The `link`, `footnote_ref`, `font_name`, `code`, and `ruby` fields are
+    /// left at their defaults and can be set via chained builder methods
+    /// (`with_ruby`, `with_link`, etc.).
     #[must_use]
-    // Parameters mirror the Inline struct field layout: bold, italic, underline, strikethrough, superscript, subscript, color.
-    #[allow(clippy::fn_params_excessive_bools)]
-    #[allow(clippy::too_many_arguments)]
-    pub fn with_formatting(
-        text: String,
-        bold: bool,
-        italic: bool,
-        underline: bool,
-        strikethrough: bool,
-        superscript: bool,
-        subscript: bool,
-        color: Option<String>,
-    ) -> Self {
+    pub fn with_formatting(text: String, fmt: &InlineFormat) -> Self {
         Self {
             text,
-            bold,
-            italic,
-            underline,
-            strikethrough,
-            superscript,
-            subscript,
-            color,
+            bold: fmt.bold,
+            italic: fmt.italic,
+            underline: fmt.underline,
+            strikethrough: fmt.strikethrough,
+            superscript: fmt.superscript,
+            subscript: fmt.subscript,
+            color: fmt.color.clone(),
             code: false,
             link: None,
             footnote_ref: None,

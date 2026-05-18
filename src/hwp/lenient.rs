@@ -32,6 +32,10 @@ const HWPTAG_MAX_PLAUSIBLE: u16 = HWPTAG_BEGIN + 200;
 /// Large values almost certainly indicate misaligned reads.
 const LENIENT_MAX_RECORD_BYTES: usize = 4 * 1024 * 1024;
 
+/// Maximum file size allowed for lenient reading (256 MiB).
+/// Prevents decompression bombs and excessive memory allocation.
+const MAX_LENIENT_FILE_BYTES: u64 = 256 * 1024 * 1024;
+
 /// Minimum bytes before the scan start offset.  The HWP file signature and CFB
 /// header occupy the first 512 bytes; skipping them reduces false positives.
 const SCAN_SKIP_BYTES: usize = 512;
@@ -41,9 +45,26 @@ const SCAN_SKIP_BYTES: usize = 512;
 /// # Errors
 ///
 /// Returns [`Hwp2MdError::Io`] when the file cannot be read.
+/// Returns [`Hwp2MdError::FileTooLarge`] if the file exceeds [`MAX_LENIENT_FILE_BYTES`].
 /// Never returns an error for malformed/truncated content — such bytes are
 /// silently skipped and a (possibly empty) document is returned.
 pub(crate) fn try_lenient_read(path: &Path) -> Result<ir::Document, Hwp2MdError> {
+    try_lenient_read_inner(path, MAX_LENIENT_FILE_BYTES)
+}
+
+/// Inner implementation with configurable size limit (useful for testing).
+fn try_lenient_read_inner(path: &Path, limit: u64) -> Result<ir::Document, Hwp2MdError> {
+    let metadata = std::fs::metadata(path)?;
+    let file_size = metadata.len();
+
+    if file_size > limit {
+        return Err(Hwp2MdError::FileTooLarge {
+            path: path.to_path_buf(),
+            size: file_size,
+            limit,
+        });
+    }
+
     let data = std::fs::read(path)?;
     let records = scan_records(&data);
 
@@ -412,5 +433,21 @@ mod tests {
             doc.sections.is_empty(),
             "empty PARA_TEXT must not add a section"
         );
+    }
+
+    #[test]
+    fn try_lenient_read_rejects_oversized_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("big.hwp");
+        std::fs::write(&path, [0u8; 10]).unwrap();
+        let err = try_lenient_read_inner(&path, 5).unwrap_err();
+        assert!(matches!(
+            err,
+            Hwp2MdError::FileTooLarge {
+                size: 10,
+                limit: 5,
+                ..
+            }
+        ));
     }
 }

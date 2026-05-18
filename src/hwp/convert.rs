@@ -580,16 +580,16 @@ pub(crate) fn build_inlines(para: &HwpParagraph, doc_info: &DocInfo) -> Vec<ir::
             // Resolve font name via face_id lookup in the DocInfo face_names table.
             let font_name = doc_info.face_names.get(cs.face_id as usize).cloned();
 
-            let mut inline = ir::Inline::with_formatting(
-                segment,
-                cs.bold,
-                cs.italic,
-                cs.underline,
-                cs.strikethrough,
-                cs.superscript,
-                cs.subscript,
+            let fmt = crate::ir::InlineFormat {
+                bold: cs.bold,
+                italic: cs.italic,
+                underline: cs.underline,
+                strikethrough: cs.strikethrough,
+                superscript: cs.superscript,
+                subscript: cs.subscript,
                 color,
-            );
+            };
+            let mut inline = ir::Inline::with_formatting(segment, &fmt);
             inline.font_name = font_name;
             inline
         } else {

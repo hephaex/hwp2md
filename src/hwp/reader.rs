@@ -417,8 +417,12 @@ pub(crate) fn parse_char_shape_refs(data: &[u8]) -> Vec<(u32, u16)> {
         while i + 8 <= data.len() {
             let pos = u32::from_le_bytes([data[i], data[i + 1], data[i + 2], data[i + 3]]);
             let id = u32::from_le_bytes([data[i + 4], data[i + 5], data[i + 6], data[i + 7]]);
-            // HWP char-shape IDs are always < 65536; malformed files get u16::MAX.
-            refs.push((pos, u16::try_from(id).unwrap_or(u16::MAX)));
+            // IDs > 65535 are from malformed files; entries are skipped with a warning.
+            if let Ok(id_u16) = u16::try_from(id) {
+                refs.push((pos, id_u16));
+            } else {
+                tracing::warn!("HWP char-shape ID {id} exceeds u16 range; skipping entry");
+            }
             i += 8;
         }
     }
@@ -458,7 +462,12 @@ fn read_bin_data(
                 entry.id
             } else {
                 // bin_data_entries len is bounded by u16::MAX in the HWP format.
-                u16::try_from(idx + 1).unwrap_or(u16::MAX)
+                if let Ok(id) = u16::try_from(idx + 1) {
+                    id
+                } else {
+                    tracing::warn!("BinData entry index {idx} exceeds u16 range; skipping");
+                    continue;
+                }
             };
             let path = format!("BinData/BIN{id:04X}");
             if let Ok(stream) = cfb.open_stream(&path) {

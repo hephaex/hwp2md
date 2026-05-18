@@ -30,6 +30,20 @@ impl FormattingState {
     }
 }
 
+impl From<&FormattingState> for crate::ir::InlineFormat {
+    fn from(s: &FormattingState) -> Self {
+        Self {
+            bold: s.bold,
+            italic: s.italic,
+            underline: s.underline,
+            strikethrough: s.strike,
+            superscript: s.superscript,
+            subscript: s.subscript,
+            color: s.color.clone(),
+        }
+    }
+}
+
 /// Table parsing accumulator.
 #[derive(Debug)]
 pub(crate) struct TableState {

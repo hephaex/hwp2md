@@ -340,8 +340,7 @@ mod tests {
         let units: Vec<u16> = s.encode_utf16().collect();
         let mut buf = Vec::with_capacity(units.len() * 2);
         for u in units {
-            buf.push((u & 0xFF) as u8);
-            buf.push((u >> 8) as u8);
+            buf.extend_from_slice(&u.to_le_bytes());
         }
         buf
     }
@@ -391,11 +390,10 @@ mod tests {
     fn build_utf16le_str(s: &str) -> Vec<u8> {
         let units: Vec<u16> = s.encode_utf16().collect();
         let mut buf = Vec::new();
-        buf.push((u16::try_from(units.len()).unwrap() & 0xFF) as u8);
-        buf.push((u16::try_from(units.len()).unwrap() >> 8) as u8);
+        let len_u16 = u16::try_from(units.len()).unwrap();
+        buf.extend_from_slice(&len_u16.to_le_bytes());
         for u in &units {
-            buf.push((*u & 0xFF) as u8);
-            buf.push((*u >> 8) as u8);
+            buf.extend_from_slice(&u.to_le_bytes());
         }
         buf
     }

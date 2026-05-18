@@ -220,13 +220,7 @@ pub(super) fn handle_end_element(
             if !text.is_empty() {
                 let inline = ir::Inline::with_formatting(
                     text,
-                    ctx.fmt.bold,
-                    ctx.fmt.italic,
-                    ctx.fmt.underline,
-                    ctx.fmt.strike,
-                    ctx.fmt.superscript,
-                    ctx.fmt.subscript,
-                    ctx.fmt.color.clone(),
+                    &crate::ir::InlineFormat::from(&ctx.fmt),
                 )
                 .with_font_name(ctx.fmt.font_name.clone())
                 .with_link(if ctx.in_hyperlink {
@@ -319,13 +313,7 @@ pub(super) fn handle_end_element(
             if !base.is_empty() || !annotation.is_empty() {
                 let inline = ir::Inline::with_formatting(
                     base,
-                    ctx.fmt.bold,
-                    ctx.fmt.italic,
-                    ctx.fmt.underline,
-                    ctx.fmt.strike,
-                    ctx.fmt.superscript,
-                    ctx.fmt.subscript,
-                    ctx.fmt.color.clone(),
+                    &crate::ir::InlineFormat::from(&ctx.fmt),
                 )
                 .with_ruby(if annotation.is_empty() {
                     None
