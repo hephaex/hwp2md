@@ -109,6 +109,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 33**: Security hardening — `try_lenient_read` capped at 256 MiB (`FileTooLarge`); malformed
+  shape/BinData IDs > u16 now skip+warn instead of silently aliasing to `u16::MAX`. API refactor —
+  new `InlineFormat` POD in `ir`; `Inline::with_formatting` takes `&InlineFormat` instead of 7 positional
+  bools; removes two `clippy::pedantic` allows.
 - **Sprint 32**: Replace module-level `#[allow(cast_possible_truncation)]` in 8 test files/functions
   with `try_from().unwrap()` — eliminates broad suppression, makes each cast explicit and verifiable.
   Add one-line justification comments to all 20+ production `#[allow]` attributes across 16 files.

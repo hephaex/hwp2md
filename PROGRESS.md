@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 32 완료 (try_from in tests + allow justification comments)
+## 현재 상태: v0.5.0 Sprint 33 완료 (security hardening + InlineFormat refactor)
 
 ### 완료
 
@@ -259,6 +259,31 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-19 — v0.5.0 Sprint 33: Security Hardening + InlineFormat Refactor
+
+**S33-SEC-01: `try_lenient_read` file size cap (256 MiB)**:
+- `MAX_LENIENT_FILE_BYTES: u64 = 256 * 1024 * 1024` added alongside `LENIENT_MAX_RECORD_BYTES`
+- `try_lenient_read_inner(path, limit)` extracted for testability; public wrapper delegates with constant
+- Returns `Hwp2MdError::FileTooLarge` before `fs::read`; prevents unbounded allocation on adversarial input
+- Test: `try_lenient_read_rejects_oversized_file` verifies rejection with small injected limit
+
+**S33-SEC-02: Replace `unwrap_or(u16::MAX)` with skip+warn**:
+- `parse_char_shape_refs` 8-byte entry path: IDs > 65535 are now skipped with `tracing::warn!`
+- `read_bin_data` fallback ID: out-of-range index skips entry via `continue` instead of sentinel aliasing
+- Eliminates silent ID aliasing that could corrupt formatting on adversarial HWP files
+
+**S33-01: `record.rs` `to_le_bytes()` cleanup (test helpers)**:
+- `encode_utf16le` and `build_utf16le_str`: `buf.push(lo); buf.push(hi)` → `buf.extend_from_slice(&u.to_le_bytes())`
+
+**S33-02: `InlineFormat` POD + `Inline::with_formatting` refactor**:
+- New `pub struct InlineFormat { bold, italic, underline, strikethrough, superscript, subscript, color }` in `ir.rs`
+- `Inline::with_formatting` signature: 7 positional args → `(text: String, fmt: &InlineFormat)`
+- Removes `#[allow(clippy::fn_params_excessive_bools)]` + `#[allow(clippy::too_many_arguments)]` from `ir.rs`
+- `From<&FormattingState> for InlineFormat` in `hwpx/context/state.rs`
+- All 6 call sites updated (flush.rs ×2, handlers.rs ×2, convert.rs, md/parser.rs) + 3 test sites
+
+**검증**: `cargo clippy --all-targets -- -W clippy::pedantic` **0 warnings**, 1220 tests (0 failures)
 
 ### 2026-05-19 — v0.5.0 Sprint 32: Test Cast Hardening + Allow Justifications
 
