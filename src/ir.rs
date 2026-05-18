@@ -258,6 +258,7 @@ pub enum Block {
 }
 
 /// A run of inline text with optional formatting and annotations.
+// Bool fields represent format flags (bold, italic, underline, etc.) that are independent.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Inline {
@@ -320,6 +321,7 @@ impl Inline {
     /// and `ruby` fields are left at their defaults and can be set via chained
     /// builder methods (`with_ruby`, etc.).
     #[must_use]
+    // Parameters mirror the Inline struct field layout: bold, italic, underline, strikethrough, superscript, subscript, color.
     #[allow(clippy::fn_params_excessive_bools)]
     #[allow(clippy::too_many_arguments)]
     pub fn with_formatting(

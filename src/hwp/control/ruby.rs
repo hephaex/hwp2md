@@ -118,7 +118,6 @@ pub(crate) fn parse_ruby_ctrl(rec: &Record) -> Option<String> {
 }
 
 #[cfg(test)]
-#[allow(clippy::cast_possible_truncation)]
 mod tests {
     use super::*;
     use crate::hwp::record::{CTRL_RUBY, HWPTAG_CTRL_HEADER};
@@ -130,7 +129,7 @@ mod tests {
     fn make_ruby_record(ruby_text: &str) -> Record {
         let chars: Vec<u16> = ruby_text.encode_utf16().collect();
         let mut data = CTRL_RUBY.to_le_bytes().to_vec();
-        data.extend_from_slice(&(chars.len() as u16).to_le_bytes());
+        data.extend_from_slice(&(u16::try_from(chars.len()).unwrap()).to_le_bytes());
         for ch in &chars {
             data.extend_from_slice(&ch.to_le_bytes());
         }

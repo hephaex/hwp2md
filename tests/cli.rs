@@ -658,7 +658,10 @@ fn convert_frontmatter_flag_adds_yaml_header() {
         String::from_utf8_lossy(&result.stderr)
     );
     let body = std::fs::read_to_string(&md_out).expect("read md");
-    assert!(body.starts_with("---"), "expected YAML frontmatter: {body:?}");
+    assert!(
+        body.starts_with("---"),
+        "expected YAML frontmatter: {body:?}"
+    );
 }
 
 #[test]
@@ -748,4 +751,3 @@ fn convert_assets_dir_extracts_embedded_image() {
         "extracted image data must match original"
     );
 }
-

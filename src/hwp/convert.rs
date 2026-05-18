@@ -371,6 +371,7 @@ pub(crate) fn paragraph_to_blocks(para: &HwpParagraph, doc_info: &DocInfo) -> Ve
 
 /// Convert a single `HwpControl` to an `ir::Block`.  Returns `None` for
 /// controls that have no direct IR representation (e.g. page-break hints).
+// Dispatch function over HwpControl enum; splitting would not improve clarity.
 #[allow(clippy::too_many_lines)]
 pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<ir::Block> {
     match ctrl {
@@ -405,9 +406,7 @@ pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<
                 .map(|(row_idx, row_cells)| {
                     // Capture is_header from the first cell before sorting consumes the vec.
                     // Fall back to row_idx == 0 for empty rows (no cells parsed).
-                    let row_is_header = row_cells
-                        .first()
-                        .map_or(row_idx == 0, |c| c.is_header);
+                    let row_is_header = row_cells.first().map_or(row_idx == 0, |c| c.is_header);
                     let mut sorted = row_cells;
                     sorted.sort_by_key(|c| c.col);
                     let ir_cells: Vec<ir::TableCell> = sorted

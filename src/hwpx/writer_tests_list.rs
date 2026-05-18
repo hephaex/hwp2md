@@ -619,4 +619,3 @@ fn section_xml_list_paragraph_ids_continue_after_preceding_blocks() {
     );
     assert!(xml.contains(r#"id="1""#), "list item must be id=1: {xml}");
 }
-

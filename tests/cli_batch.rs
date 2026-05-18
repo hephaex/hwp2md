@@ -343,10 +343,7 @@ fn batch_skips_symlinks() {
         String::from_utf8_lossy(&result.stderr)
     );
 
-    assert!(
-        out_dir.join("real.md").exists(),
-        "real.md must be created"
-    );
+    assert!(out_dir.join("real.md").exists(), "real.md must be created");
     assert!(
         !out_dir.join("link.md").exists(),
         "link.md must not be created (symlink)"

@@ -82,9 +82,7 @@ fn build_bin_map(bin_files: &[String]) -> HashMap<String, String> {
         .iter()
         .filter_map(|path| {
             let filename = path.rsplit('/').next()?;
-            let stem = filename
-                .rsplit_once('.')
-                .map_or(filename, |(s, _)| s);
+            let stem = filename.rsplit_once('.').map_or(filename, |(s, _)| s);
             Some((stem.to_string(), path.clone()))
         })
         .collect()
@@ -143,6 +141,7 @@ fn resolve_block_bin_refs(block: &mut ir::Block, bin_map: &HashMap<String, Strin
 /// Parse document metadata (title, author, subject, description) from the
 /// text of a header.xml entry.  Returns a default `Metadata` if parsing fails
 /// or the XML contains none of the recognised elements.
+// Result return keeps consistent Result interface for the handler dispatch table.
 #[allow(clippy::unnecessary_wraps)]
 fn parse_metadata(xml: &str) -> Result<ir::Metadata, Hwp2MdError> {
     let mut meta = ir::Metadata::default();
@@ -351,6 +350,7 @@ fn read_section_xml(
 /// indices on `<charPr>` elements to be resolved to human-readable font names
 /// stored on `ir::Inline::font_name`.  Pass an empty slice when no header is
 /// available (e.g. in unit tests that work with raw section XML snippets).
+// Result return keeps consistent Result interface for the handler dispatch table.
 #[allow(clippy::unnecessary_wraps)]
 pub(crate) fn parse_section_xml_with_face_names(
     xml: &str,

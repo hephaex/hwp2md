@@ -16,7 +16,9 @@ use hwp2md::ir;
 #[path = "common/mod.rs"]
 mod common;
 
-use common::{collect_all_text, first_blocks, ir_to_hwpx_to_md, md_to_hwpx_to_ir, md_to_hwpx_to_md};
+use common::{
+    collect_all_text, first_blocks, ir_to_hwpx_to_md, md_to_hwpx_to_ir, md_to_hwpx_to_md,
+};
 
 // =======================================================================
 // Phase D-1: Comprehensive full-roundtrip tests (MD → HWPX → IR → MD)

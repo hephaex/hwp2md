@@ -60,9 +60,7 @@ pub fn make_doc(blocks: Vec<hwp2md::ir::Block>) -> hwp2md::ir::Document {
 /// slice if the document has no sections.
 #[allow(dead_code)]
 pub fn first_blocks(doc: &hwp2md::ir::Document) -> &[hwp2md::ir::Block] {
-    doc.sections
-        .first()
-        .map_or(&[], |s| s.blocks.as_slice())
+    doc.sections.first().map_or(&[], |s| s.blocks.as_slice())
 }
 
 // ---------------------------------------------------------------------------

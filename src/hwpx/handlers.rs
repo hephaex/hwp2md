@@ -6,6 +6,7 @@ use super::context::{
     flush_paragraph_staged, ParseContext, RubyPart, StagedBlock,
 };
 
+// Handles all XML element parse logic; splitting would lose locality.
 #[allow(clippy::too_many_lines)]
 pub(super) fn handle_start_element(
     local: &str,
@@ -177,6 +178,7 @@ pub(super) fn handle_start_element(
     }
 }
 
+// Handles all XML element parse logic; splitting would lose locality.
 #[allow(clippy::too_many_lines)]
 pub(super) fn handle_end_element(
     local: &str,
@@ -368,6 +370,7 @@ pub(super) fn handle_text(text: &str, ctx: &mut ParseContext) {
     }
 }
 
+// Handles all XML element parse logic; splitting would lose locality.
 #[allow(clippy::too_many_lines)]
 pub(super) fn handle_empty_element(
     local: &str,

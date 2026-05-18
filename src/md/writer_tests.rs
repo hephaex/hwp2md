@@ -11,7 +11,11 @@ fn plain(t: &str) -> ir::Inline {
 
 fn make_doc_with_blocks(blocks: Vec<ir::Block>) -> ir::Document {
     let mut doc = ir::Document::new();
-    doc.sections.push(ir::Section { blocks, page_layout: None , ..Default::default() });
+    doc.sections.push(ir::Section {
+        blocks,
+        page_layout: None,
+        ..Default::default()
+    });
     doc
 }
 
@@ -385,7 +389,11 @@ fn write_markdown_frontmatter() {
     let mut doc = ir::Document::new();
     doc.metadata.title = Some("My Title".into());
     doc.metadata.author = Some("Author Name".into());
-    doc.sections.push(ir::Section { blocks: Vec::new(), page_layout: None , ..Default::default() });
+    doc.sections.push(ir::Section {
+        blocks: Vec::new(),
+        page_layout: None,
+        ..Default::default()
+    });
     let md = write_markdown(&doc, true);
     assert!(md.starts_with("---\n"), "got: {md}");
     assert!(md.contains("title: \"My Title\""), "got: {md}");
@@ -395,7 +403,7 @@ fn write_markdown_frontmatter() {
 #[test]
 fn write_markdown_multi_section_separator() {
     let mut doc = ir::Document::new();
-    doc.sections.push(ir::Section{
+    doc.sections.push(ir::Section {
         blocks: vec![ir::Block::Paragraph {
             inlines: vec![plain("Section 1")],
         }],
@@ -403,7 +411,7 @@ fn write_markdown_multi_section_separator() {
         page_layout: None,
         ..Default::default()
     });
-    doc.sections.push(ir::Section{
+    doc.sections.push(ir::Section {
         blocks: vec![ir::Block::Paragraph {
             inlines: vec![plain("Section 2")],
         }],

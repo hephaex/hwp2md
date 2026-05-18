@@ -6,9 +6,7 @@ use crate::ir;
 // -----------------------------------------------------------------------
 
 pub(super) fn first_section_blocks(doc: &ir::Document) -> &[ir::Block] {
-    doc.sections
-        .first()
-        .map_or(&[], |s| s.blocks.as_slice())
+    doc.sections.first().map_or(&[], |s| s.blocks.as_slice())
 }
 
 // -----------------------------------------------------------------------

@@ -14,6 +14,7 @@ pub struct HwpDocument {
     pub summary_keywords: Vec<String>,
 }
 
+// Bool fields represent independent binary flags in the HWP file format specification.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Default)]
 pub struct FileHeader {
@@ -98,6 +99,7 @@ pub struct DocProperties {
     pub section_count: u16,
 }
 
+// Bool fields represent independent binary formatting flags in the HWP format specification.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Default, Clone)]
 pub struct CharShape {

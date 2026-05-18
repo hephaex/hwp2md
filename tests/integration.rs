@@ -608,7 +608,10 @@ fn read_hwpx_with_bindata_populates_assets() {
     let (_dir, path) = fixture.write_to_tempfile();
 
     let doc = hwp2md::hwpx::read_hwpx(&path).expect("read fixture");
-    assert!(!doc.assets.is_empty(), "assets should contain the BinData entry");
+    assert!(
+        !doc.assets.is_empty(),
+        "assets should contain the BinData entry"
+    );
     assert_eq!(doc.assets[0].name, "test_image.png");
     assert_eq!(doc.assets[0].data, png_data);
 }
@@ -622,10 +625,22 @@ fn write_assets_extracts_bindata_to_disk() {
     let (dir, path) = fixture.write_to_tempfile();
 
     let assets_dir = dir.path().join("extracted");
-    hwp2md::convert::to_markdown(&path, Some(&dir.path().join("out.md")), Some(&assets_dir), false)
-        .expect("convert with assets");
+    hwp2md::convert::to_markdown(
+        &path,
+        Some(&dir.path().join("out.md")),
+        Some(&assets_dir),
+        false,
+    )
+    .expect("convert with assets");
 
     let extracted = assets_dir.join("photo.png");
-    assert!(extracted.exists(), "image should be extracted to assets dir");
-    assert_eq!(std::fs::read(&extracted).unwrap(), png_data, "extracted data must match");
+    assert!(
+        extracted.exists(),
+        "image should be extracted to assets dir"
+    );
+    assert_eq!(
+        std::fs::read(&extracted).unwrap(),
+        png_data,
+        "extracted data must match"
+    );
 }

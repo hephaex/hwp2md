@@ -410,9 +410,7 @@ fn header_xml_para_pr_0_has_zero_left_margin() {
     // paraPr id="0" must have left margin = 0.
     // We verify that the first paraPr (id=0) has <hh:left value="0"/>.
     // Since id=0 comes first, the first occurrence of <hh:left is from id=0.
-    let first_left_pos = header
-        .find(r"<hh:left value=")
-        .expect("hh:left must exist");
+    let first_left_pos = header.find(r"<hh:left value=").expect("hh:left must exist");
     let first_left_slice = &header[first_left_pos..];
     assert!(
         first_left_slice.starts_with(r#"<hh:left value="0"/>"#),

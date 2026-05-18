@@ -303,15 +303,13 @@ fn write_hwpx_data_uri_image_creates_bindata_entry() {
 
     let entries = write_to_zip_entries(&doc);
 
-    let has_bindata = entries
-        .iter()
-        .any(|e| {
-            e.starts_with("BinData/image_")
-                && std::path::Path::new(e)
-                    .extension()
-                    .and_then(|ext| ext.to_str())
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("png"))
-        });
+    let has_bindata = entries.iter().any(|e| {
+        e.starts_with("BinData/image_")
+            && std::path::Path::new(e)
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("png"))
+    });
     assert!(
         has_bindata,
         "BinData/image_N.png must be present for data URI image; entries: {entries:?}"

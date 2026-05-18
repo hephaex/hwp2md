@@ -116,6 +116,7 @@ pub(super) fn generate_section_xml(
 ///
 /// `asset_map` maps image `src` values to the resolved `BinData/` entry name
 /// used as `binaryItemIDRef` in the emitted `<hp:img>` element.
+// Handles all IR block variants; splitting would scatter related match arms.
 #[allow(clippy::too_many_lines)]
 fn write_block<W: Write>(
     writer: &mut Writer<W>,
@@ -262,9 +263,7 @@ fn write_block<W: Write>(
         ir::Block::Image { src, alt } => {
             // Resolve the src to the embedded BinData entry name when available.
             // For remote URLs (not in the map) the original src is used as-is.
-            let bin_ref: &str = asset_map
-                .get(src.as_str())
-                .map_or(src, String::as_str);
+            let bin_ref: &str = asset_map.get(src.as_str()).map_or(src, String::as_str);
 
             let id_str = para_id.to_string();
             *para_id += 1;

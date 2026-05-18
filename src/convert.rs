@@ -110,8 +110,10 @@ pub fn to_hwpx(
     let content = fs::read_to_string(input)?;
     let doc = md::parse_markdown(&content);
 
-    let out_path = output
-        .map_or_else(|| input.with_extension("hwpx"), std::path::Path::to_path_buf);
+    let out_path = output.map_or_else(
+        || input.with_extension("hwpx"),
+        std::path::Path::to_path_buf,
+    );
 
     if let Some(parent) = out_path.parent() {
         fs::create_dir_all(parent)?;

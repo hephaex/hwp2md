@@ -27,7 +27,7 @@ pub struct HwpxFixture {
     author: Option<String>,
     /// Raw XML snippets (paragraph / table / etc.) that go *inside* `<hs:sec …>`.
     section_body: String,
-    bin_data_entries: Vec<(String, Vec<u8>)>,  // (name, data)
+    bin_data_entries: Vec<(String, Vec<u8>)>, // (name, data)
 }
 
 impl HwpxFixture {

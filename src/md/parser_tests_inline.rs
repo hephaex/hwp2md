@@ -1,6 +1,6 @@
+use super::tests::first_section_blocks;
 use super::*;
 use crate::ir;
-use super::tests::first_section_blocks;
 
 // -----------------------------------------------------------------------
 // Helpers (shared with marker tests)

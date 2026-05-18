@@ -307,8 +307,7 @@ fn ctrl_newpage_produces_page_break_block() {
     assert!(kinds.contains(&"pb"), "expected PageBreak block: {kinds:?}");
     let pb_idx = kinds.iter().position(|k| *k == "pb").unwrap();
     assert!(
-        kinds[..pb_idx].contains(&"para")
-            && kinds[pb_idx + 1..].contains(&"para"),
+        kinds[..pb_idx].contains(&"para") && kinds[pb_idx + 1..].contains(&"para"),
         "PageBreak must sit between the two paragraphs: {kinds:?}"
     );
 }

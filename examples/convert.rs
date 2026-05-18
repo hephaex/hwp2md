@@ -60,15 +60,35 @@ fn main() {
             TableRow {
                 is_header: true,
                 cells: vec![
-                    TableCell { blocks: vec![Block::Paragraph { inlines: vec![Inline::plain("Format")] }], ..TableCell::default() },
-                    TableCell { blocks: vec![Block::Paragraph { inlines: vec![Inline::plain("Extension")] }], ..TableCell::default() },
+                    TableCell {
+                        blocks: vec![Block::Paragraph {
+                            inlines: vec![Inline::plain("Format")],
+                        }],
+                        ..TableCell::default()
+                    },
+                    TableCell {
+                        blocks: vec![Block::Paragraph {
+                            inlines: vec![Inline::plain("Extension")],
+                        }],
+                        ..TableCell::default()
+                    },
                 ],
             },
             TableRow {
                 is_header: false,
                 cells: vec![
-                    TableCell { blocks: vec![Block::Paragraph { inlines: vec![Inline::plain("HWP 5.0")] }], ..TableCell::default() },
-                    TableCell { blocks: vec![Block::Paragraph { inlines: vec![Inline::plain(".hwp")] }], ..TableCell::default() },
+                    TableCell {
+                        blocks: vec![Block::Paragraph {
+                            inlines: vec![Inline::plain("HWP 5.0")],
+                        }],
+                        ..TableCell::default()
+                    },
+                    TableCell {
+                        blocks: vec![Block::Paragraph {
+                            inlines: vec![Inline::plain(".hwp")],
+                        }],
+                        ..TableCell::default()
+                    },
                 ],
             },
         ],

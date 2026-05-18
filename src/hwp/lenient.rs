@@ -138,7 +138,6 @@ pub(crate) fn scan_records(data: &[u8]) -> Vec<(u16, Vec<u8>)> {
 }
 
 #[cfg(test)]
-#[allow(clippy::cast_possible_truncation)]
 mod tests {
     use super::*;
     use crate::hwp::record::{HWPTAG_PARA_HEADER, HWPTAG_PARA_TEXT};
@@ -199,7 +198,7 @@ mod tests {
     #[test]
     fn scan_records_single_para_text_record() {
         let text_bytes = encode_utf16le("Hello");
-        let size = text_bytes.len() as u32;
+        let size = u32::try_from(text_bytes.len()).unwrap();
         let mut rec = make_header(HWPTAG_PARA_TEXT, 0, size).to_vec();
         rec.extend_from_slice(&text_bytes);
         let data = padded(&rec);
@@ -213,7 +212,7 @@ mod tests {
     #[test]
     fn scan_records_two_consecutive_records() {
         let text_bytes = encode_utf16le("테스트");
-        let size = text_bytes.len() as u32;
+        let size = u32::try_from(text_bytes.len()).unwrap();
 
         let mut recs = make_header(HWPTAG_PARA_HEADER, 0, 0).to_vec();
         recs.extend_from_slice(&make_header(HWPTAG_PARA_TEXT, 1, size));
@@ -232,7 +231,7 @@ mod tests {
     fn scan_records_garbage_bytes_skipped() {
         // Insert garbage before a valid record — should still find the record.
         let text_bytes = encode_utf16le("찾기");
-        let size = text_bytes.len() as u32;
+        let size = u32::try_from(text_bytes.len()).unwrap();
         let mut rec = make_header(HWPTAG_PARA_TEXT, 0, size).to_vec();
         rec.extend_from_slice(&text_bytes);
 
@@ -256,7 +255,7 @@ mod tests {
     #[test]
     fn scan_records_extended_size_record() {
         let text_bytes = encode_utf16le("拡張サイズ");
-        let size = text_bytes.len() as u32;
+        let size = u32::try_from(text_bytes.len()).unwrap();
         let mut rec = make_ext_header(HWPTAG_PARA_TEXT, size);
         rec.extend_from_slice(&text_bytes);
         let data = padded(&rec);
@@ -271,7 +270,7 @@ mod tests {
     fn scan_records_oversized_record_skipped() {
         // A header claiming more bytes than LENIENT_MAX_RECORD_BYTES.
         let tag_id = HWPTAG_PARA_TEXT;
-        let huge: u32 = LENIENT_MAX_RECORD_BYTES as u32 + 1;
+        let huge: u32 = u32::try_from(LENIENT_MAX_RECORD_BYTES).unwrap() + 1;
         let mut rec = make_ext_header(tag_id, huge);
         // Don't actually append that many bytes — simulate a truncated file.
         rec.extend_from_slice(&[0u8; 8]); // tiny actual payload
@@ -330,7 +329,7 @@ mod tests {
         use std::io::Write;
 
         let text_bytes = encode_utf16le("복구된 텍스트");
-        let size = text_bytes.len() as u32;
+        let size = u32::try_from(text_bytes.len()).unwrap();
         let mut rec = make_header(HWPTAG_PARA_TEXT, 0, size).to_vec();
         rec.extend_from_slice(&text_bytes);
 
@@ -357,7 +356,7 @@ mod tests {
 
         // PARA_HEADER (no text) followed by PARA_TEXT with content.
         let text_bytes = encode_utf16le("only this");
-        let size = text_bytes.len() as u32;
+        let size = u32::try_from(text_bytes.len()).unwrap();
         let mut recs = make_header(HWPTAG_PARA_HEADER, 0, 0).to_vec();
         recs.extend_from_slice(&make_header(HWPTAG_PARA_TEXT, 1, size));
         recs.extend_from_slice(&text_bytes);
@@ -385,7 +384,7 @@ mod tests {
         let mut file_bytes = vec![0u8; SCAN_SKIP_BYTES];
         for line in lines {
             let text_bytes = encode_utf16le(line);
-            let size = text_bytes.len() as u32;
+            let size = u32::try_from(text_bytes.len()).unwrap();
             file_bytes.extend_from_slice(&make_header(HWPTAG_PARA_TEXT, 0, size));
             file_bytes.extend_from_slice(&text_bytes);
         }

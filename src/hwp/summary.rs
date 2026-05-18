@@ -136,7 +136,6 @@ pub(crate) fn parse_summary_bytes(
 }
 
 #[cfg(test)]
-#[allow(clippy::cast_possible_truncation)]
 mod tests {
     use super::*;
 
@@ -158,7 +157,7 @@ mod tests {
         // Section header: byte-count (placeholder) + prop_count
         let sec_start = buf.len();
         buf.extend_from_slice(&0u32.to_le_bytes()); // byte-count placeholder
-        buf.extend_from_slice(&(props.len() as u32).to_le_bytes());
+        buf.extend_from_slice(&(u32::try_from(props.len()).unwrap()).to_le_bytes());
 
         // Property directory (8 bytes each)
         let dir_size = props.len() * 8;
@@ -170,13 +169,13 @@ mod tests {
             let _ = entry_offset;
             buf.extend_from_slice(&prop_id.to_le_bytes());
             let prop_offset = data_base_offset + prop_data.len();
-            buf.extend_from_slice(&(prop_offset as u32).to_le_bytes());
+            buf.extend_from_slice(&(u32::try_from(prop_offset).unwrap()).to_le_bytes());
 
             // VT_LPSTR value: type (4) + size (4) + data (padded to 4-byte)
             prop_data.extend_from_slice(&VT_LPSTR.to_le_bytes());
             let bytes = value.as_bytes();
             let size = bytes.len() + 1; // include NUL
-            prop_data.extend_from_slice(&(size as u32).to_le_bytes());
+            prop_data.extend_from_slice(&(u32::try_from(size).unwrap()).to_le_bytes());
             prop_data.extend_from_slice(bytes);
             prop_data.push(0); // NUL
                                // Pad to 4-byte alignment
@@ -188,7 +187,7 @@ mod tests {
         buf.extend_from_slice(&prop_data);
 
         // Patch section byte-count
-        let sec_size = (buf.len() - sec_start) as u32;
+        let sec_size = u32::try_from(buf.len() - sec_start).unwrap();
         buf[sec_start..sec_start + 4].copy_from_slice(&sec_size.to_le_bytes());
 
         buf

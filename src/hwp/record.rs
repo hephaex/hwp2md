@@ -99,9 +99,7 @@ pub fn parse_records<R: Read>(reader: &mut R) -> Result<Vec<Record>, Hwp2MdError
 
         let mut data = vec![0u8; size];
         reader.read_exact(&mut data).map_err(|e| {
-            Hwp2MdError::InvalidRecord(format!(
-                "record data read (tag={tag_id}, size={size}): {e}"
-            ))
+            Hwp2MdError::InvalidRecord(format!("record data read (tag={tag_id}, size={size}): {e}"))
         })?;
 
         records.push(Record {
@@ -136,7 +134,6 @@ pub fn read_utf16le_str(data: &[u8], offset: usize) -> (String, usize) {
 }
 
 #[cfg(test)]
-#[allow(clippy::cast_possible_truncation)]
 mod tests {
     use super::*;
     use std::io::Cursor;
@@ -393,8 +390,8 @@ mod tests {
     fn build_utf16le_str(s: &str) -> Vec<u8> {
         let units: Vec<u16> = s.encode_utf16().collect();
         let mut buf = Vec::new();
-        buf.push((units.len() as u16 & 0xFF) as u8);
-        buf.push((units.len() as u16 >> 8) as u8);
+        buf.push((u16::try_from(units.len()).unwrap() & 0xFF) as u8);
+        buf.push((u16::try_from(units.len()).unwrap() >> 8) as u8);
         for u in &units {
             buf.push((*u & 0xFF) as u8);
             buf.push((*u >> 8) as u8);

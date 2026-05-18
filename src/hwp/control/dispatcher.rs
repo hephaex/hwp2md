@@ -172,7 +172,6 @@ pub(crate) fn parse_ctrl_header_at(records: &[Record], ctrl_idx: usize) -> Optio
 }
 
 #[cfg(test)]
-#[allow(clippy::cast_possible_truncation)]
 mod tests {
     use super::*;
     use crate::hwp::reader::encode_u16s_test;
@@ -278,7 +277,7 @@ mod tests {
     fn parse_ctrl_header_at_hyperlink_returns_control() {
         let url_chars: Vec<u16> = "https://test.org".encode_utf16().collect();
         let mut data = CTRL_HYPERLINK.to_le_bytes().to_vec();
-        data.extend_from_slice(&(url_chars.len() as u16).to_le_bytes());
+        data.extend_from_slice(&(u16::try_from(url_chars.len()).unwrap()).to_le_bytes());
         for ch in &url_chars {
             data.extend_from_slice(&ch.to_le_bytes());
         }

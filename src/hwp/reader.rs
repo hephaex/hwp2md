@@ -426,6 +426,7 @@ pub(crate) fn parse_char_shape_refs(data: &[u8]) -> Vec<(u32, u16)> {
     refs
 }
 
+// BinData length is bounded by HWP record size limits (max 65535 bytes); truncation is safe.
 #[allow(clippy::cast_possible_truncation)]
 fn read_bin_data(
     cfb: &mut cfb::CompoundFile<std::fs::File>,

@@ -3,6 +3,7 @@ use crate::ir;
 // ── Sub-struct definitions ──────────────────────────────────────────────
 
 /// Character-level formatting state for the current XML run.
+// Bool fields directly map to HWPX formatting state bits defined in the OWPML spec.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Default)]
 pub(crate) struct FormattingState {

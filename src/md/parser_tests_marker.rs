@@ -1,7 +1,7 @@
-use super::*;
-use crate::ir;
 use super::tests::first_section_blocks;
 use super::tests_inline::parse_with_unsafe_html;
+use super::*;
+use crate::ir;
 
 // -----------------------------------------------------------------------
 // parse_markdown — pagebreak HTML comment markers

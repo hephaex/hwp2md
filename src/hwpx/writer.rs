@@ -18,12 +18,12 @@ mod content;
 
 // Re-export submodule functions for test access.
 #[cfg(test)]
-use section::generate_section_xml;
-#[cfg(test)]
 use content::{
     base64_decode, collect_image_assets, generate_content_hpf, mime_from_extension,
     xml_escape_content,
 };
+#[cfg(test)]
+use section::generate_section_xml;
 
 // ---------------------------------------------------------------------------
 // Image asset map
@@ -51,6 +51,7 @@ pub(crate) const LANG_SLOTS: [&str; 7] = [
 ///
 /// `id=0` is always the plain/default entry (all fields false, no color, no
 /// custom font).  Additional entries are assigned IDs starting at 1.
+// Bool fields represent character property flags from the HWP spec (bold, italic, etc.).
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct CharPrKey {

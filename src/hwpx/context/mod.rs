@@ -1,13 +1,13 @@
 mod flush;
 mod state;
 
+#[cfg(test)]
+pub(crate) use flush::flush_paragraph;
 pub(crate) use flush::{
     apply_charpr_attrs, flush_active_paragraph_scope, flush_cell_paragraph, flush_footer_paragraph,
     flush_footnote_paragraph, flush_header_paragraph, flush_list_item_paragraph,
     flush_paragraph_staged, group_list_paragraphs, StagedBlock,
 };
-#[cfg(test)]
-pub(crate) use flush::flush_paragraph;
 pub(crate) use state::{
     FootnoteState, FormattingState, HeaderFooterState, ListState, PageLayoutState, TableState,
 };
@@ -26,6 +26,7 @@ use crate::ir;
 /// Fields are grouped into sub-structs by concern:
 /// [`FormattingState`], [`TableState`], [`ListState`], [`FootnoteState`],
 /// [`PageLayoutState`].
+// Bool fields track independent parse state flags (paragraph/run/text context, hyperlink, ruby, equation).
 #[allow(clippy::struct_excessive_bools)]
 pub(crate) struct ParseContext {
     // ── Paragraph / run state ──────────────────────────────────────

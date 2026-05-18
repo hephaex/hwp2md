@@ -18,7 +18,6 @@ pub(crate) fn parse_hyperlink_url(rec: &Record) -> String {
 }
 
 #[cfg(test)]
-#[allow(clippy::cast_possible_truncation)]
 mod tests {
     use super::*;
     use crate::hwp::record::{CTRL_HYPERLINK, HWPTAG_CTRL_HEADER};
@@ -27,7 +26,7 @@ mod tests {
     fn parse_hyperlink_url_valid() {
         let url_chars: Vec<u16> = "https://example.com".encode_utf16().collect();
         let mut data = CTRL_HYPERLINK.to_le_bytes().to_vec();
-        data.extend_from_slice(&(url_chars.len() as u16).to_le_bytes());
+        data.extend_from_slice(&(u16::try_from(url_chars.len()).unwrap()).to_le_bytes());
         for ch in &url_chars {
             data.extend_from_slice(&ch.to_le_bytes());
         }

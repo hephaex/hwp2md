@@ -125,6 +125,7 @@ pub(crate) fn extract_aes_key(decrypted_seed: &[u8]) -> Result<[u8; 16], Hwp2MdE
 ///
 /// # Errors
 /// Currently infallible; the `Result` wrapper is kept for API stability.
+// Result return maintains uniform interface with other decrypt functions.
 #[allow(clippy::unnecessary_wraps)]
 pub(crate) fn decrypt_viewtext(data: &[u8], key: &[u8; 16]) -> Result<Vec<u8>, Hwp2MdError> {
     let cipher = Aes128::new(GenericArray::from_slice(key));
@@ -144,7 +145,6 @@ pub(crate) fn decrypt_viewtext(data: &[u8], key: &[u8; 16]) -> Result<Vec<u8>, H
 }
 
 #[cfg(test)]
-#[allow(clippy::cast_possible_truncation)]
 mod tests {
     use super::*;
 
@@ -274,11 +274,11 @@ mod tests {
         let mut data = vec![0u8; 256];
         data[0] = 0x00;
         for i in 0..16 {
-            data[4 + i] = (i + 1) as u8;
+            data[4 + i] = u8::try_from(i + 1).unwrap();
         }
         let key = extract_aes_key(&data).unwrap();
         for (i, &b) in key.iter().enumerate() {
-            assert_eq!(b, (i + 1) as u8);
+            assert_eq!(b, u8::try_from(i + 1).unwrap());
         }
     }
 
@@ -397,7 +397,7 @@ mod tests {
         // delta = 0x36 & 0x0F = 6 → key at bytes [10..26]
         seed[0] = 0x10;
         for i in 0..16 {
-            seed[10 + i] = i as u8; // we'll check after XOR
+            seed[10 + i] = u8::try_from(i).unwrap(); // we'll check after XOR
         }
 
         let decrypted = decrypt_seed(&seed).unwrap();

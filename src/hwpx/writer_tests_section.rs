@@ -423,4 +423,3 @@ fn section_xml_code_block() {
     );
     assert!(xml.contains("fn main() {}"), "{xml}");
 }
-

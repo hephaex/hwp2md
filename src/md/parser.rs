@@ -151,6 +151,7 @@ fn extract_frontmatter(input: &str) -> ir::Metadata {
     meta
 }
 
+// Dispatches over all CommonMark node types; heading level is 1-6, always fits in u8.
 #[allow(clippy::too_many_lines)]
 #[allow(clippy::cast_possible_truncation)]
 fn node_to_block<'a>(node: &'a AstNode<'a>) -> Option<ir::Block> {
@@ -363,6 +364,7 @@ struct InlineStyle {
     link: Option<String>,
 }
 
+// Handles all CommonMark node types in inline context; cannot be decomposed.
 #[allow(clippy::too_many_lines)]
 fn collect_inlines_recursive<'a>(
     node: &'a AstNode<'a>,

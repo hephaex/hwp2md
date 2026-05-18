@@ -73,7 +73,9 @@ fn to_hwpx_style_template_applies_page_dimensions() {
         .expect("Contents/section0.xml not found in HWPX ZIP");
 
     let mut xml = String::new();
-    section_entry.read_to_string(&mut xml).expect("read section0.xml");
+    section_entry
+        .read_to_string(&mut xml)
+        .expect("read section0.xml");
 
     // The pageSize element must carry the custom dimensions.
     assert!(

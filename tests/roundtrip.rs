@@ -599,4 +599,3 @@ fn roundtrip_ir_to_md_to_ir_frontmatter() {
         "author not preserved; md: {md:?}"
     );
 }
-

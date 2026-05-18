@@ -25,8 +25,7 @@ pub(crate) fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut Pa
                     !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0";
             }
             "strikeout" | "hp:strikeout" => {
-                ctx.fmt.strike =
-                    !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0";
+                ctx.fmt.strike = !val.is_empty() && val.as_ref() != "none" && val.as_ref() != "0";
             }
             "supscript" | "hp:supscript" => {
                 ctx.fmt.superscript = val.as_ref() == "superscript";

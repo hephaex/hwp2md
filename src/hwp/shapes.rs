@@ -3,6 +3,7 @@ use crate::hwp::record::read_utf16le_str;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::Cursor;
 
+// Height is clamped to 0 via .max(0) before cast; sign loss is impossible.
 #[allow(clippy::cast_sign_loss)]
 pub(crate) fn parse_char_shape(data: &[u8]) -> CharShape {
     // HWP 5.0 CharShape record layout:

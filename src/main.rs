@@ -184,16 +184,10 @@ fn run_batch(
     assets_dir: Option<&std::path::Path>,
 ) -> Result<()> {
     if !input_dir.exists() {
-        anyhow::bail!(
-            "input directory does not exist: {}",
-            input_dir.display()
-        );
+        anyhow::bail!("input directory does not exist: {}", input_dir.display());
     }
     if !input_dir.is_dir() {
-        anyhow::bail!(
-            "input path is not a directory: {}",
-            input_dir.display()
-        );
+        anyhow::bail!("input path is not a directory: {}", input_dir.display());
     }
 
     let out_dir = output_dir.unwrap_or(input_dir);
@@ -262,7 +256,12 @@ fn run_batch(
             None
         };
 
-        match hwp2md::convert::to_markdown(&path, Some(&out_path), file_assets_dir.as_deref(), frontmatter) {
+        match hwp2md::convert::to_markdown(
+            &path,
+            Some(&out_path),
+            file_assets_dir.as_deref(),
+            frontmatter,
+        ) {
             Ok(()) => {
                 println!("Converted: {} -> {}", path.display(), out_path.display());
                 converted += 1;

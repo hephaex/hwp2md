@@ -102,12 +102,13 @@ pub(super) fn collect_image_assets(doc: &ir::Document) -> (ImageAssetMap, Vec<Re
     // Pre-populate from doc.assets (already-resolved assets from an HWPX reader
     // roundtrip).  Use the asset's bare filename as the entry name.
     for asset in &doc.assets {
-        let entry_name = std::path::Path::new(&asset.name)
-            .file_name()
-            .map_or_else(|| {
+        let entry_name = std::path::Path::new(&asset.name).file_name().map_or_else(
+            || {
                 counter += 1;
                 format!("asset_{counter}")
-            }, |n| n.to_string_lossy().into_owned());
+            },
+            |n| n.to_string_lossy().into_owned(),
+        );
         // Only register if not already mapped (src key == asset.name for
         // pre-existing assets coming from the reader).
         asset_map
@@ -197,12 +198,13 @@ pub(super) fn collect_images_from_blocks(
                     ImageSource::FilePath(path) => {
                         match std::fs::read(path) {
                             Ok(bytes) => {
-                                let bare = std::path::Path::new(path)
-                                    .file_name()
-                                    .map_or_else(|| {
+                                let bare = std::path::Path::new(path).file_name().map_or_else(
+                                    || {
                                         *counter += 1;
                                         format!("image_{counter}")
-                                    }, |n| n.to_string_lossy().into_owned());
+                                    },
+                                    |n| n.to_string_lossy().into_owned(),
+                                );
                                 let mime = mime_from_extension(path).to_owned();
                                 // Deduplicate: if the bare filename is already
                                 // occupied by a different asset, append a
@@ -263,8 +265,11 @@ pub(super) fn collect_images_from_blocks(
 ///
 /// No external crate is required — the `base64` crate is not in the dependency
 /// tree.  The implementation handles the standard RFC 4648 alphabet and padding.
+// Casting from 6-bit base64 indices to u8 always fits.
 #[allow(clippy::cast_possible_truncation)]
+// Sign loss is inherent: i8 indices cast to u32 for bitwise operations, lossy but safe after validation.
 #[allow(clippy::cast_sign_loss)]
+// Single-char names (a, b, c, d) are standard base64 nomenclature for quad processing.
 #[allow(clippy::many_single_char_names)]
 pub(super) fn base64_decode(input: &str) -> Result<Vec<u8>, Hwp2MdError> {
     const TABLE: [i8; 256] = {
@@ -378,11 +383,17 @@ pub(super) fn generate_version_xml() -> String {
         .to_string()
 }
 
-pub(super) fn generate_content_hpf(doc: &ir::Document, resolved_assets: &[ResolvedAsset]) -> String {
+pub(super) fn generate_content_hpf(
+    doc: &ir::Document,
+    resolved_assets: &[ResolvedAsset],
+) -> String {
     let section_count = doc.sections.len().max(1);
     let mut items = String::new();
     for i in 0..section_count {
-        let _ = writeln!(items, "    <hp:item href=\"section{i}.xml\" type=\"Section\"/>");
+        let _ = writeln!(
+            items,
+            "    <hp:item href=\"section{i}.xml\" type=\"Section\"/>"
+        );
     }
 
     // Build optional <hp:docInfo> with title/author metadata.
@@ -392,12 +403,20 @@ pub(super) fn generate_content_hpf(doc: &ir::Document, resolved_assets: &[Resolv
         let mut info = String::from("  <hp:docInfo>\n");
         if let Some(title) = doc.metadata.title.as_deref() {
             if !title.is_empty() {
-                let _ = writeln!(info, "    <hp:title>{}</hp:title>", xml_escape_content(title));
+                let _ = writeln!(
+                    info,
+                    "    <hp:title>{}</hp:title>",
+                    xml_escape_content(title)
+                );
             }
         }
         if let Some(author) = doc.metadata.author.as_deref() {
             if !author.is_empty() {
-                let _ = writeln!(info, "    <hp:author>{}</hp:author>", xml_escape_content(author));
+                let _ = writeln!(
+                    info,
+                    "    <hp:author>{}</hp:author>",
+                    xml_escape_content(author)
+                );
             }
         }
         info.push_str("  </hp:docInfo>\n");
@@ -418,7 +437,10 @@ pub(super) fn generate_content_hpf(doc: &ir::Document, resolved_assets: &[Resolv
     for asset in resolved_assets {
         let item_id = std::path::Path::new(&asset.entry_name)
             .file_stem()
-            .map_or_else(|| asset.entry_name.clone(), |s| s.to_string_lossy().into_owned());
+            .map_or_else(
+                || asset.entry_name.clone(),
+                |s| s.to_string_lossy().into_owned(),
+            );
         let _ = writeln!(
             bin_data_entries,
             "    <hp:binData itemId=\"{}\" file=\"BinData/{}\" type=\"EMBED\" compress=\"true\"/>",
