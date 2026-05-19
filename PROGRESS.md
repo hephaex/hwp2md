@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 34 완료 (proptest invariants + write_assets security)
+## 현재 상태: v0.5.0 Sprint 35 완료 (proptest expansion + CLI split + CI improvements)
 
 ### 완료
 
@@ -259,6 +259,31 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-19 — v0.5.0 Sprint 35: proptest Expansion + CLI Split + CI Improvements
+
+**T1: CodeBlock trailing-whitespace fix**:
+- `src/md/writer.rs:120`: `{line}` → `{}`, line.trim_end()` — CommonMark 이음매 수정
+- `tests/proptest_roundtrip.rs`: `prop_assume!` 블록 13줄 제거; `write_is_idempotent` 완전 이음매
+
+**T2: proptest 전략 확장**:
+- `block_quote()`: 내부 Paragraph/Heading/HR만 (comrak blockquote 중첩 제약)
+- `block_list()`: start=1 고정, 단일 Paragraph 항목, 비중첩
+- `block_table()`: 고정 cols, safe_text(), col_count 일치
+- `no_adjacent_same_type_lists` 필터로 동형 인접 List 병합 방지
+
+**T3: `tests/cli.rs` (753L) 분할**:
+- `tests/cli_general.rs` (21 tests), `cli_to_md.rs` (4), `cli_to_hwpx.rs` (2)
+- `tests/cli_batch.rs` (11, 기존) — 총 38 CLI tests, 커버리지 손실 없음
+
+**T4: `InlineFormat` 임포트 정리**:
+- `flush.rs`, `handlers.rs`, `convert.rs`, `parser.rs`: fully-qualified → `use crate::ir::InlineFormat;`
+
+**T5: CI 개선**:
+- `msrv` job: `dtolnay/rust-toolchain@1.75.0` + `cargo check --workspace`
+- `semver` job: `obi1kenobi/cargo-semver-checks-action@v2` + `continue-on-error: true`
+
+**검증**: `cargo clippy --all-targets -- -W clippy::pedantic` **0 warnings**, 1245 tests (0 failures)
 
 ### 2026-05-19 — v0.5.0 Sprint 34: proptest Roundtrip Invariants + write_assets Security
 
