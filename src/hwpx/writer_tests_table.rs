@@ -61,6 +61,14 @@ fn write_table_2x3_has_required_elements() {
 
     assert!(xml.contains("<hp:tbl "), "must contain <hp:tbl>: {xml}");
     assert!(
+        xml.contains("<hp:tblPr>"),
+        "must contain <hp:tblPr>: {xml}"
+    );
+    assert!(
+        xml.contains("<hp:inMargin "),
+        "must contain <hp:inMargin>: {xml}"
+    );
+    assert!(
         xml.contains(r#"borderFillIDRef="2""#),
         "tbl must reference borderFill id=2: {xml}"
     );
@@ -322,5 +330,39 @@ fn write_table_colspan_emitted_in_cell_span() {
     assert!(
         xml.contains(r#"<hp:cellSpan colSpan="2" rowSpan="1""#),
         "cellSpan must reflect colspan=2: {xml}"
+    );
+}
+
+/// The `<hp:tbl>` element must contain a `<hp:tblPr>` child with an
+/// `<hp:inMargin>` specifying the inner cell gap.
+#[test]
+fn write_table_has_tblpr() {
+    let rows = vec![text_row(&["A", "B"], false)];
+    let doc = table_doc(rows);
+    let tables = RefTables::build(&doc, None);
+    let sec = &doc.sections[0];
+    let asset_map = ImageAssetMap::new();
+    let xml =
+        generate_section_xml(sec, 0, &tables, &asset_map).expect("generate_section_xml failed");
+
+    assert!(
+        xml.contains("<hp:tblPr>"),
+        "must contain <hp:tblPr>: {xml}"
+    );
+    assert!(
+        xml.contains("</hp:tblPr>"),
+        "must close </hp:tblPr>: {xml}"
+    );
+    assert!(
+        xml.contains("<hp:inMargin "),
+        "must contain <hp:inMargin>: {xml}"
+    );
+    assert!(
+        xml.contains(r#"left="141""#),
+        "inMargin left must be 141: {xml}"
+    );
+    assert!(
+        xml.contains(r#"right="141""#),
+        "inMargin right must be 141: {xml}"
     );
 }

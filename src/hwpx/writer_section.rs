@@ -330,6 +330,9 @@ fn write_block<W: Write>(
 ///
 /// ```xml
 /// <hp:tbl rowCnt="…" colCnt="…" borderFillIDRef="2" noAdjust="0">
+///   <hp:tblPr>
+///     <hp:inMargin left="141" right="141" top="141" bottom="141"/>
+///   </hp:tblPr>
 ///   <hp:sz width="…" height="…"/>
 ///   <hp:pos treatAsChar="1"/>
 ///   <hp:tr>
@@ -385,6 +388,16 @@ fn write_table<W: Write>(
     tbl.push_attribute(("borderFillIDRef", table_fill_ref.as_str()));
     tbl.push_attribute(("noAdjust", "0"));
     writer.write_event(Event::Start(tbl))?;
+
+    // <hp:tblPr> — table properties: inner cell gap margin
+    writer.write_event(Event::Start(BytesStart::new("hp:tblPr")))?;
+    let mut in_margin = BytesStart::new("hp:inMargin");
+    in_margin.push_attribute(("left", "141"));
+    in_margin.push_attribute(("right", "141"));
+    in_margin.push_attribute(("top", "141"));
+    in_margin.push_attribute(("bottom", "141"));
+    writer.write_event(Event::Empty(in_margin))?;
+    writer.write_event(Event::End(BytesEnd::new("hp:tblPr")))?;
 
     // <hp:sz> — overall table dimensions
     let mut sz = BytesStart::new("hp:sz");

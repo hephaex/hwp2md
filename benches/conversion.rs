@@ -37,6 +37,32 @@ fn main() {
 - 다섯 번째 항목: 라운드트립 무결성 보장
 "##;
 
+/// Table-heavy Markdown document: 20-row × 5-column table for write/read benchmarks.
+const TABLE_HEAVY_MD: &str = "\
+| 항목 | 설명 | 값 | 단위 | 비고 |\n\
+|------|------|-----|------|------|\n\
+| 행 01 | 데이터 항목 1 | 100 | ms | 측정값 A |\n\
+| 행 02 | 데이터 항목 2 | 200 | ms | 측정값 B |\n\
+| 행 03 | 데이터 항목 3 | 300 | ms | 측정값 C |\n\
+| 행 04 | 데이터 항목 4 | 400 | ms | 측정값 D |\n\
+| 행 05 | 데이터 항목 5 | 500 | ms | 측정값 E |\n\
+| 행 06 | 데이터 항목 6 | 600 | ms | 측정값 F |\n\
+| 행 07 | 데이터 항목 7 | 700 | ms | 측정값 G |\n\
+| 행 08 | 데이터 항목 8 | 800 | ms | 측정값 H |\n\
+| 행 09 | 데이터 항목 9 | 900 | ms | 측정값 I |\n\
+| 행 10 | 데이터 항목 10 | 1000 | ms | 측정값 J |\n\
+| 행 11 | 데이터 항목 11 | 1100 | ms | 측정값 K |\n\
+| 행 12 | 데이터 항목 12 | 1200 | ms | 측정값 L |\n\
+| 행 13 | 데이터 항목 13 | 1300 | ms | 측정값 M |\n\
+| 행 14 | 데이터 항목 14 | 1400 | ms | 측정값 N |\n\
+| 행 15 | 데이터 항목 15 | 1500 | ms | 측정값 O |\n\
+| 행 16 | 데이터 항목 16 | 1600 | ms | 측정값 P |\n\
+| 행 17 | 데이터 항목 17 | 1700 | ms | 측정값 Q |\n\
+| 행 18 | 데이터 항목 18 | 1800 | ms | 측정값 R |\n\
+| 행 19 | 데이터 항목 19 | 1900 | ms | 측정값 S |\n\
+| 행 20 | 데이터 항목 20 | 2000 | ms | 측정값 T |\n\
+";
+
 fn bench_md_to_ir(c: &mut Criterion) {
     c.bench_function("md_to_ir", |b| {
         b.iter(|| hwp2md::md::parse_markdown(black_box(SAMPLE_MD)));
@@ -83,12 +109,36 @@ fn bench_roundtrip(c: &mut Criterion) {
     });
 }
 
+fn bench_ir_to_hwpx_table_heavy(c: &mut Criterion) {
+    let doc = hwp2md::md::parse_markdown(TABLE_HEAVY_MD);
+    let tmp = NamedTempFile::new().expect("tempfile");
+    c.bench_function("ir_to_hwpx_table_heavy", |b| {
+        b.iter(|| {
+            hwp2md::hwpx::write_hwpx(black_box(&doc), tmp.path(), None)
+                .expect("write_hwpx failed");
+        });
+    });
+}
+
+fn bench_hwpx_table_heavy_roundtrip(c: &mut Criterion) {
+    let tmp = NamedTempFile::new().expect("tempfile");
+    c.bench_function("hwpx_table_heavy_roundtrip", |b| {
+        b.iter(|| {
+            let doc = hwp2md::md::parse_markdown(black_box(TABLE_HEAVY_MD));
+            hwp2md::hwpx::write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+            hwp2md::hwpx::read_hwpx(tmp.path()).expect("read_hwpx")
+        });
+    });
+}
+
 criterion_group!(
     benches,
     bench_md_to_ir,
     bench_ir_to_md,
     bench_ir_to_hwpx,
     bench_hwpx_to_ir,
-    bench_roundtrip
+    bench_roundtrip,
+    bench_ir_to_hwpx_table_heavy,
+    bench_hwpx_table_heavy_roundtrip
 );
 criterion_main!(benches);
