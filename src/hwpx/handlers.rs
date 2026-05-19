@@ -392,11 +392,10 @@ pub(super) fn handle_empty_element(
             ctx.active_text_buf().push('\n');
         }
         "cellAddr" | "hp:cellAddr" => {
-            // `cellAddr` carries `colAddr`/`rowAddr` (cell position) in the
-            // OWPML spec, but some older writers (including earlier versions of
-            // this codebase) emitted colspan/rowspan here.  We read both for
-            // backward compatibility; the authoritative values come from
-            // `cellSpan` when present.
+            // `cellAddr` carries `colAddr`/`rowAddr` plus span attrs in older
+            // HWPX files.  Read spans here for backward compatibility; when
+            // `cellSpan` is also present it comes after `cellAddr` per OWPML
+            // element order, so its values overwrite these safely.
             for attr in e.attributes().flatten() {
                 let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                 let val = attr.unescape_value().unwrap_or_default();

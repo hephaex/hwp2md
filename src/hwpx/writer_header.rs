@@ -170,8 +170,9 @@ fn write_border_fills<W: Write>(
     w.write_event(Event::End(BytesEnd::new("hh:borderFill")))?;
 
     // ── Entry 2: all-black solid border (used by table cells) ────────────
+    let table_fill_id = tables.table_border_fill_id.to_string();
     let mut bf2 = BytesStart::new("hh:borderFill");
-    bf2.push_attribute(("id", "2"));
+    bf2.push_attribute(("id", table_fill_id.as_str()));
     bf2.push_attribute(("threeD", "false"));
     bf2.push_attribute(("shadow", "false"));
     w.write_event(Event::Start(bf2))?;

@@ -382,7 +382,8 @@ fn write_table<W: Write>(
     let mut tbl = BytesStart::new("hp:tbl");
     tbl.push_attribute(("rowCnt", row_cnt_str.as_str()));
     tbl.push_attribute(("colCnt", col_cnt_str.as_str()));
-    tbl.push_attribute(("borderFillIDRef", "2"));
+    let table_fill_ref = tables.table_border_fill_id.to_string();
+    tbl.push_attribute(("borderFillIDRef", table_fill_ref.as_str()));
     tbl.push_attribute(("noAdjust", "0"));
     writer.write_event(Event::Start(tbl))?;
 

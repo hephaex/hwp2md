@@ -144,8 +144,10 @@ pub(crate) struct RefTables {
     pub(crate) char_pr_ids: HashMap<CharPrKey, u32>,
     /// Unique font names in document order (first seen wins for ordering).
     pub(crate) font_names: Vec<String>,
-    /// The single default borderFill entry ID (always 1).
+    /// The default no-border fill entry ID (always 1, used by charPr).
     pub(crate) border_fill_id: u32,
+    /// The solid-border fill entry ID (always 2, referenced by table cells).
+    pub(crate) table_border_fill_id: u32,
     /// Resolved code font name (from style template or default).
     pub(crate) code_font: String,
     /// User-supplied style template (for page layout, heading spacing, etc.).
@@ -210,6 +212,7 @@ impl RefTables {
             char_pr_ids,
             font_names,
             border_fill_id: 1,
+            table_border_fill_id: 2,
             code_font,
             style,
         }
