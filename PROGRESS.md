@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 38 완료 (hp:tblPr emission + table-heavy benchmarks)
+## 현재 상태: v0.5.0 Sprint 39 완료 (table margin const extraction + criterion bench baseline)
 
 ### 완료
 
@@ -259,6 +259,24 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-19 — v0.5.0 Sprint 39: Table Margin Const Extraction + Criterion Bench Baseline
+
+**S39-01: Magic literal extraction** (`src/hwpx/writer_section.rs`):
+- `TABLE_INNER_MARGIN: &str = "141"` — inter-cell gap in `<hp:inMargin>`
+- `TABLE_CELL_PAD_H: &str = "510"` — horizontal padding in `<hp:cellMargin>`
+- `TABLE_CELL_PAD_V: &str = "141"` — vertical padding in `<hp:cellMargin>`
+- Replaced 8 literal sites; kept separate despite equal values (distinct physical concepts)
+
+**S39-02: Criterion bench baseline** (2026-05-19, Apple Silicon):
+- `ir_to_md`: 8.29 µs
+- `ir_to_hwpx`: 474.78 µs | `hwpx_to_ir`: 205.96 µs
+- `md_hwpx_md_roundtrip`: 764.52 µs
+- `ir_to_hwpx_table_heavy` (20×5): 692.49 µs | `hwpx_table_heavy_write_read`: 1.117 ms
+
+**리뷰 follow-up**: `write_table_2x3_has_required_elements`에 `<hp:cellMargin>` 속성값 assertion 추가 (left/right=510, top/bottom=141)
+
+**검증**: `cargo clippy --all-targets -- -W clippy::pedantic` **0 warnings**, 1254 tests (0 failures)
 
 ### 2026-05-19 — v0.5.0 Sprint 37: colspan cellSz Scaling + HWPX Span Proptest + Publish Prep
 
