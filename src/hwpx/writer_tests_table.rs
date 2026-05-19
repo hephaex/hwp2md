@@ -243,6 +243,66 @@ fn write_table_roundtrip_cell_text() {
     );
 }
 
+/// A cell with `colspan=2, rowspan=1` must emit `<hp:cellSz width="16000"` (2 × 8000).
+///
+/// The writer scales `width` by `colspan` so that merged cells span the correct
+/// horizontal extent in OWPML.  A normal cell (`colspan=1`) must still have
+/// `width="8000"`.
+#[test]
+fn write_table_colspan_cellsz_scaled() {
+    // Row 0: one merged cell (colspan=2) followed by a normal cell (colspan=1).
+    let merged_cell = ir::TableCell {
+        blocks: vec![Block::Paragraph {
+            inlines: vec![Inline::plain("merged")],
+        }],
+        colspan: 2,
+        rowspan: 1,
+    };
+    let normal_cell = ir::TableCell {
+        blocks: vec![Block::Paragraph {
+            inlines: vec![Inline::plain("normal")],
+        }],
+        colspan: 1,
+        rowspan: 1,
+    };
+    let rows = vec![ir::TableRow {
+        cells: vec![merged_cell, normal_cell],
+        is_header: false,
+    }];
+    // col_count reflects the *logical* column count (3 columns: 2 merged + 1).
+    let doc = Document {
+        metadata: Metadata::default(),
+        sections: vec![Section {
+            blocks: vec![Block::Table { rows, col_count: 3 }],
+            page_layout: None,
+            ..Default::default()
+        }],
+        assets: Vec::new(),
+    };
+    let tables = RefTables::build(&doc, None);
+    let sec = &doc.sections[0];
+    let asset_map = ImageAssetMap::new();
+    let xml =
+        generate_section_xml(sec, 0, &tables, &asset_map).expect("generate_section_xml failed");
+
+    // The colspan=2 cell must have width="16000" (2 × TABLE_CELL_WIDTH of 8000).
+    assert!(
+        xml.contains(r#"width="16000""#),
+        "merged cell (colspan=2) must emit width=\"16000\": {xml}"
+    );
+    // The XML must NOT contain a bare width="8000" for the merged cell position.
+    // We verify by checking that 16000 is present (above) and that 8000 only
+    // appears for the normal colspan=1 cell — we do that by confirming 16000
+    // appears before any 8000 in the output (cells are emitted in order).
+    let pos_16000 = xml.find(r#"width="16000""#).expect("16000 must be present");
+    let first_8000 = xml.find(r#"width="8000""#);
+    assert!(
+        first_8000.map_or(true, |p| pos_16000 < p),
+        "width=\"16000\" for merged cell must appear before any width=\"8000\" \
+         (merged cell is emitted first): {xml}"
+    );
+}
+
 /// A cell with `colspan=2, rowspan=1` must emit `<hp:cellSpan colSpan="2" rowSpan="1"/>`.
 #[test]
 fn write_table_colspan_emitted_in_cell_span() {

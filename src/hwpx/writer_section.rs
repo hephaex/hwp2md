@@ -376,7 +376,6 @@ fn write_table<W: Write>(
     let tbl_height = (row_cnt * TABLE_CELL_HEIGHT).to_string();
     let row_cnt_str = row_cnt.to_string();
     let col_cnt_str = col_cnt.to_string();
-    let cell_width_str = TABLE_CELL_WIDTH.to_string();
     let cell_height_str = TABLE_CELL_HEIGHT.to_string();
 
     let mut tbl = BytesStart::new("hp:tbl");
@@ -426,10 +425,12 @@ fn write_table<W: Write>(
             cell_span.push_attribute(("rowSpan", rowspan_str.as_str()));
             writer.write_event(Event::Empty(cell_span))?;
 
-            // <hp:cellSz> — cell size
+            // <hp:cellSz> — cell size scales with colspan/rowspan
+            let cell_w = (cell.colspan as usize * TABLE_CELL_WIDTH).to_string();
+            let cell_h = (cell.rowspan as usize * TABLE_CELL_HEIGHT).to_string();
             let mut cell_sz = BytesStart::new("hp:cellSz");
-            cell_sz.push_attribute(("width", cell_width_str.as_str()));
-            cell_sz.push_attribute(("height", cell_height_str.as_str()));
+            cell_sz.push_attribute(("width", cell_w.as_str()));
+            cell_sz.push_attribute(("height", cell_h.as_str()));
             writer.write_event(Event::Empty(cell_sz))?;
 
             // <hp:cellMargin> — inner padding (HWP units)

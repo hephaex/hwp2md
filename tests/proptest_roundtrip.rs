@@ -6,8 +6,10 @@
 //!    non-empty document when the input was non-empty.
 //! 2. **Idempotence** — `write(parse(write(doc))) == write(doc)`.
 //! 3. **No panics** — the pipeline never panics on any generated document.
+//!
+//! A separate proptest block covers HWPX write→read span preservation.
 
-use hwp2md::ir::{Block, Document, Inline, ListItem, Section, TableCell, TableRow};
+use hwp2md::ir::{Block, Document, Inline, ListItem, Metadata, Section, TableCell, TableRow};
 use hwp2md::md::{parse_markdown, write_markdown};
 use proptest::prelude::*;
 
@@ -62,7 +64,7 @@ fn block_horizontal_rule() -> BoxedStrategy<Block> {
     Just(Block::HorizontalRule).boxed()
 }
 
-/// BlockQuote strategy: only Paragraph, Heading, or HorizontalRule inside.
+/// `BlockQuote` strategy: only Paragraph, Heading, or `HorizontalRule` inside.
 ///
 /// Nested List and Table are excluded because comrak's blockquote parser is
 /// strict about complex nested block structure and does not reliably round-trip
@@ -196,6 +198,47 @@ fn simple_document() -> impl Strategy<Value = Document> {
 }
 
 // ---------------------------------------------------------------------------
+// HWPX span strategy
+// ---------------------------------------------------------------------------
+
+/// A deterministic 2×2 table where every cell has `colspan=1, rowspan=1`.
+///
+/// Using fixed span values keeps the strategy simple: the roundtrip invariant
+/// is that the HWPX writer preserves span metadata, not that arbitrary spans
+/// survive.  The text content is drawn from `safe_text()` so each cell is
+/// distinguishable.
+fn table_with_spans() -> impl Strategy<Value = Block> {
+    (
+        safe_text(),
+        safe_text(),
+        safe_text(),
+        safe_text(),
+    )
+        .prop_map(|(a, b, c, d)| {
+            let make_cell = |text: String| TableCell {
+                blocks: vec![Block::Paragraph {
+                    inlines: vec![Inline::plain(&text)],
+                }],
+                colspan: 1,
+                rowspan: 1,
+            };
+            Block::Table {
+                rows: vec![
+                    TableRow {
+                        cells: vec![make_cell(a), make_cell(b)],
+                        is_header: true,
+                    },
+                    TableRow {
+                        cells: vec![make_cell(c), make_cell(d)],
+                        is_header: false,
+                    },
+                ],
+                col_count: 2,
+            }
+        })
+}
+
+// ---------------------------------------------------------------------------
 // Invariants
 // ---------------------------------------------------------------------------
 
@@ -256,5 +299,95 @@ proptest! {
     fn no_panics_on_random_documents(doc in simple_document()) {
         let md = write_markdown(&doc, false);
         let _parsed = parse_markdown(&md);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HWPX span roundtrip invariants
+// ---------------------------------------------------------------------------
+
+proptest! {
+    #![proptest_config(ProptestConfig {
+        cases: 64,
+        ..Default::default()
+    })]
+
+    /// HWPX write→read roundtrip preserves `colspan` and `rowspan` for every
+    /// cell in a 2×2 table.
+    ///
+    /// All cells use `colspan=1, rowspan=1`.  The invariant confirms that the
+    /// HWPX writer encodes span values and the reader decodes them faithfully —
+    /// even when the values are the trivial default.
+    #[test]
+    fn hwpx_table_roundtrip_preserves_spans(table in table_with_spans()) {
+        use hwp2md::hwpx::{read_hwpx, write_hwpx};
+
+        // Build a minimal Document containing only the generated table.
+        let doc = Document {
+            metadata: Metadata::default(),
+            sections: vec![Section {
+                blocks: vec![table.clone()],
+                page_layout: None,
+                header: None,
+                footer: None,
+                header_footer_type: None,
+            }],
+            assets: Vec::new(),
+        };
+
+        let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+        write_hwpx(&doc, tmp.path(), None).expect("write_hwpx failed");
+        let read_back = read_hwpx(tmp.path()).expect("read_hwpx failed");
+
+        // Extract the table rows from the original and the read-back document.
+        let Block::Table { rows: orig_rows, .. } = &table else {
+            unreachable!("strategy always produces a Table")
+        };
+
+        let parsed_rows = read_back
+            .sections
+            .into_iter()
+            .flat_map(|s| s.blocks)
+            .find_map(|b| match b {
+                Block::Table { rows, .. } => Some(rows),
+                _ => None,
+            })
+            .expect("no Table block found after HWPX roundtrip");
+
+        prop_assert_eq!(
+            parsed_rows.len(),
+            orig_rows.len(),
+            "row count must be preserved after HWPX roundtrip"
+        );
+
+        for (row_idx, (orig_row, parsed_row)) in
+            orig_rows.iter().zip(parsed_rows.iter()).enumerate()
+        {
+            prop_assert_eq!(
+                parsed_row.cells.len(),
+                orig_row.cells.len(),
+                "row {}: cell count must be preserved after HWPX roundtrip",
+                row_idx
+            );
+
+            for (col_idx, (orig_cell, parsed_cell)) in
+                orig_row.cells.iter().zip(parsed_row.cells.iter()).enumerate()
+            {
+                prop_assert_eq!(
+                    parsed_cell.colspan,
+                    orig_cell.colspan,
+                    "cell [{}][{}]: colspan must be preserved after HWPX roundtrip",
+                    row_idx,
+                    col_idx
+                );
+                prop_assert_eq!(
+                    parsed_cell.rowspan,
+                    orig_cell.rowspan,
+                    "cell [{}][{}]: rowspan must be preserved after HWPX roundtrip",
+                    row_idx,
+                    col_idx
+                );
+            }
+        }
     }
 }

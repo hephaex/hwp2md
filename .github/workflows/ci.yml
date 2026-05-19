@@ -55,7 +55,6 @@ jobs:
   semver:
     name: semver
     runs-on: ubuntu-latest
-    continue-on-error: true  # crate not yet on crates.io; remove after first publish
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
