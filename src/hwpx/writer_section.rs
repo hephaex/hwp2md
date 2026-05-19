@@ -357,6 +357,15 @@ const TABLE_CELL_WIDTH: usize = 8_000;
 /// Default row height in HWP units (1 000 ≈ 10 mm) used for table sizing.
 const TABLE_CELL_HEIGHT: usize = 1_000;
 
+/// Inner margin between table cells (left/right/top/bottom), ~1 mm in HWP units.
+const TABLE_INNER_MARGIN: &str = "141";
+
+/// Horizontal cell padding (left and right inner padding), ~3.6 mm in HWP units.
+const TABLE_CELL_PAD_H: &str = "510";
+
+/// Vertical cell padding (top and bottom inner padding), ~1 mm in HWP units.
+const TABLE_CELL_PAD_V: &str = "141";
+
 #[allow(clippy::too_many_arguments)]
 fn write_table<W: Write>(
     writer: &mut Writer<W>,
@@ -392,10 +401,10 @@ fn write_table<W: Write>(
     // <hp:tblPr> — table properties: inner cell gap margin
     writer.write_event(Event::Start(BytesStart::new("hp:tblPr")))?;
     let mut in_margin = BytesStart::new("hp:inMargin");
-    in_margin.push_attribute(("left", "141"));
-    in_margin.push_attribute(("right", "141"));
-    in_margin.push_attribute(("top", "141"));
-    in_margin.push_attribute(("bottom", "141"));
+    in_margin.push_attribute(("left", TABLE_INNER_MARGIN));
+    in_margin.push_attribute(("right", TABLE_INNER_MARGIN));
+    in_margin.push_attribute(("top", TABLE_INNER_MARGIN));
+    in_margin.push_attribute(("bottom", TABLE_INNER_MARGIN));
     writer.write_event(Event::Empty(in_margin))?;
     writer.write_event(Event::End(BytesEnd::new("hp:tblPr")))?;
 
@@ -448,10 +457,10 @@ fn write_table<W: Write>(
 
             // <hp:cellMargin> — inner padding (HWP units)
             let mut cell_margin = BytesStart::new("hp:cellMargin");
-            cell_margin.push_attribute(("left", "510"));
-            cell_margin.push_attribute(("right", "510"));
-            cell_margin.push_attribute(("top", "141"));
-            cell_margin.push_attribute(("bottom", "141"));
+            cell_margin.push_attribute(("left", TABLE_CELL_PAD_H));
+            cell_margin.push_attribute(("right", TABLE_CELL_PAD_H));
+            cell_margin.push_attribute(("top", TABLE_CELL_PAD_V));
+            cell_margin.push_attribute(("bottom", TABLE_CELL_PAD_V));
             writer.write_event(Event::Empty(cell_margin))?;
 
             // <hp:subList> — cell content (paragraphs)
