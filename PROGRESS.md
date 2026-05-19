@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 35 완료 (proptest expansion + CLI split + CI improvements)
+## 현재 상태: v0.5.0 Sprint 36 완료 (HWPX table writer OWPML completion + release prep)
 
 ### 완료
 
@@ -259,6 +259,23 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-19 — v0.5.0 Sprint 36: HWPX Table Writer OWPML Completion + Release Prep
+
+**T1: HWPX table writer — complete OWPML structure**:
+- `src/hwpx/writer_section.rs`: `write_table` helper extracted; emits `<hp:sz>`, `<hp:pos treatAsChar>`,
+  `<hp:trHeight>`, `<hp:cellAddr>`, `<hp:cellSpan>`, `<hp:cellSz>`, `<hp:cellMargin>`, `<hp:subList>`
+- `src/hwpx/writer_header.rs`: second borderFill entry (id=2, SOLID black) added; itemCnt 1→2
+- `src/hwpx/writer.rs`: `RefTables.table_border_fill_id: u32 = 2` — single source of truth for table border ID
+- `src/hwpx/handlers.rs`: `cellSpan` handler added (OWPML-authoritative span source);
+  `cellAddr` handler preserved for old HWPX compat with clarified comment
+- `src/hwpx/writer_tests_table.rs`: 6 new tests (structure, indices, roundtrip, colspan, borderFill)
+
+**T2: v0.5.0 release prep**:
+- `CHANGELOG.md`: `[0.5.0] - Unreleased` → `[0.5.0] - 2026-05-19`; Sprint 34/35/36 entries added
+- Stale 0.4.x references: none found in docs/config
+
+**검증**: `cargo clippy --all-targets -- -W clippy::pedantic` **0 warnings**, 1251 tests (0 failures)
 
 ### 2026-05-19 — v0.5.0 Sprint 35: proptest Expansion + CLI Split + CI Improvements
 
