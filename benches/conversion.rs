@@ -121,11 +121,12 @@ fn bench_ir_to_hwpx_table_heavy(c: &mut Criterion) {
 }
 
 fn bench_hwpx_table_heavy_roundtrip(c: &mut Criterion) {
+    // Pre-parse MD outside the loop; benchmarks only the write+read path.
+    let doc = hwp2md::md::parse_markdown(TABLE_HEAVY_MD);
     let tmp = NamedTempFile::new().expect("tempfile");
-    c.bench_function("hwpx_table_heavy_roundtrip", |b| {
+    c.bench_function("hwpx_table_heavy_write_read", |b| {
         b.iter(|| {
-            let doc = hwp2md::md::parse_markdown(black_box(TABLE_HEAVY_MD));
-            hwp2md::hwpx::write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+            hwp2md::hwpx::write_hwpx(black_box(&doc), tmp.path(), None).expect("write_hwpx");
             hwp2md::hwpx::read_hwpx(tmp.path()).expect("read_hwpx")
         });
     });

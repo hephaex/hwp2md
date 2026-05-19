@@ -357,12 +357,21 @@ fn write_table_has_tblpr() {
         xml.contains("<hp:inMargin "),
         "must contain <hp:inMargin>: {xml}"
     );
+    // Extract the inMargin element to check all four attributes without
+    // false positives from cellMargin which also uses "141".
+    let im_start = xml.find("<hp:inMargin ").expect("<hp:inMargin> missing");
+    let im_end = xml[im_start..].find("/>").expect("/>") + im_start;
+    let im_tag = &xml[im_start..=im_end + 1];
+    assert!(im_tag.contains(r#"left="141""#),   "inMargin left must be 141: {im_tag}");
+    assert!(im_tag.contains(r#"right="141""#),  "inMargin right must be 141: {im_tag}");
+    assert!(im_tag.contains(r#"top="141""#),    "inMargin top must be 141: {im_tag}");
+    assert!(im_tag.contains(r#"bottom="141""#), "inMargin bottom must be 141: {im_tag}");
+
+    // tblPr must appear before sz (OWPML child-order requirement).
+    let tblpr_pos = xml.find("<hp:tblPr>").expect("<hp:tblPr> missing");
+    let sz_pos = xml.find("<hp:sz ").expect("<hp:sz> missing");
     assert!(
-        xml.contains(r#"left="141""#),
-        "inMargin left must be 141: {xml}"
-    );
-    assert!(
-        xml.contains(r#"right="141""#),
-        "inMargin right must be 141: {xml}"
+        tblpr_pos < sz_pos,
+        "<hp:tblPr> must appear before <hp:sz>: tblPr@{tblpr_pos}, sz@{sz_pos}"
     );
 }
