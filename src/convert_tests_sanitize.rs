@@ -89,6 +89,38 @@ fn sanitize_double_dot_falls_back() {
 }
 
 // -----------------------------------------------------------------------
+// sanitize_asset_name — control chars and trailing dots/spaces (HIGH fixes)
+// -----------------------------------------------------------------------
+
+#[test]
+fn sanitize_control_chars_replaced() {
+    assert_eq!(sanitize_asset_name("bad\x01name.png"), "bad_name.png");
+    assert_eq!(sanitize_asset_name("esc\x1Bname.png"), "esc_name.png");
+    assert_eq!(sanitize_asset_name("del\x7Fname.png"), "del_name.png");
+}
+
+#[test]
+fn sanitize_trailing_dots_stripped() {
+    // Windows rejects filenames ending with dots or spaces
+    assert_eq!(sanitize_asset_name("name. "), "name");
+    assert_eq!(sanitize_asset_name("file..."), "file");
+}
+
+// -----------------------------------------------------------------------
+// next_available_name — dotfile and multi-extension handling (HIGH fixes)
+// -----------------------------------------------------------------------
+
+#[test]
+fn next_available_name_dotfile_no_empty_stem() {
+    let mut seen = HashMap::new();
+    next_available_name(".htaccess", &mut seen);
+    // Should NOT produce " (2).htaccess" (leading space) — use fallback form
+    let result = next_available_name(".htaccess", &mut seen);
+    assert!(!result.starts_with(' '), "got leading space: {result:?}");
+    assert_eq!(result, ".htaccess (2)");
+}
+
+// -----------------------------------------------------------------------
 // next_available_name — collision counter
 // -----------------------------------------------------------------------
 

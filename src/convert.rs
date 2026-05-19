@@ -374,17 +374,20 @@ pub fn sanitize_asset_name(raw: &str) -> String {
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_default();
 
-    // Step 2: replace dangerous characters.
+    // Step 2: replace dangerous characters (NUL, path separators, ASCII control chars).
     let base: String = base
         .chars()
         .map(|c| {
-            if c == '\0' || c == '/' || c == '\\' {
+            if c == '\0' || c == '/' || c == '\\' || (c as u32) < 0x20 || c == '\x7F' {
                 '_'
             } else {
                 c
             }
         })
         .collect();
+
+    // Step 2b: strip trailing dots and spaces (Windows rejects these).
+    let base = base.trim_end_matches(['.', ' ']).to_string();
 
     // Step 3: Windows reserved device-name check (case-insensitive).
     let stem = base.rsplit_once('.').map_or(base.as_str(), |(s, _)| s);
@@ -411,11 +414,18 @@ fn next_available_name(name: &str, seen: &mut HashMap<String, u32>) -> String {
     let count = seen.entry(name.to_string()).or_insert(0);
     *count += 1;
     if *count == 1 {
-        name.to_string()
-    } else if let Some(dot) = name.rfind('.') {
-        format!("{} ({}).{}", &name[..dot], count, &name[dot + 1..])
-    } else {
-        format!("{name} ({count})")
+        return name.to_string();
+    }
+    // Use Path to correctly handle dotfiles (.htaccess) and multi-extension files.
+    let p = std::path::Path::new(name);
+    match (
+        p.file_stem().and_then(|s| s.to_str()),
+        p.extension().and_then(|e| e.to_str()),
+    ) {
+        (Some(stem), Some(ext)) if !stem.is_empty() => {
+            format!("{stem} ({count}).{ext}")
+        }
+        _ => format!("{name} ({count})"),
     }
 }
 
