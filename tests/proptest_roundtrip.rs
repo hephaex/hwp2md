@@ -7,7 +7,7 @@
 //! 2. **Idempotence** — `write(parse(write(doc))) == write(doc)`.
 //! 3. **No panics** — the pipeline never panics on any generated document.
 
-use hwp2md::ir::{Block, Document, Inline, Section};
+use hwp2md::ir::{Block, Document, Inline, ListItem, Section, TableCell, TableRow};
 use hwp2md::md::{parse_markdown, write_markdown};
 use proptest::prelude::*;
 
@@ -62,29 +62,137 @@ fn block_horizontal_rule() -> BoxedStrategy<Block> {
     Just(Block::HorizontalRule).boxed()
 }
 
+/// BlockQuote strategy: only Paragraph, Heading, or HorizontalRule inside.
+///
+/// Nested List and Table are excluded because comrak's blockquote parser is
+/// strict about complex nested block structure and does not reliably round-trip
+/// them.
+fn block_quote() -> BoxedStrategy<Block> {
+    let inner = prop_oneof![
+        block_paragraph(),
+        block_heading(),
+        block_horizontal_rule(),
+    ];
+    prop::collection::vec(inner, 1..4)
+        .prop_map(|blocks| Block::BlockQuote { blocks })
+        .boxed()
+}
+
+/// List strategy: ordered or unordered, 1–3 items, each item a single Paragraph.
+///
+/// Nested lists are excluded because comrak's indentation-based nesting is
+/// fragile under the wide variety of content proptest generates.  `start` is
+/// always 1 for ordered lists because comrak may renumber items when parsing,
+/// which would break idempotence for any other start value.
+fn block_list() -> BoxedStrategy<Block> {
+    (any::<bool>(), prop::collection::vec(block_paragraph(), 1..4))
+        .prop_map(|(ordered, paragraphs)| {
+            let items = paragraphs
+                .into_iter()
+                .map(|p| ListItem::new(vec![p], vec![]))
+                .collect();
+            Block::List {
+                ordered,
+                start: 1,
+                items,
+            }
+        })
+        .boxed()
+}
+
+/// Table strategy: 1–3 columns, header row + 0–3 data rows.
+///
+/// Each cell contains a single plain-text Paragraph derived from `safe_text()`.
+/// `col_count` is set to match the header cell count so the writer and parser
+/// agree on the column width.  `|` in cell text is escaped by the writer, but
+/// we use `safe_text()` which already excludes `|` to keep the strategy simple.
+fn block_table() -> BoxedStrategy<Block> {
+    (1usize..4usize)
+        .prop_flat_map(|cols| {
+            let header_cells = prop::collection::vec(inlines(), cols..=cols);
+            let data_rows = prop::collection::vec(
+                prop::collection::vec(inlines(), cols..=cols),
+                0..4usize,
+            );
+            (Just(cols), header_cells, data_rows)
+        })
+        .prop_map(|(cols, header_cells, data_rows)| {
+            let make_cell = |cell_inlines: Vec<Inline>| TableCell {
+                blocks: vec![Block::Paragraph {
+                    inlines: cell_inlines,
+                }],
+                colspan: 1,
+                rowspan: 1,
+            };
+
+            let header_row = TableRow {
+                cells: header_cells.into_iter().map(make_cell).collect(),
+                is_header: true,
+            };
+
+            let mut rows = vec![header_row];
+            for row_inlines in data_rows {
+                rows.push(TableRow {
+                    cells: row_inlines.into_iter().map(make_cell).collect(),
+                    is_header: false,
+                });
+            }
+
+            Block::Table {
+                rows,
+                col_count: cols,
+            }
+        })
+        .boxed()
+}
+
 fn block_simple() -> BoxedStrategy<Block> {
     prop_oneof![
         block_paragraph(),
         block_heading(),
         block_code(),
         block_horizontal_rule(),
+        block_quote(),
+        block_list(),
+        block_table(),
     ]
     .boxed()
 }
 
-fn simple_document() -> impl Strategy<Value = Document> {
-    prop::collection::vec(block_simple(), 1..8).prop_map(|blocks| {
-        let section = Section {
-            blocks,
-            page_layout: None,
-            header: None,
-            footer: None,
-            header_footer_type: None,
-        };
-        let mut doc = Document::new();
-        doc.sections.push(section);
-        doc
+/// Return `true` when no two consecutive blocks in `blocks` are both
+/// `Block::List` with the same `ordered` flag.
+///
+/// Comrak merges adjacent same-type lists (ordered+ordered or
+/// unordered+unordered) separated only by a blank line into a single loose
+/// list, which changes the rendered Markdown on the second write pass and
+/// breaks idempotence.  Filtering these cases out keeps the invariant valid
+/// without restricting the individual block strategies.
+fn no_adjacent_same_type_lists(blocks: &[Block]) -> bool {
+    blocks.windows(2).all(|pair| {
+        !matches!(
+            (&pair[0], &pair[1]),
+            (Block::List { ordered: a, .. }, Block::List { ordered: b, .. }) if a == b
+        )
     })
+}
+
+fn simple_document() -> impl Strategy<Value = Document> {
+    prop::collection::vec(block_simple(), 1..8)
+        .prop_filter("no adjacent same-type lists", |blocks| {
+            no_adjacent_same_type_lists(blocks)
+        })
+        .prop_map(|blocks| {
+            let section = Section {
+                blocks,
+                page_layout: None,
+                header: None,
+                footer: None,
+                header_footer_type: None,
+            };
+            let mut doc = Document::new();
+            doc.sections.push(section);
+            doc
+        })
 }
 
 // ---------------------------------------------------------------------------
@@ -126,33 +234,8 @@ proptest! {
     }
 
     /// Invariant 2: write is idempotent — `write(parse(write(doc))) == write(doc)`.
-    ///
-    /// # Known divergences
-    ///
-    /// Code-block bodies are passed through verbatim by the writer, but the
-    /// CommonMark parser normalises trailing whitespace inside fenced blocks.
-    /// Concretely, `"code \n"` is written as-is but parsed back as `"code"`,
-    /// producing a divergence on the second write pass.
-    ///
-    /// To keep the invariant testable without disabling it, code blocks whose
-    /// body contains trailing whitespace on any line are skipped via
-    /// `prop_assume!`.  All other document shapes must be fully idempotent.
     #[test]
     fn write_is_idempotent(doc in simple_document()) {
-        // Skip documents where a code-block body has trailing whitespace on any
-        // line, because CommonMark parsers normalise that and the second write
-        // pass will differ from the first.
-        let has_trailing_ws_in_code = doc.sections.iter().any(|sec| {
-            sec.blocks.iter().any(|blk| {
-                if let Block::CodeBlock { code, .. } = blk {
-                    code.lines().any(|l| l != l.trim_end())
-                } else {
-                    false
-                }
-            })
-        });
-        prop_assume!(!has_trailing_ws_in_code);
-
         let md1 = write_markdown(&doc, false);
         let doc2 = parse_markdown(&md1);
         let md2 = write_markdown(&doc2, false);

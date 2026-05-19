@@ -1,4 +1,4 @@
-use crate::ir;
+use crate::ir::{self, InlineFormat};
 
 use super::state::FormattingState;
 use super::ParseContext;
@@ -63,7 +63,7 @@ fn flush_inlines_to_blocks(
     if !text.is_empty() {
         let t = std::mem::take(text);
         inlines.push(
-            ir::Inline::with_formatting(t, &crate::ir::InlineFormat::from(fmt))
+            ir::Inline::with_formatting(t, &InlineFormat::from(fmt))
                 .with_font_name(fmt.font_name.clone()),
         );
     }
@@ -75,7 +75,7 @@ fn flush_inlines_to_blocks(
 
 /// Build an `ir::Inline` from the current formatting state.
 fn make_inline(text: String, fmt: &FormattingState) -> ir::Inline {
-    ir::Inline::with_formatting(text, &crate::ir::InlineFormat::from(fmt))
+    ir::Inline::with_formatting(text, &InlineFormat::from(fmt))
         .with_font_name(fmt.font_name.clone())
 }
 

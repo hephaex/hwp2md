@@ -1,4 +1,4 @@
-use crate::ir;
+use crate::ir::{self, InlineFormat};
 use comrak::nodes::{AstNode, ListType, NodeValue};
 use comrak::{parse_document, Arena, Options};
 
@@ -393,7 +393,7 @@ fn collect_inlines_recursive<'a>(
                     ruby_annotation.push_str(text);
                     continue;
                 }
-                let fmt = crate::ir::InlineFormat {
+                let fmt = InlineFormat {
                     bold: current_style.bold,
                     italic: current_style.italic,
                     underline: current_style.underline,

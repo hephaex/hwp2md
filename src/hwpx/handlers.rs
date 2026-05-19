@@ -1,4 +1,4 @@
-use crate::ir;
+use crate::ir::{self, InlineFormat};
 
 use super::context::{
     apply_charpr_attrs, flush_active_paragraph_scope, flush_cell_paragraph, flush_footer_paragraph,
@@ -220,7 +220,7 @@ pub(super) fn handle_end_element(
             if !text.is_empty() {
                 let inline = ir::Inline::with_formatting(
                     text,
-                    &crate::ir::InlineFormat::from(&ctx.fmt),
+                    &InlineFormat::from(&ctx.fmt),
                 )
                 .with_font_name(ctx.fmt.font_name.clone())
                 .with_link(if ctx.in_hyperlink {
@@ -313,7 +313,7 @@ pub(super) fn handle_end_element(
             if !base.is_empty() || !annotation.is_empty() {
                 let inline = ir::Inline::with_formatting(
                     base,
-                    &crate::ir::InlineFormat::from(&ctx.fmt),
+                    &InlineFormat::from(&ctx.fmt),
                 )
                 .with_ruby(if annotation.is_empty() {
                     None

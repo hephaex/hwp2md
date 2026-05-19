@@ -1,6 +1,6 @@
 use crate::hwp::eqedit::eqedit_to_latex;
 use crate::hwp::model::{DocInfo, HwpControl, HwpDocument, HwpParagraph, HwpTableCell};
-use crate::ir;
+use crate::ir::{self, InlineFormat};
 use crate::url_util::is_safe_url_scheme;
 
 /// HWP font height is in 1/100 point units (HWP internal unit).
@@ -580,7 +580,7 @@ pub(crate) fn build_inlines(para: &HwpParagraph, doc_info: &DocInfo) -> Vec<ir::
             // Resolve font name via face_id lookup in the DocInfo face_names table.
             let font_name = doc_info.face_names.get(cs.face_id as usize).cloned();
 
-            let fmt = crate::ir::InlineFormat {
+            let fmt = InlineFormat {
                 bold: cs.bold,
                 italic: cs.italic,
                 underline: cs.underline,

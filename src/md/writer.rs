@@ -117,7 +117,7 @@ fn write_block(out: &mut String, block: &ir::Block, indent: usize) {
             let lang = language.as_deref().unwrap_or("");
             let _ = writeln!(out, "{prefix}```{lang}");
             for line in code.lines() {
-                let _ = writeln!(out, "{prefix}{line}");
+                let _ = writeln!(out, "{prefix}{}", line.trim_end());
             }
             let _ = writeln!(out, "{prefix}```\n");
         }

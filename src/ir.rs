@@ -258,7 +258,7 @@ pub enum Block {
 }
 
 /// Formatting attributes for an inline text run.
-// Bool fields track independent text decoration flags; struct grouping replaces a 7-arg constructor.
+// Independent text decoration flags; each flag controls a distinct orthogonal property. Bitflags would add complexity without safety benefit.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct InlineFormat {
