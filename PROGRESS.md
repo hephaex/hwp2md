@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 33 완료 (security hardening + InlineFormat refactor)
+## 현재 상태: v0.5.0 Sprint 34 완료 (proptest invariants + write_assets security)
 
 ### 완료
 
@@ -259,6 +259,21 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-19 — v0.5.0 Sprint 34: proptest Roundtrip Invariants + write_assets Security
+
+**S34-01: proptest roundtrip invariants**:
+- `tests/proptest_roundtrip.rs` 신규 작성; `proptest = "1"` dev-dependency 추가
+- 3가지 속성 기반 불변식 (128 케이스): `roundtrip_preserves_block_structure`, `write_is_idempotent`, `no_panics_on_random_documents`
+- `safe_text()` 전략: 제어문자·서로게이트 없는 유니코드 — 파서 충돌 방지
+- `CodeBlock` trailing-whitespace 불일치는 `prop_assume!` 임시 필터링 (Sprint 35 수정 예정)
+
+**S34-02: `write_assets` 경로 보안 강화**:
+- `sanitize_asset_name`: 경로 순회(`../../`), NUL/제어문자(0x01–0x1F, 0x7F), 후행 점/공백, Windows 예약명(CON/PRN/AUX/NUL/COM1-9/LPT1-9) 모두 처리
+- `next_available_name`: 점파일 충돌 버그 수정 (`rfind('.')` → `Path::file_stem()/extension()`)
+- `src/convert_tests_sanitize.rs` 21개 단위 테스트 추가
+
+**검증**: `cargo clippy --all-targets -- -W clippy::pedantic` **0 warnings**, 1245 tests (0 failures)
 
 ### 2026-05-19 — v0.5.0 Sprint 33: Security Hardening + InlineFormat Refactor
 
