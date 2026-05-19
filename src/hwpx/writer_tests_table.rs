@@ -285,21 +285,17 @@ fn write_table_colspan_cellsz_scaled() {
     let xml =
         generate_section_xml(sec, 0, &tables, &asset_map).expect("generate_section_xml failed");
 
-    // The colspan=2 cell must have width="16000" (2 × TABLE_CELL_WIDTH of 8000).
-    assert!(
-        xml.contains(r#"width="16000""#),
-        "merged cell (colspan=2) must emit width=\"16000\": {xml}"
+    // Merged cell (colspan=2) must emit exactly one width="16000".
+    let count_16000 = xml.matches(r#"width="16000""#).count();
+    assert_eq!(
+        count_16000, 1,
+        "expected exactly 1 occurrence of width=\"16000\" (merged cell): {xml}"
     );
-    // The XML must NOT contain a bare width="8000" for the merged cell position.
-    // We verify by checking that 16000 is present (above) and that 8000 only
-    // appears for the normal colspan=1 cell — we do that by confirming 16000
-    // appears before any 8000 in the output (cells are emitted in order).
-    let pos_16000 = xml.find(r#"width="16000""#).expect("16000 must be present");
-    let first_8000 = xml.find(r#"width="8000""#);
-    assert!(
-        first_8000.map_or(true, |p| pos_16000 < p),
-        "width=\"16000\" for merged cell must appear before any width=\"8000\" \
-         (merged cell is emitted first): {xml}"
+    // Normal cell (colspan=1) must emit exactly one width="8000".
+    let count_8000 = xml.matches(r#"width="8000""#).count();
+    assert_eq!(
+        count_8000, 1,
+        "expected exactly 1 occurrence of width=\"8000\" (normal cell): {xml}"
     );
 }
 

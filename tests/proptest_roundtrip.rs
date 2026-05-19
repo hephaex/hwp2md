@@ -201,20 +201,15 @@ fn simple_document() -> impl Strategy<Value = Document> {
 // HWPX span strategy
 // ---------------------------------------------------------------------------
 
-/// A deterministic 2×2 table where every cell has `colspan=1, rowspan=1`.
+/// Table strategy for HWPX span roundtrip tests.
 ///
-/// Using fixed span values keeps the strategy simple: the roundtrip invariant
-/// is that the HWPX writer preserves span metadata, not that arbitrary spans
-/// survive.  The text content is drawn from `safe_text()` so each cell is
-/// distinguishable.
+/// Generates two variants with equal probability:
+/// - **Variant A**: 2×2 table, all cells `colspan=1, rowspan=1` — baseline.
+/// - **Variant B**: 2-column table, single header row with one cell spanning
+///   both columns (`colspan=2`) — exercises non-trivial span encoding.
 fn table_with_spans() -> impl Strategy<Value = Block> {
-    (
-        safe_text(),
-        safe_text(),
-        safe_text(),
-        safe_text(),
-    )
-        .prop_map(|(a, b, c, d)| {
+    let variant_a = (safe_text(), safe_text(), safe_text(), safe_text()).prop_map(
+        |(a, b, c, d)| {
             let make_cell = |text: String| TableCell {
                 blocks: vec![Block::Paragraph {
                     inlines: vec![Inline::plain(&text)],
@@ -235,7 +230,24 @@ fn table_with_spans() -> impl Strategy<Value = Block> {
                 ],
                 col_count: 2,
             }
-        })
+        },
+    );
+
+    let variant_b = safe_text().prop_map(|text| Block::Table {
+        rows: vec![TableRow {
+            cells: vec![TableCell {
+                blocks: vec![Block::Paragraph {
+                    inlines: vec![Inline::plain(&text)],
+                }],
+                colspan: 2,
+                rowspan: 1,
+            }],
+            is_header: true,
+        }],
+        col_count: 2,
+    });
+
+    prop_oneof![variant_a, variant_b]
 }
 
 // ---------------------------------------------------------------------------

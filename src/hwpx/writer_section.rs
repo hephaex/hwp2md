@@ -425,9 +425,9 @@ fn write_table<W: Write>(
             cell_span.push_attribute(("rowSpan", rowspan_str.as_str()));
             writer.write_event(Event::Empty(cell_span))?;
 
-            // <hp:cellSz> — cell size scales with colspan/rowspan
-            let cell_w = (cell.colspan as usize * TABLE_CELL_WIDTH).to_string();
-            let cell_h = (cell.rowspan as usize * TABLE_CELL_HEIGHT).to_string();
+            // <hp:cellSz> — cell size scales with colspan/rowspan; .max(1) guards malformed 0 values
+            let cell_w = (cell.colspan.max(1) as usize * TABLE_CELL_WIDTH).to_string();
+            let cell_h = (cell.rowspan.max(1) as usize * TABLE_CELL_HEIGHT).to_string();
             let mut cell_sz = BytesStart::new("hp:cellSz");
             cell_sz.push_attribute(("width", cell_w.as_str()));
             cell_sz.push_attribute(("height", cell_h.as_str()));
