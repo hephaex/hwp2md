@@ -125,10 +125,15 @@ fn write_border_fills<W: Write>(
     w: &mut Writer<W>,
     tables: &RefTables,
 ) -> Result<(), quick_xml::Error> {
+    // Two entries:
+    //   id=1 (border_fill_id): default no-border fill used by charPr.
+    //   id=2: all-black solid border fill referenced by table cells via
+    //         `borderFillIDRef="2"` on `<hp:tbl>` and `<hh:charPr>`.
     let mut border_fills = BytesStart::new("hh:borderFills");
-    border_fills.push_attribute(("itemCnt", "1"));
+    border_fills.push_attribute(("itemCnt", "2"));
     w.write_event(Event::Start(border_fills))?;
 
+    // ── Entry 1: no-border (used by charPr defaults) ──────────────────────
     let id_str = tables.border_fill_id.to_string();
     let mut bf = BytesStart::new("hh:borderFill");
     bf.push_attribute(("id", id_str.as_str()));
@@ -163,6 +168,42 @@ fn write_border_fills<W: Write>(
     }
 
     w.write_event(Event::End(BytesEnd::new("hh:borderFill")))?;
+
+    // ── Entry 2: all-black solid border (used by table cells) ────────────
+    let mut bf2 = BytesStart::new("hh:borderFill");
+    bf2.push_attribute(("id", "2"));
+    bf2.push_attribute(("threeD", "false"));
+    bf2.push_attribute(("shadow", "false"));
+    w.write_event(Event::Start(bf2))?;
+
+    let mut slash2 = BytesStart::new("hh:slash");
+    slash2.push_attribute(("type", "NONE"));
+    slash2.push_attribute(("Crooked", "false"));
+    slash2.push_attribute(("isCounter", "false"));
+    w.write_event(Event::Empty(slash2))?;
+
+    let mut back_slash2 = BytesStart::new("hh:backSlash");
+    back_slash2.push_attribute(("type", "NONE"));
+    back_slash2.push_attribute(("Crooked", "false"));
+    back_slash2.push_attribute(("isCounter", "false"));
+    w.write_event(Event::Empty(back_slash2))?;
+
+    for border_name in &[
+        "hh:leftBorder",
+        "hh:rightBorder",
+        "hh:topBorder",
+        "hh:bottomBorder",
+        "hh:diagonal",
+    ] {
+        let mut border = BytesStart::new(*border_name);
+        border.push_attribute(("type", "SOLID"));
+        border.push_attribute(("width", "0.12 mm"));
+        border.push_attribute(("color", "000000"));
+        w.write_event(Event::Empty(border))?;
+    }
+
+    w.write_event(Event::End(BytesEnd::new("hh:borderFill")))?;
+
     w.write_event(Event::End(BytesEnd::new("hh:borderFills")))?;
     Ok(())
 }

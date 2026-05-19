@@ -132,3 +132,6 @@ mod tests_para_pr;
 
 #[path = "writer_tests_header_footer.rs"]
 mod tests_header_footer;
+
+#[path = "writer_tests_table.rs"]
+mod tests_table;

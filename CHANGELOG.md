@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - Unreleased
+## [0.5.0] - 2026-05-19
 
 ### Added
 - **Phase B-1**: YAML-based style template (`--style`) — `StyleTemplate` with
@@ -109,6 +109,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction with Markdown rendering.
 
 ### Changed
+- **Sprint 36**: HWPX table writer — complete OWPML structure: `<hp:sz>`, `<hp:pos treatAsChar>`,
+  `<hp:trHeight>`, `<hp:cellAddr>`, `<hp:cellSpan>`, `<hp:cellSz>`, `<hp:cellMargin>`, `<hp:subList>`
+  emitted per cell; second `borderFill` entry (id=2, solid black) added to header; `cellSpan` handler
+  added to HWPX reader; 6 new tests in `writer_tests_table.rs`; write→read roundtrip preserves cell text.
+- **Sprint 35**: CodeBlock trailing-whitespace normalised in MD writer (`line.trim_end()`); `prop_assume!`
+  removed from proptest. proptest expanded with `block_quote()`, `block_list()`, `block_table()` strategies
+  + `no_adjacent_same_type_lists` filter. `tests/cli.rs` (753L) split into `cli_general`, `cli_to_md`,
+  `cli_to_hwpx`. `InlineFormat` imports de-qualified in 4 source files. CI: `msrv` (Rust 1.75.0 check)
+  + `semver` (cargo-semver-checks) jobs added.
+- **Sprint 34**: `proptest` roundtrip invariants (3 properties × 128 cases). `sanitize_asset_name`
+  hardened — path traversal, NUL/control chars, trailing dots/spaces, Windows reserved names; dotfile
+  collision fix in `next_available_name`; 21 unit tests in `convert_tests_sanitize.rs`.
 - **Sprint 33**: Security hardening — `try_lenient_read` capped at 256 MiB (`FileTooLarge`); malformed
   shape/BinData IDs > u16 now skip+warn instead of silently aliasing to `u16::MAX`. API refactor —
   new `InlineFormat` POD in `ir`; `Inline::with_formatting` takes `&InlineFormat` instead of 7 positional

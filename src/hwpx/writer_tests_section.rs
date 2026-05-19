@@ -215,10 +215,22 @@ fn section_xml_table_2x2() {
         xml.contains(r#"<hp:run charPrIDRef="0">"#),
         "run wrapper: {xml}"
     );
-    // 5-C: tbl must carry rowCnt and colCnt
+    // 5-C: tbl must carry rowCnt, colCnt, borderFillIDRef and noAdjust
     assert!(
-        xml.contains(r#"<hp:tbl rowCnt="2" colCnt="2">"#),
-        "tbl with rowCnt/colCnt: {xml}"
+        xml.contains(r#"rowCnt="2""#),
+        "tbl must have rowCnt=2: {xml}"
+    );
+    assert!(
+        xml.contains(r#"colCnt="2""#),
+        "tbl must have colCnt=2: {xml}"
+    );
+    assert!(
+        xml.contains(r#"borderFillIDRef="2""#),
+        "tbl must have borderFillIDRef=2: {xml}"
+    );
+    assert!(
+        xml.contains(r#"noAdjust="0""#),
+        "tbl must have noAdjust=0: {xml}"
     );
     assert!(xml.contains("</hp:tbl>"), "tbl close: {xml}");
     assert_eq!(xml.matches("<hp:tr>").count(), 2, "two rows: {xml}");
@@ -257,7 +269,9 @@ fn section_xml_table_colspan_rowspan_present() {
 
 #[test]
 fn section_xml_table_no_celladdr_for_1x1() {
-    // When colspan=1 and rowspan=1, no <hp:cellAddr> should be emitted.
+    // The OWPML-compliant writer always emits <hp:cellAddr> and <hp:cellSpan>
+    // for every cell — including 1×1 cells — so that validators and readers
+    // can always find the position and span information without special-casing.
     let cell = TableCell {
         blocks: vec![Block::Paragraph {
             inlines: vec![inline("normal")],
@@ -274,8 +288,22 @@ fn section_xml_table_no_celladdr_for_1x1() {
     }]);
     assert!(xml.contains("<hp:tc>"), "tc emitted: {xml}");
     assert!(
-        !xml.contains("<hp:cellAddr"),
-        "cellAddr must NOT appear for 1x1: {xml}"
+        xml.contains("<hp:cellAddr "),
+        "cellAddr must appear for all cells: {xml}"
+    );
+    assert!(
+        xml.contains("<hp:cellSpan "),
+        "cellSpan must appear for all cells: {xml}"
+    );
+    // For a single 1×1 cell the position is col=0, row=0.
+    assert!(
+        xml.contains(r#"colAddr="0" rowAddr="0""#),
+        "1x1 cell must be at colAddr=0 rowAddr=0: {xml}"
+    );
+    // Span values must be 1×1.
+    assert!(
+        xml.contains(r#"colSpan="1" rowSpan="1""#),
+        "1x1 cell must have colSpan=1 rowSpan=1: {xml}"
     );
 }
 

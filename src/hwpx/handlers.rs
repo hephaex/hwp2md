@@ -392,6 +392,35 @@ pub(super) fn handle_empty_element(
             ctx.active_text_buf().push('\n');
         }
         "cellAddr" | "hp:cellAddr" => {
+            // `cellAddr` carries `colAddr`/`rowAddr` (cell position) in the
+            // OWPML spec, but some older writers (including earlier versions of
+            // this codebase) emitted colspan/rowspan here.  We read both for
+            // backward compatibility; the authoritative values come from
+            // `cellSpan` when present.
+            for attr in e.attributes().flatten() {
+                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                let val = attr.unescape_value().unwrap_or_default();
+                match key {
+                    "colSpan" | "hp:colSpan" => {
+                        if let Ok(n) = val.parse::<u32>() {
+                            if n >= 1 {
+                                ctx.table.current_colspan = n;
+                            }
+                        }
+                    }
+                    "rowSpan" | "hp:rowSpan" => {
+                        if let Ok(n) = val.parse::<u32>() {
+                            if n >= 1 {
+                                ctx.table.current_rowspan = n;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        "cellSpan" | "hp:cellSpan" => {
+            // Authoritative colspan/rowspan per the OWPML spec.
             for attr in e.attributes().flatten() {
                 let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                 let val = attr.unescape_value().unwrap_or_default();

@@ -139,17 +139,20 @@ fn section_xml_table_wrapped_in_paragraph() {
     );
     // The table element must be present with rowCnt and colCnt.
     assert!(
-        xml.contains(r#"<hp:tbl rowCnt="1" colCnt="2">"#),
-        "tbl attrs: {xml}"
+        xml.contains(r#"rowCnt="1""#),
+        "tbl must have rowCnt=1: {xml}"
     );
+    assert!(
+        xml.contains(r#"colCnt="2""#),
+        "tbl must have colCnt=2: {xml}"
+    );
+    assert!(xml.contains("<hp:tbl "), "tbl element: {xml}");
     // Structural nesting: p opens before run, run opens before tbl.
     let p_pos = xml.find(r#"id="0""#).expect("p wrapper position");
     let run_pos = xml
         .find(r#"<hp:run charPrIDRef="0">"#)
         .expect("run position");
-    let tbl_pos = xml
-        .find(r#"<hp:tbl rowCnt="1" colCnt="2">"#)
-        .expect("tbl position");
+    let tbl_pos = xml.find("<hp:tbl ").expect("tbl position");
     assert!(p_pos < run_pos, "p must come before run: {xml}");
     assert!(run_pos < tbl_pos, "run must come before tbl: {xml}");
     // Cell paragraph IDs (inside the table) continue from the outer counter.

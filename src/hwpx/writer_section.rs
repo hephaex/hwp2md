@@ -162,11 +162,7 @@ fn write_block<W: Write>(
             write_inlines(writer, inlines, tables)?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
-        ir::Block::Table { rows, .. } => {
-            // OWPML requires <hp:tbl> to be a child of <hp:run> inside <hp:p>.
-            let row_cnt = rows.len();
-            let col_cnt = rows.first().map_or(0, |r| r.cells.len());
-
+        ir::Block::Table { rows, col_count } => {
             let id_str = para_id.to_string();
             *para_id += 1;
             let mut p = BytesStart::new("hp:p");
@@ -178,30 +174,8 @@ fn write_block<W: Write>(
             run.push_attribute(("charPrIDRef", "0"));
             writer.write_event(Event::Start(run))?;
 
-            let mut tbl = BytesStart::new("hp:tbl");
-            tbl.push_attribute(("rowCnt", row_cnt.to_string().as_str()));
-            tbl.push_attribute(("colCnt", col_cnt.to_string().as_str()));
-            writer.write_event(Event::Start(tbl))?;
+            write_table(writer, rows, *col_count, tables, para_id, quote_depth, asset_map)?;
 
-            for row in rows {
-                writer.write_event(Event::Start(BytesStart::new("hp:tr")))?;
-                for cell in &row.cells {
-                    writer.write_event(Event::Start(BytesStart::new("hp:tc")))?;
-                    if cell.colspan > 1 || cell.rowspan > 1 {
-                        let mut addr = BytesStart::new("hp:cellAddr");
-                        addr.push_attribute(("colSpan", cell.colspan.to_string().as_str()));
-                        addr.push_attribute(("rowSpan", cell.rowspan.to_string().as_str()));
-                        writer.write_event(Event::Empty(addr))?;
-                    }
-                    for b in &cell.blocks {
-                        write_block(writer, b, tables, para_id, quote_depth, asset_map)?;
-                    }
-                    writer.write_event(Event::End(BytesEnd::new("hp:tc")))?;
-                }
-                writer.write_event(Event::End(BytesEnd::new("hp:tr")))?;
-            }
-
-            writer.write_event(Event::End(BytesEnd::new("hp:tbl")))?;
             writer.write_event(Event::End(BytesEnd::new("hp:run")))?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
@@ -346,6 +320,139 @@ fn write_block<W: Write>(
             writer.write_event(Event::End(BytesEnd::new("hp:fn")))?;
         }
     }
+    Ok(())
+}
+
+/// Emit a complete OWPML `<hp:tbl>` element for the given rows.
+///
+/// Caller is responsible for the surrounding `<hp:p>` / `<hp:run>` wrappers.
+/// The table element structure emitted follows the OWPML spec:
+///
+/// ```xml
+/// <hp:tbl rowCnt="…" colCnt="…" borderFillIDRef="2" noAdjust="0">
+///   <hp:sz width="…" height="…"/>
+///   <hp:pos treatAsChar="1"/>
+///   <hp:tr>
+///     <hp:trHeight value="1000"/>
+///     <hp:tc>
+///       <hp:cellAddr colAddr="…" rowAddr="…"/>
+///       <hp:cellSpan colSpan="…" rowSpan="…"/>
+///       <hp:cellSz width="8000" height="1000"/>
+///       <hp:cellMargin left="510" right="510" top="141" bottom="141"/>
+///       <hp:subList>…paragraphs…</hp:subList>
+///     </hp:tc>
+///   </hp:tr>
+/// </hp:tbl>
+/// ```
+///
+/// Cell widths use 8 000 HWP units per column (≈ 80 mm) and row height is
+/// 1 000 HWP units (≈ 10 mm).  `borderFillIDRef="2"` references the
+/// all-black solid border entry defined in `header.xml`.
+/// Default cell width in HWP units (8 000 ≈ 80 mm) used for table sizing.
+const TABLE_CELL_WIDTH: usize = 8_000;
+
+/// Default row height in HWP units (1 000 ≈ 10 mm) used for table sizing.
+const TABLE_CELL_HEIGHT: usize = 1_000;
+
+#[allow(clippy::too_many_arguments)]
+fn write_table<W: Write>(
+    writer: &mut Writer<W>,
+    rows: &[ir::TableRow],
+    col_count: usize,
+    tables: &RefTables,
+    para_id: &mut u32,
+    quote_depth: u32,
+    asset_map: &ImageAssetMap,
+) -> Result<(), quick_xml::Error> {
+    let row_cnt = rows.len();
+    // Fall back to scanning the widest row when col_count is 0.
+    let col_cnt = if col_count > 0 {
+        col_count
+    } else {
+        rows.iter().map(|r| r.cells.len()).max().unwrap_or(0)
+    };
+
+    let tbl_width = (col_cnt * TABLE_CELL_WIDTH).to_string();
+    let tbl_height = (row_cnt * TABLE_CELL_HEIGHT).to_string();
+    let row_cnt_str = row_cnt.to_string();
+    let col_cnt_str = col_cnt.to_string();
+    let cell_width_str = TABLE_CELL_WIDTH.to_string();
+    let cell_height_str = TABLE_CELL_HEIGHT.to_string();
+
+    let mut tbl = BytesStart::new("hp:tbl");
+    tbl.push_attribute(("rowCnt", row_cnt_str.as_str()));
+    tbl.push_attribute(("colCnt", col_cnt_str.as_str()));
+    tbl.push_attribute(("borderFillIDRef", "2"));
+    tbl.push_attribute(("noAdjust", "0"));
+    writer.write_event(Event::Start(tbl))?;
+
+    // <hp:sz> — overall table dimensions
+    let mut sz = BytesStart::new("hp:sz");
+    sz.push_attribute(("width", tbl_width.as_str()));
+    sz.push_attribute(("height", tbl_height.as_str()));
+    writer.write_event(Event::Empty(sz))?;
+
+    // <hp:pos> — inline (treat-as-character) positioning
+    let mut pos = BytesStart::new("hp:pos");
+    pos.push_attribute(("treatAsChar", "1"));
+    writer.write_event(Event::Empty(pos))?;
+
+    for (row_idx, row) in rows.iter().enumerate() {
+        let row_idx_str = row_idx.to_string();
+        writer.write_event(Event::Start(BytesStart::new("hp:tr")))?;
+
+        // <hp:trHeight> — default row height
+        let mut tr_height = BytesStart::new("hp:trHeight");
+        tr_height.push_attribute(("value", cell_height_str.as_str()));
+        writer.write_event(Event::Empty(tr_height))?;
+
+        for (col_idx, cell) in row.cells.iter().enumerate() {
+            let col_idx_str = col_idx.to_string();
+            let colspan_str = cell.colspan.to_string();
+            let rowspan_str = cell.rowspan.to_string();
+
+            writer.write_event(Event::Start(BytesStart::new("hp:tc")))?;
+
+            // <hp:cellAddr> — cell position
+            let mut cell_addr = BytesStart::new("hp:cellAddr");
+            cell_addr.push_attribute(("colAddr", col_idx_str.as_str()));
+            cell_addr.push_attribute(("rowAddr", row_idx_str.as_str()));
+            writer.write_event(Event::Empty(cell_addr))?;
+
+            // <hp:cellSpan> — span information (always emitted, even for 1×1)
+            let mut cell_span = BytesStart::new("hp:cellSpan");
+            cell_span.push_attribute(("colSpan", colspan_str.as_str()));
+            cell_span.push_attribute(("rowSpan", rowspan_str.as_str()));
+            writer.write_event(Event::Empty(cell_span))?;
+
+            // <hp:cellSz> — cell size
+            let mut cell_sz = BytesStart::new("hp:cellSz");
+            cell_sz.push_attribute(("width", cell_width_str.as_str()));
+            cell_sz.push_attribute(("height", cell_height_str.as_str()));
+            writer.write_event(Event::Empty(cell_sz))?;
+
+            // <hp:cellMargin> — inner padding (HWP units)
+            let mut cell_margin = BytesStart::new("hp:cellMargin");
+            cell_margin.push_attribute(("left", "510"));
+            cell_margin.push_attribute(("right", "510"));
+            cell_margin.push_attribute(("top", "141"));
+            cell_margin.push_attribute(("bottom", "141"));
+            writer.write_event(Event::Empty(cell_margin))?;
+
+            // <hp:subList> — cell content (paragraphs)
+            writer.write_event(Event::Start(BytesStart::new("hp:subList")))?;
+            for b in &cell.blocks {
+                write_block(writer, b, tables, para_id, quote_depth, asset_map)?;
+            }
+            writer.write_event(Event::End(BytesEnd::new("hp:subList")))?;
+
+            writer.write_event(Event::End(BytesEnd::new("hp:tc")))?;
+        }
+
+        writer.write_event(Event::End(BytesEnd::new("hp:tr")))?;
+    }
+
+    writer.write_event(Event::End(BytesEnd::new("hp:tbl")))?;
     Ok(())
 }
 
