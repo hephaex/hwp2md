@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 37 완료 (colspan cellSz scaling + HWPX span proptest + publish prep)
+## 현재 상태: v0.5.0 Sprint 38 완료 (hp:tblPr emission + table-heavy benchmarks)
 
 ### 완료
 
@@ -277,6 +277,26 @@
 - `hwpx_table_roundtrip_preserves_spans` (64 cases): colspan=2 회귀 감지 가능
 
 **검증**: `cargo clippy --all-targets -- -W clippy::pedantic` **0 warnings**, 1253 tests (0 failures)
+
+### 2026-05-19 — v0.5.0 Sprint 38: hp:tblPr Emission + Table-Heavy Benchmarks
+
+**P4: Table-heavy benchmarks** (`benches/conversion.rs`):
+- `TABLE_HEAVY_MD`: 20행 × 5열 Korean 텍스트 테이블 constant 추가
+- `bench_ir_to_hwpx_table_heavy`: IR 사전 빌드, `write_hwpx`만 측정
+- `bench_hwpx_table_heavy_write_read`: IR 사전 빌드, write+read 경로 측정
+- `criterion_group!` 7 bench functions 등록
+
+**P5: `<hp:tblPr>` emission** (`src/hwpx/writer_section.rs`):
+- `write_table`: `<hp:tbl>` 첫 번째 자식으로 `<hp:tblPr><hp:inMargin left="141" right="141" top="141" bottom="141"/></hp:tblPr>` 추가 (OWPML spec 준수)
+- doc comment XML 예시 업데이트
+
+**테스트** (`src/hwpx/writer_tests_table.rs`):
+- `write_table_has_tblpr`: `<hp:inMargin>` 요소 추출 후 4방향 속성 검증; `tblPr < sz` 순서 불변성 assertion
+- `write_table_2x3_has_required_elements`: `<hp:tblPr>`, `<hp:inMargin>` assertion 추가
+
+**리뷰 follow-up**: benchmark criterion id 수정 (`hwpx_table_heavy_roundtrip` → `hwpx_table_heavy_write_read`), inMargin top/bottom assertion 추가, OWPML child-order assertion
+
+**검증**: `cargo clippy --all-targets -- -W clippy::pedantic` **0 warnings**, 1254 tests (0 failures)
 
 ### 2026-05-19 — v0.5.0 Sprint 36: HWPX Table Writer OWPML Completion + Release Prep
 
