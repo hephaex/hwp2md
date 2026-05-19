@@ -69,6 +69,7 @@ tempfile = "3"
 pretty_assertions = "1"
 serde_json = "1"
 criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1"
 polaris-dvc-core = { git = "https://github.com/PolarisOffice/polaris_dvc.git", rev = "d635741946253b08c08556dfeb7637eecb3e571c" }
 polaris-dvc-hwpx = { git = "https://github.com/PolarisOffice/polaris_dvc.git", rev = "d635741946253b08c08556dfeb7637eecb3e571c" }
 

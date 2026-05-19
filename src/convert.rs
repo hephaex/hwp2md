@@ -1,5 +1,6 @@
 //! High-level conversion entry points for HWP/HWPX ↔ Markdown.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -341,6 +342,83 @@ fn count_chars(block: &ir::Block) -> usize {
     }
 }
 
+/// Sanitise an asset filename so that it is safe to write to the filesystem.
+///
+/// The function:
+/// 1. Takes only the basename component (strips any directory prefix).
+/// 2. Replaces NUL bytes and path-separator characters (`/`, `\`) with `_`.
+/// 3. Prepends `_` when the stem matches a Windows reserved device name
+///    (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`).
+/// 4. Falls back to `"asset"` when the result is empty, `"."`, or `".."`.
+///
+/// # Examples
+///
+/// ```
+/// use hwp2md::convert::sanitize_asset_name;
+///
+/// assert_eq!(sanitize_asset_name("../../etc/passwd"), "passwd");
+/// assert_eq!(sanitize_asset_name("CON.png"), "_CON.png");
+/// assert_eq!(sanitize_asset_name(""), "asset");
+/// ```
+#[must_use]
+pub fn sanitize_asset_name(raw: &str) -> String {
+    // Windows reserved device names — defined first to satisfy items_after_statements.
+    const RESERVED: &[&str] = &[
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
+        "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+
+    // Step 1: basename only — strip any directory prefix.
+    let base = Path::new(raw)
+        .file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+
+    // Step 2: replace dangerous characters.
+    let base: String = base
+        .chars()
+        .map(|c| {
+            if c == '\0' || c == '/' || c == '\\' {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+
+    // Step 3: Windows reserved device-name check (case-insensitive).
+    let stem = base.rsplit_once('.').map_or(base.as_str(), |(s, _)| s);
+    let base = if RESERVED.iter().any(|&r| stem.eq_ignore_ascii_case(r)) {
+        format!("_{base}")
+    } else {
+        base
+    };
+
+    // Step 4: fallback for empty or dot-only names.
+    if base.is_empty() || base == "." || base == ".." {
+        "asset".to_string()
+    } else {
+        base
+    }
+}
+
+/// Resolve a collision-free filename given a set of already-used names.
+///
+/// The first occurrence keeps its name unchanged.  Subsequent occurrences
+/// receive a ` (N)` suffix inserted before the extension, where N counts up
+/// from 2 (matching common operating-system behaviour).
+fn next_available_name(name: &str, seen: &mut HashMap<String, u32>) -> String {
+    let count = seen.entry(name.to_string()).or_insert(0);
+    *count += 1;
+    if *count == 1 {
+        name.to_string()
+    } else if let Some(dot) = name.rfind('.') {
+        format!("{} ({}).{}", &name[..dot], count, &name[dot + 1..])
+    } else {
+        format!("{name} ({count})")
+    }
+}
+
 fn write_assets(doc: &ir::Document, dir: &Path) -> Result<(), Hwp2MdError> {
     if doc.assets.is_empty() {
         return Ok(());
@@ -348,11 +426,12 @@ fn write_assets(doc: &ir::Document, dir: &Path) -> Result<(), Hwp2MdError> {
 
     fs::create_dir_all(dir)?;
 
+    let mut seen: HashMap<String, u32> = HashMap::new();
+
     for asset in &doc.assets {
-        let safe_name = std::path::Path::new(&asset.name)
-            .file_name()
-            .unwrap_or(std::ffi::OsStr::new("asset"));
-        let path = dir.join(safe_name);
+        let raw_name = sanitize_asset_name(&asset.name);
+        let final_name = next_available_name(&raw_name, &mut seen);
+        let path = dir.join(&final_name);
         fs::write(&path, &asset.data)?;
         tracing::info!("Extracted: {:?}", path);
     }
@@ -523,3 +602,7 @@ mod tests_count;
 #[cfg(test)]
 #[path = "convert_tests_builder.rs"]
 mod tests_builder;
+
+#[cfg(test)]
+#[path = "convert_tests_sanitize.rs"]
+mod tests_sanitize;
