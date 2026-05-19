@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 2147aefab5cce7fa3f7341756b9476746ca45a6cb7a1c0e72b8b751a8fd33dc3 # shrinks to doc = Document { metadata: Metadata { title: None, author: None, created: None, modified: None, description: None, subject: None, keywords: [] }, sections: [Section { blocks: [List { ordered: false, start: 1, items: [ListItem { blocks: [Paragraph { inlines: [Inline { text: "가", bold: false, italic: false, underline: false, strikethrough: false, code: false, superscript: false, subscript: false, link: None, footnote_ref: None, color: None, font_name: None, ruby: None }] }], children: [], checked: None }] }, List { ordered: false, start: 1, items: [ListItem { blocks: [Paragraph { inlines: [Inline { text: "0", bold: false, italic: false, underline: false, strikethrough: false, code: false, superscript: false, subscript: false, link: None, footnote_ref: None, color: None, font_name: None, ruby: None }] }], children: [], checked: None }] }], page_layout: None, header: None, footer: None, header_footer_type: None }], assets: [] }
