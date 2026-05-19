@@ -98,6 +98,14 @@ fn write_table_2x3_has_required_elements() {
         xml.contains("<hp:cellMargin "),
         "must contain <hp:cellMargin>: {xml}"
     );
+    // Pin cell padding attribute values against silent const drift.
+    let cm_start = xml.find("<hp:cellMargin ").expect("<hp:cellMargin> missing");
+    let cm_end = xml[cm_start..].find("/>").expect("/>") + cm_start;
+    let cm_tag = &xml[cm_start..=cm_end + 1];
+    assert!(cm_tag.contains(r#"left="510""#),   "cellMargin left must be 510: {cm_tag}");
+    assert!(cm_tag.contains(r#"right="510""#),  "cellMargin right must be 510: {cm_tag}");
+    assert!(cm_tag.contains(r#"top="141""#),    "cellMargin top must be 141: {cm_tag}");
+    assert!(cm_tag.contains(r#"bottom="141""#), "cellMargin bottom must be 141: {cm_tag}");
     assert!(
         xml.contains("<hp:subList>"),
         "must contain <hp:subList>: {xml}"
