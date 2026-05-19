@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 36 완료 (HWPX table writer OWPML completion + release prep)
+## 현재 상태: v0.5.0 Sprint 37 완료 (colspan cellSz scaling + HWPX span proptest + publish prep)
 
 ### 완료
 
@@ -259,6 +259,24 @@
 - L2: 문자열 기반 XML assertion (brittle)
 
 **검증**: cargo check 0 에러, clippy -D warnings 0 경고, 1217 테스트 (0 failures), publish dry-run 통과
+
+### 2026-05-19 — v0.5.0 Sprint 37: colspan cellSz Scaling + HWPX Span Proptest + Publish Prep
+
+**P1: cargo publish --dry-run + semver CI 활성화**:
+- `cargo publish --dry-run -p hwp2md` 성공 (114 files, 256.2 KiB)
+- `.github/workflows/ci.yml`: semver job `continue-on-error: true` 제거
+
+**P2: colspan/rowspan-scaled `<hp:cellSz>`**:
+- `src/hwpx/writer_section.rs`: `cell.colspan.max(1) * TABLE_CELL_WIDTH` 비례 계산
+- `cell.rowspan.max(1)` guard — malformed 0 값 방어
+- `writer_tests_table.rs`: `write_table_colspan_cellsz_scaled` — count 기반 assertion
+
+**P3: HWPX span roundtrip proptest 강화**:
+- `table_with_spans()`: Variant B (colspan=2 단일 셀) `prop_oneof!` 추가
+- ordering 기반 assertion → `matches().count()` count 기반으로 교체
+- `hwpx_table_roundtrip_preserves_spans` (64 cases): colspan=2 회귀 감지 가능
+
+**검증**: `cargo clippy --all-targets -- -W clippy::pedantic` **0 warnings**, 1253 tests (0 failures)
 
 ### 2026-05-19 — v0.5.0 Sprint 36: HWPX Table Writer OWPML Completion + Release Prep
 
