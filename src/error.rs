@@ -18,10 +18,6 @@ pub enum Hwp2MdError {
     #[error("HWPX parse error: {0}")]
     HwpxParse(String),
 
-    /// The Markdown source could not be parsed.
-    #[error("Markdown parse error: {0}")]
-    MarkdownParse(String),
-
     /// An error occurred while generating HWPX output.
     #[error("HWPX write error: {0}")]
     HwpxWrite(String),
