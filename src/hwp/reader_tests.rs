@@ -78,6 +78,49 @@ fn extract_paragraph_text_null_code_unit_skipped() {
     assert_eq!(extract_paragraph_text(&data), "Z");
 }
 
+// Regression test for the 湰灧 garbled character bug (Sprint 49).
+// Code 0x0015 is an extended HWP 5.0 inline control (e.g. auto-numbering) that
+// carries 14 bytes of inline data embedded in the PARA_TEXT stream.  Before the
+// fix, that range (0x000E..=0x001F) was treated as a bare 2-byte code, causing
+// the first two u16 values of the inline data to appear in the output as CJK
+// garbage characters.
+//
+// Pattern observed in real government HWP files:
+//   [0x0015][pngp data: 0x706E 0x6770 ...][valid text]
+//   → garbled output "湰灧" (U+6E70 U+7067) followed by text
+//
+// After the fix the 14 bytes must be silently consumed.
+#[test]
+fn extract_paragraph_text_extended_ctrl_0x0015_skips_14_bytes() {
+    // Build: text "A" + code 0x0015 + 14 bytes inline (7 u16 "pngp" payload) + text "B"
+    let mut units: Vec<u16> = vec![u16::from(b'A'), 0x0015];
+    // 14 bytes = 7 u16 inline data for the control (first 4 bytes are [70 6E 67 70] = 湰灧)
+    units.extend_from_slice(&[0x6E70, 0x7067, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000]);
+    units.push(u16::from(b'B'));
+    let data = encode_u16s(&units);
+    assert_eq!(
+        extract_paragraph_text(&data),
+        "AB",
+        "0x0015 inline data must not appear as garbled chars in output"
+    );
+}
+
+#[test]
+fn extract_paragraph_text_extended_ctrl_0x000e_skips_14_bytes() {
+    let mut units: Vec<u16> = vec![u16::from(b'X'), 0x000E];
+    units.extend_from_slice(&[0x1111, 0x2222, 0x3333, 0x4444, 0x5555, 0x6666, 0x7777]);
+    units.push(u16::from(b'Y'));
+    let data = encode_u16s(&units);
+    assert_eq!(extract_paragraph_text(&data), "XY");
+}
+
+#[test]
+fn extract_paragraph_text_section_break_0x000d_no_extra_bytes() {
+    // 0x000D is a section/column break — just 2 bytes, NO inline data.
+    let data = encode_u16s(&[u16::from(b'C'), 0x000D, u16::from(b'D')]);
+    assert_eq!(extract_paragraph_text(&data), "CD");
+}
+
 // --- parse_char_shape ---
 
 #[test]

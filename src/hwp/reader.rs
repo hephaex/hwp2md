@@ -367,8 +367,13 @@ pub(crate) fn extract_paragraph_text(data: &[u8]) -> String {
         i += 2;
 
         match ch {
-            0x0000 | 0x000D | 0x000E..=0x001F => {}
-            0x0001..=0x0008 | 0x000B..=0x000C => {
+            // Paragraph end and section/column break: 2-byte code only, no inline data.
+            0x0000 | 0x000D => {}
+            // Inline control objects: 2-byte code followed by 14 bytes of inline data.
+            // Codes 0x000E–0x001F are extended HWP 5.0 inline controls (e.g. auto-numbering
+            // 0x0015) that follow the same 14-byte structure as 0x0001–0x000C.  Failing to
+            // skip their inline data causes garbled characters (湰灧) in the output.
+            0x0001..=0x0008 | 0x000B..=0x000C | 0x000E..=0x001F => {
                 if i + 14 > len {
                     break;
                 }
