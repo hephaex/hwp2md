@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 47 완료 (dead code 제거)
+## 현재 상태: v0.5.0 Sprint 48 완료 (CI 복구 + 실 HWP 파일 평가)
 
 ### 완료
 
@@ -233,6 +233,30 @@
 - 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
+
+### 2026-05-21 — v0.5.0 Sprint 48: CI 복구 + 실 HWP 파일 평가
+
+**S48-01: MSRV 1.75 → 1.88 + CI 수정** (`Cargo.toml`, `.github/workflows/ci.yml`, `README.md`):
+- 원인: `comrak 0.34` → `bon 3.9.1` → `darling 0.23` → `edition2024` feature 요구 (≥ Rust 1.88)
+- CI toolchain `1.75.0` → `1.88.0` (test/lint/msrv job 모두)
+- `rust-version = "1.75"` → `"1.88"`
+
+**S48-02: flush.rs broken intra-doc link 수정** (`src/hwpx/context/flush.rs`):
+- `` [`flush_paragraph`] `` → `` `flush_paragraph` `` (비공개 모듈 scope 미지원 → backtick 코드 스팬)
+- `cargo doc --document-private-items` 0 warnings
+
+**실 HWP 파일 수집 + 평가** (`tests/fixtures/real/`):
+- 고용노동부 훈령/고시 5개 파일 수집 (공공저작물)
+- 변환 성공률: 5/5 (종료 코드 0)
+- **버그 발견**:
+  - `湰灧` 깨진 문자 — 4개 파일에서 발생 (섹션 경계 컨트롤 코드 오해석)
+  - HWP 단락 스타일 → 마크다운 헤딩 미변환
+  - 테이블 셀이 `| col |` 아닌 plain text로 분해
+  - 목록 번호 중복 (`1.   1.` 패턴)
+
+**Commits**: `dd652bf` (S48-01+02), `5a8bc08` (MD 출력), `7df34a0` (HWP fixtures)
+
+**검증**: 1326 tests, 0 failures. Clippy pedantic 0 warnings.
 
 ### 2026-05-21 — v0.5.0 Sprint 47: dead code 제거
 
