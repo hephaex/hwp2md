@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 43 완료 (PageLayoutState parser edge cases — invalid/negative/overflow/unknown)
+## 현재 상태: v0.5.0 Sprint 44 완료 (preserve-existing bool parsing — landscape + bold/italic)
 
 ### 완료
 
@@ -233,6 +233,33 @@
 - 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
+
+### 2026-05-20 — v0.5.0 Sprint 44: Preserve-Existing Bool Parsing
+
+**S44-01: `parse_page_pr` landscape semantics fix** (`src/hwpx/context/state.rs`):
+- Before: `self.landscape = val == "true" || val == "1"` (unconditional — resets to false on "yes"/"TRUE"/"")
+- After: `match val { "true"|"1" => true, "false"|"0" => false, _ => {} }` (preserve-existing)
+- Consistent with `parse_page_size` / `parse_margin` skip-on-parse-failure semantics
+
+**S44-02+03: Group C test updates + new test**:
+- 3 tests renamed + assertions flipped (`_resets_to_false` → `_preserves_existing`)
+- New: `parse_page_pr_unknown_value_preserves_false` (symmetric counterpart)
+
+**S44-04: `apply_charpr_attrs` bool semantics fix** (`src/hwpx/context/flush.rs`):
+- Extracted `parse_bool_preserve(val: &str, current: bool) -> bool` helper
+- `bold`/`italic` arms use preserve-existing; `underline`/`strikeout`/`supscript` unchanged (different OWPML semantics)
+
+**S44-05: 3 charpr preserve tests** (`src/hwpx/reader_tests_charpr.rs`):
+- `apply_charpr_attrs_bold_garbage_value_preserves_existing`
+- `apply_charpr_attrs_italic_garbage_value_preserves_existing`
+- `apply_charpr_attrs_bold_numeric_one_sets_true`
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 1 Suggestion):
+- Suggestion: if a 3rd `parse_bool_preserve` call site emerges, promote to `context/mod.rs` or `context/xml_attr.rs` — YAGNI applies now.
+
+**Commit**: `591abdc`
+
+**검증**: `cargo clippy --all-targets -- -D clippy::pedantic` **0 warnings**, 1293 tests (0 failures)
 
 ### 2026-05-20 — v0.5.0 Sprint 43: PageLayoutState Parser Edge Cases
 
