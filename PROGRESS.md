@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 46 완료 (hh:breakSetting IR roundtrip)
+## 현재 상태: v0.5.0 Sprint 47 완료 (dead code 제거)
 
 ### 완료
 
@@ -233,6 +233,18 @@
 - 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
+
+### 2026-05-21 — v0.5.0 Sprint 47: dead code 제거
+
+**S47-01: `Hwp2MdError::MarkdownParse` 제거** (`src/error.rs`):
+- 정의만 있고 생성 코드가 없는 dead variant 삭제 (4줄)
+- `HwpxParse` / `HwpParse`로 커버되는 에러 경로여서 실제 미사용
+
+**검증**: Sprint 46 검증 중 발견 — `grep -rn "MarkdownParse" src/` 결과 정의 1건만
+
+**Commits**: `93d5026`
+
+**검증**: `cargo clippy --all-targets -- -D clippy::pedantic` 0 warnings, 1326 tests (0 failures)
 
 ### 2026-05-21 — v0.5.0 Sprint 46: hh:breakSetting IR roundtrip
 
