@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 40 완료 (TableInnerMargin IR + roundtrip preservation)
+## 현재 상태: v0.5.0 Sprint 41 완료 (partial inMargin axis defaults + parser robustness)
 
 ### 완료
 
@@ -277,6 +277,30 @@
 **리뷰 follow-up**: `write_table_2x3_has_required_elements`에 `<hp:cellMargin>` 속성값 assertion 추가 (left/right=510, top/bottom=141)
 
 **검증**: `cargo clippy --all-targets -- -W clippy::pedantic` **0 warnings**, 1254 tests (0 failures)
+
+### 2026-05-20 — v0.5.0 Sprint 41: Partial inMargin Axis Defaults + Parser Robustness
+
+**S41-01: parse_in_margin() default fix** (`src/hwpx/context/state.rs`):
+- Changed initial `TableInnerMargin { left: 0, right: 0, top: 0, bottom: 0 }` → `{ left: 141, right: 141, top: 141, bottom: 141 }`
+- Unspecified axes now default to 141 HWP units (OWPML default) instead of 0
+
+**S41-02: 4 unit tests** for `parse_in_margin()`:
+- All 4 axes explicit, left-only partial, top+bottom partial, no attrs
+
+**S41-03: Bench verification** (2026-05-20, Apple Silicon):
+- `md_to_ir`: 23.64 µs (confirmed bench_md_to_ir running — was P3 concern from Sprint 39)
+- `ir_to_md`: 8.21 µs | `ir_to_hwpx`: 501.12 µs | `hwpx_to_ir`: 214.14 µs
+- `md_hwpx_md_roundtrip`: 786.46 µs | `ir_to_hwpx_table_heavy`: 702.29 µs | `hwpx_table_heavy_write_read`: 1.1173 ms
+
+**리뷰 follow-up** (W1+W2+W3+S2):
+- `DEFAULT_TABLE_INNER_MARGIN: u32 = 141` const added to `ir.rs` — single source of truth; `state.rs` references it
+- `Box::leak` → `into_owned()` in test helper (no memory leak)
+- `hp:left`/`hp:bottom` prefix branch test added (W3)
+- Invalid attribute value: `unwrap_or(0)` → `let-else continue` (S2) — preserves 141 default instead of overwriting with 0
+
+**Commits**: `360218e` (Sprint 41), `f3921d1` (follow-up W1+W2+W3+S2)
+
+**검증**: `cargo clippy --all-targets -- -D clippy::pedantic` **0 warnings**, 1268 tests (0 failures)
 
 ### 2026-05-20 — v0.5.0 Sprint 40: TableInnerMargin IR Field + Roundtrip Preservation
 
