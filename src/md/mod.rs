@@ -1,6 +1,7 @@
 //! Markdown parser and writer built on top of the `pulldown_cmark` ecosystem.
 #![allow(missing_docs)]
 
+pub(crate) mod html_table;
 mod parser;
 mod writer;
 

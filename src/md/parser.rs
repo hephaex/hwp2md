@@ -258,7 +258,7 @@ fn node_to_block<'a>(node: &'a AstNode<'a>) -> Option<ir::Block> {
             if is_pagebreak_marker(&html.literal) {
                 Some(ir::Block::PageBreak)
             } else {
-                None
+                super::html_table::parse_html_table(&html.literal)
             }
         }
         NodeValue::Image(link) => {
@@ -527,3 +527,7 @@ mod tests_inline;
 #[cfg(test)]
 #[path = "parser_tests_marker.rs"]
 mod tests_marker;
+
+#[cfg(test)]
+#[path = "parser_tests_html_table.rs"]
+mod tests_html_table;
