@@ -38,6 +38,7 @@ fn golden_comprehensive_document_structure() {
                 },
                 // 2x2 table
                 Block::Table {
+                    inner_margin: None,
                     rows: vec![
                         TableRow {
                             cells: vec![

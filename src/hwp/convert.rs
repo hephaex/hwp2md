@@ -431,6 +431,7 @@ pub(crate) fn control_to_block(ctrl: &HwpControl, doc_info: &DocInfo) -> Option<
             Some(ir::Block::Table {
                 rows: ir_rows,
                 col_count: effective_cols,
+                inner_margin: None,
             })
         }
         HwpControl::Image { bin_data_id, .. } => {

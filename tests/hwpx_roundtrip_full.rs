@@ -338,6 +338,7 @@ fn full_roundtrip_table_ir_2x2_cell_text_preserved() {
                         is_header: false,
                     },
                 ],
+                inner_margin: None,
             }],
             page_layout: None,
             ..Default::default()
@@ -379,6 +380,7 @@ fn full_roundtrip_table_ir_block_type_preserved() {
                         is_header: false,
                     },
                 ],
+                inner_margin: None,
             }],
             page_layout: None,
             ..Default::default()
@@ -391,7 +393,7 @@ fn full_roundtrip_table_ir_block_type_preserved() {
     let read_back = read_hwpx(tmp.path()).expect("read_hwpx");
 
     let has_table = first_blocks(&read_back).iter().any(
-        |b| matches!(b, ir::Block::Table { rows, col_count } if *col_count >= 2 && rows.len() >= 2),
+        |b| matches!(b, ir::Block::Table { rows, col_count, .. } if *col_count >= 2 && rows.len() >= 2),
     );
     let text = collect_all_text(first_blocks(&read_back));
     assert!(

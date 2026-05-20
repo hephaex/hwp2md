@@ -56,6 +56,7 @@ fn main() {
     // Table (2 columns: header row + one data row)
     section.blocks.push(Block::Table {
         col_count: 2,
+        inner_margin: None,
         rows: vec![
             TableRow {
                 is_header: true,

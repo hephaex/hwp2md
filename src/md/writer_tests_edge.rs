@@ -47,7 +47,7 @@ fn write_markdown_table_cell_with_code_block_uses_fallback_text() {
             is_header: false,
         },
     ];
-    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 1 }]);
+    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 1, inner_margin: None }]);
     let md = write_markdown(&doc, false);
     // Should contain the code content (or at minimum not panic).
     assert!(md.contains("let x = 1;") || md.contains("```"), "got: {md}");
@@ -65,7 +65,7 @@ fn write_markdown_table_cell_with_image_uses_fallback_text() {
         }],
         is_header: true,
     }];
-    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 1 }]);
+    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 1, inner_margin: None }]);
     let md = write_markdown(&doc, false);
     assert!(md.contains("img.png") || md.contains("photo"), "got: {md}");
 }
@@ -82,7 +82,7 @@ fn write_markdown_table_cell_with_math_block() {
         }],
         is_header: true,
     }];
-    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 1 }]);
+    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 1, inner_margin: None }]);
     let md = write_markdown(&doc, false);
     assert!(md.contains("E=mc^2"), "got: {md}");
 }
@@ -104,7 +104,7 @@ fn write_markdown_html_table_cell_script_tag_is_escaped() {
         }],
         is_header: true,
     }];
-    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2 }]);
+    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2, inner_margin: None }]);
     let md = write_markdown(&doc, false);
     assert!(
         md.contains("<table>"),
@@ -132,7 +132,7 @@ fn write_markdown_html_table_cell_ampersand_escaped() {
         }],
         is_header: true,
     }];
-    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2 }]);
+    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2, inner_margin: None }]);
     let md = write_markdown(&doc, false);
     assert!(
         md.contains("&amp;"),
@@ -168,7 +168,7 @@ fn write_markdown_html_table_with_rowspan() {
             is_header: false,
         },
     ];
-    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 1 }]);
+    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 1, inner_margin: None }]);
     let md = write_markdown(&doc, false);
     assert!(md.contains("<table>"), "got: {md}");
     assert!(md.contains("rowspan=\"2\""), "got: {md}");
@@ -189,7 +189,7 @@ fn write_markdown_table_cell_pipe_escaped() {
         }],
         is_header: true,
     }];
-    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 1 }]);
+    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 1, inner_margin: None }]);
     let md = write_markdown(&doc, false);
     // The | inside cell text must be escaped to \|
     assert!(md.contains("\\|"), "pipe must be escaped; got: {md}");

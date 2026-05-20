@@ -78,6 +78,7 @@ fn resolve_bin_refs_inside_table_cell() {
         blocks: vec![ir::Block::Table {
             rows: vec![row],
             col_count: 1,
+            inner_margin: None,
         }],
 
         page_layout: None,

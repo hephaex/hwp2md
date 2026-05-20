@@ -57,6 +57,7 @@ pub(crate) struct TableState {
     pub(crate) col_count: usize,
     pub(crate) current_colspan: u32,
     pub(crate) current_rowspan: u32,
+    pub(crate) inner_margin: Option<ir::TableInnerMargin>,
 }
 
 impl Default for TableState {
@@ -72,6 +73,7 @@ impl Default for TableState {
             col_count: 0,
             current_colspan: 1,
             current_rowspan: 1,
+            inner_margin: None,
         }
     }
 }

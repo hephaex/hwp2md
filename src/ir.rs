@@ -203,6 +203,8 @@ pub enum Block {
         rows: Vec<TableRow>,
         /// Total number of columns (used for alignment row generation).
         col_count: usize,
+        /// Optional inner margin override. `None` means use the writer default (141 HWP units).
+        inner_margin: Option<TableInnerMargin>,
     },
     /// Fenced code block.
     CodeBlock {
@@ -388,6 +390,22 @@ impl Inline {
             ..Self::default()
         }
     }
+}
+
+/// Inner margin between cells in a `Block::Table`, in HWP units (1/7200 inch).
+///
+/// Corresponds to `<hp:tblPr><hp:inMargin>` in OWPML. When `None`, the writer
+/// falls back to `TABLE_INNER_MARGIN` ("141" ≈ 1 mm).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TableInnerMargin {
+    /// Left inner margin in HWP units.
+    pub left: u32,
+    /// Right inner margin in HWP units.
+    pub right: u32,
+    /// Top inner margin in HWP units.
+    pub top: u32,
+    /// Bottom inner margin in HWP units.
+    pub bottom: u32,
 }
 
 /// A single row in a [`Block::Table`].

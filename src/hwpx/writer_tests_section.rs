@@ -208,6 +208,7 @@ fn section_xml_table_2x2() {
                 is_header: false,
             },
         ],
+        inner_margin: None,
     }]);
     // 5-B: table must be wrapped in a paragraph container
     assert!(xml.contains("<hp:p "), "p wrapper: {xml}");
@@ -254,6 +255,7 @@ fn section_xml_table_colspan_rowspan_present() {
             cells: vec![wide_cell],
             is_header: false,
         }],
+        inner_margin: None,
     }]);
     assert!(xml.contains("<hp:tc>"), "plain tc emitted: {xml}");
     assert!(
@@ -285,6 +287,7 @@ fn section_xml_table_no_celladdr_for_1x1() {
             cells: vec![cell],
             is_header: false,
         }],
+        inner_margin: None,
     }]);
     assert!(xml.contains("<hp:tc>"), "tc emitted: {xml}");
     assert!(

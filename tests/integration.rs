@@ -207,7 +207,7 @@ fn fixture_table_rows_and_cells_parsed() {
 
     assert!(table.is_some(), "no Table block found in parsed document");
 
-    if let Some(ir::Block::Table { rows, col_count }) = table {
+    if let Some(ir::Block::Table { rows, col_count, .. }) = table {
         assert_eq!(*col_count, 2, "expected 2 columns");
         assert_eq!(rows.len(), 2, "expected 2 rows");
     }

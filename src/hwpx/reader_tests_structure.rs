@@ -25,7 +25,7 @@ fn simple_table_two_rows_two_cols() {
     let s = section(xml);
     assert_eq!(s.blocks.len(), 1);
     match &s.blocks[0] {
-        ir::Block::Table { rows, col_count } => {
+        ir::Block::Table { rows, col_count, .. } => {
             assert_eq!(*col_count, 2);
             assert_eq!(rows.len(), 2);
             // First row is always the header row.

@@ -141,7 +141,7 @@ fn roundtrip_md_to_ir_to_md_html_table_colspan() {
         }],
         is_header: true,
     }];
-    let original = make_doc(vec![ir::Block::Table { rows, col_count: 2 }]);
+    let original = make_doc(vec![ir::Block::Table { rows, col_count: 2, inner_margin: None }]);
 
     let md = write_markdown(&original, false);
     assert!(md.contains("<table>"), "HTML table tag missing; md: {md:?}");

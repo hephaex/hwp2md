@@ -502,6 +502,7 @@ fn full_roundtrip_combined_all_block_types_text_preserved() {
                             is_header: false,
                         },
                     ],
+                    inner_margin: None,
                 },
                 // Code block
                 ir::Block::CodeBlock {

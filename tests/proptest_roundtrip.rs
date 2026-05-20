@@ -143,6 +143,7 @@ fn block_table() -> BoxedStrategy<Block> {
             Block::Table {
                 rows,
                 col_count: cols,
+                inner_margin: None,
             }
         })
         .boxed()
@@ -229,6 +230,7 @@ fn table_with_spans() -> impl Strategy<Value = Block> {
                     },
                 ],
                 col_count: 2,
+                inner_margin: None,
             }
         },
     );
@@ -245,6 +247,7 @@ fn table_with_spans() -> impl Strategy<Value = Block> {
             is_header: true,
         }],
         col_count: 2,
+        inner_margin: None,
     });
 
     prop_oneof![variant_a, variant_b]

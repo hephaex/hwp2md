@@ -14,7 +14,7 @@ fn table_doc(rows: Vec<ir::TableRow>) -> Document {
     Document {
         metadata: Metadata::default(),
         sections: vec![Section {
-            blocks: vec![Block::Table { rows, col_count }],
+            blocks: vec![Block::Table { rows, col_count, inner_margin: None }],
             page_layout: None,
             ..Default::default()
         }],
@@ -289,7 +289,7 @@ fn write_table_colspan_cellsz_scaled() {
     let doc = Document {
         metadata: Metadata::default(),
         sections: vec![Section {
-            blocks: vec![Block::Table { rows, col_count: 3 }],
+            blocks: vec![Block::Table { rows, col_count: 3, inner_margin: None }],
             page_layout: None,
             ..Default::default()
         }],
@@ -382,4 +382,104 @@ fn write_table_has_tblpr() {
         tblpr_pos < sz_pos,
         "<hp:tblPr> must appear before <hp:sz>: tblPr@{tblpr_pos}, sz@{sz_pos}"
     );
+}
+
+// ── Test: custom inner_margin is honoured by the writer ───────────────────
+
+/// When `Block::Table` carries a non-`None` `inner_margin`, the writer must
+/// emit those values in `<hp:inMargin>` instead of the default 141.
+#[test]
+fn write_table_custom_inner_margin_emitted() {
+    use ir::TableInnerMargin;
+    let rows = vec![text_row(&["A", "B"], false)];
+    let col_count = 2;
+    let doc = Document {
+        metadata: Metadata::default(),
+        sections: vec![Section {
+            blocks: vec![Block::Table {
+                rows,
+                col_count,
+                inner_margin: Some(TableInnerMargin { left: 200, right: 200, top: 100, bottom: 100 }),
+            }],
+            page_layout: None,
+            ..Default::default()
+        }],
+        assets: Vec::new(),
+    };
+    let tables = RefTables::build(&doc, None);
+    let sec = &doc.sections[0];
+    let asset_map = ImageAssetMap::new();
+    let xml =
+        generate_section_xml(sec, 0, &tables, &asset_map).expect("generate_section_xml failed");
+
+    let im_start = xml.find("<hp:inMargin ").expect("<hp:inMargin> missing");
+    let im_end = xml[im_start..].find("/>").expect("/>") + im_start;
+    let im_tag = &xml[im_start..=im_end + 1];
+    assert!(im_tag.contains(r#"left="200""#),   "inMargin left must be 200: {im_tag}");
+    assert!(im_tag.contains(r#"right="200""#),  "inMargin right must be 200: {im_tag}");
+    assert!(im_tag.contains(r#"top="100""#),    "inMargin top must be 100: {im_tag}");
+    assert!(im_tag.contains(r#"bottom="100""#), "inMargin bottom must be 100: {im_tag}");
+}
+
+/// When `inner_margin` is `None` (the default), the writer must still emit
+/// the standard 141-unit margin — no regression from adding the field.
+#[test]
+fn write_table_default_inner_margin_when_none() {
+    let rows = vec![text_row(&["X"], false)];
+    let doc = table_doc(rows);
+    let tables = RefTables::build(&doc, None);
+    let sec = &doc.sections[0];
+    let asset_map = ImageAssetMap::new();
+    let xml =
+        generate_section_xml(sec, 0, &tables, &asset_map).expect("generate_section_xml failed");
+
+    let im_start = xml.find("<hp:inMargin ").expect("<hp:inMargin> missing");
+    let im_end = xml[im_start..].find("/>").expect("/>") + im_start;
+    let im_tag = &xml[im_start..=im_end + 1];
+    assert!(im_tag.contains(r#"left="141""#),   "default left must be 141: {im_tag}");
+    assert!(im_tag.contains(r#"right="141""#),  "default right must be 141: {im_tag}");
+    assert!(im_tag.contains(r#"top="141""#),    "default top must be 141: {im_tag}");
+    assert!(im_tag.contains(r#"bottom="141""#), "default bottom must be 141: {im_tag}");
+}
+
+/// Write a table with a custom `inner_margin`, read it back, and verify the
+/// margin is preserved in the parsed `Block::Table`.
+#[test]
+fn write_table_inner_margin_roundtrip() {
+    use ir::TableInnerMargin;
+    let rows = vec![text_row(&["Hello"], false)];
+    let doc = Document {
+        metadata: Metadata::default(),
+        sections: vec![Section {
+            blocks: vec![Block::Table {
+                rows,
+                col_count: 1,
+                inner_margin: Some(TableInnerMargin { left: 300, right: 300, top: 50, bottom: 50 }),
+            }],
+            page_layout: None,
+            ..Default::default()
+        }],
+        assets: Vec::new(),
+    };
+
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+
+    let read_back = read_hwpx(tmp.path()).expect("read_hwpx");
+
+    let table_margin = read_back
+        .sections
+        .into_iter()
+        .flat_map(|s| s.blocks)
+        .find_map(|b| match b {
+            Block::Table { inner_margin, .. } => Some(inner_margin),
+            _ => None,
+        })
+        .expect("no Table block found after roundtrip");
+
+    let m = table_margin.expect("inner_margin must be Some after roundtrip");
+    assert_eq!(m.left,   300, "roundtrip left");
+    assert_eq!(m.right,  300, "roundtrip right");
+    assert_eq!(m.top,     50, "roundtrip top");
+    assert_eq!(m.bottom,  50, "roundtrip bottom");
 }

@@ -126,6 +126,7 @@ fn section_xml_table_wrapped_in_paragraph() {
             cells: vec![cell("X"), cell("Y")],
             is_header: false,
         }],
+        inner_margin: None,
     }]);
     // The outer paragraph wrapper must carry an id.
     assert!(
@@ -184,6 +185,7 @@ fn section_xml_table_rowcnt_colcnt_attributes() {
                 is_header: false,
             },
         ],
+        inner_margin: None,
     }]);
     assert!(xml.contains(r#"rowCnt="3""#), "rowCnt must be 3: {xml}");
     assert!(xml.contains(r#"colCnt="3""#), "colCnt must be 3: {xml}");
