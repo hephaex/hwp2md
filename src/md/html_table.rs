@@ -16,6 +16,17 @@
 //! | HTML entities in cell text | Decoded via `quick_xml` |
 //! | Nested `<table>` | Warns and returns `None` |
 //!
+//! # Known Limitations
+//!
+//! The following constructs are **not** round-tripped through the IR:
+//!
+//! | Construct | Behaviour |
+//! |-----------|-----------|
+//! | Nested `<table>` inside a cell | Returns `None` for the entire outer table |
+//! | Block-level content inside cells (`<p>`, `<ul>`, …) | Flattened to plain text |
+//! | Inline-formatted content inside cells (`<b>`, `<em>`, …) | Formatting stripped, plain text only |
+//! | Unescaped `&` in cell text | May cause `quick_xml` parse error → `None` fallback |
+//!
 //! # Returns
 //!
 //! Returns `None` and logs a `tracing::warn!` when:
