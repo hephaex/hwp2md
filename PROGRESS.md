@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 42 완료 (PageLayoutState parser unit tests + make_empty helper)
+## 현재 상태: v0.5.0 Sprint 43 완료 (PageLayoutState parser edge cases — invalid/negative/overflow/unknown)
 
 ### 완료
 
@@ -233,6 +233,33 @@
 - 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
+
+### 2026-05-20 — v0.5.0 Sprint 43: PageLayoutState Parser Edge Cases
+
+**Group A — `parse_page_size` (3 tests)**:
+- `parse_page_size_invalid_value_preserves_existing_some`: `"bogus"` parse fail → existing `Some(n)` preserved
+- `parse_page_size_negative_value_preserves_existing_some`: `"-1"` → u32 fail → preserved
+- `parse_page_size_overflow_value_preserves_existing_some`: `"4294967296"` → overflow → preserved
+
+**Group B — `parse_margin` (3 tests)**:
+- `parse_margin_invalid_value_preserves_existing_some`: mixed invalid+valid in one call → selectively preserved/updated
+- `parse_margin_negative_value_preserves_existing_some`
+- `parse_margin_overflow_value_preserves_existing_some`
+
+**Group C — `parse_page_pr` (5 tests)**:
+- `parse_page_pr_unknown_value_resets_to_false`: `"yes"` → false (documents current strict OWPML behavior)
+- `parse_page_pr_empty_value_resets_to_false`
+- `parse_page_pr_uppercase_true_does_not_match`: case-sensitive match
+- `parse_page_pr_unknown_attribute_ignored_preserves_landscape`
+- `parse_page_pr_mixed_known_and_unknown_attrs`
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 1 Warning):
+- Warning: Group C behavior is inconsistent with sibling parsers — `parse_page_size`/`parse_margin` preserve prior state on parse failure, but `parse_page_pr` unconditionally assigns `false` for unknown values. Requires user decision: (A) intentional strict OWPML + add doc comment, or (B) fix to preserve-existing + update 3 assertions + unify with `flush.rs:19,21`.
+- Suggestions: zero-value guard, mixed-axis margin invalid test, `"True"` title-case, duplicate attrs, whitespace in value, `flush.rs` boolean test family.
+
+**Commit**: `49cf1e3`
+
+**검증**: `cargo clippy --all-targets -- -D clippy::pedantic` **0 warnings**, 1289 tests (0 failures)
 
 ### 2026-05-20 — v0.5.0 Sprint 42: PageLayoutState Parser Unit Tests + make_empty Helper
 
