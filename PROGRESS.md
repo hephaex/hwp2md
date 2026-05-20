@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 44 완료 (preserve-existing bool parsing — landscape + bold/italic)
+## 현재 상태: v0.5.0 Sprint 45 완료 (MD parser HTML &lt;table&gt; → IR with colspan/rowspan)
 
 ### 완료
 
@@ -233,6 +233,40 @@
 - 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
+
+### 2026-05-20 — v0.5.0 Sprint 45: MD Parser HTML `<table>` → IR
+
+**New: `src/md/html_table.rs`** — `parse_html_table(literal: &str) -> Option<ir::Block>`:
+- `quick_xml` SAX-style parser for HTML `<table>` blocks embedded in Markdown HtmlBlock nodes
+- `<thead>`/`<tbody>`/`<tfoot>` silently ignored (rows treated as direct children)
+- `colspan`/`rowspan` parsed per cell (default 1, clamped ≥ 1)
+- `is_header` = all cells in row are `<th>`
+- `col_count` = max sum-of-colspans across rows
+- Nested `<table>` → `tracing::warn!` + None; parse error → warn + None
+- Self-closing `<td/>`/`<th/>` correctly pushed immediately (no End event follows `Empty`)
+
+**Wired** into `src/md/parser.rs` `HtmlBlock` arm: pagebreak check → html-table check → None.
+
+**New: `src/md/parser_tests_html_table.rs`** — 20 tests:
+- 11 happy-path: basic 2×2, colspan, rowspan, both, header detection, mixed cells, `<thead>`/`<tbody>`, entity decoding, attribute order, no-spans, `col_count` from colspan sum
+- 5 edge/negative: non-table HTML → None, empty table → None, `colspan="0"` clamped, empty `<tr>` skipped, non-numeric span defaults to 1
+- 3 round-trip: write IR → Markdown → parse back, compare row/cell structure
+- 1 W3 regression: `parse_html_table_self_closing_td_not_dropped`
+
+**Commits**: `51bff02` (main sprint), `ba35312` (W3 fix: self-closing `<td/>`)
+
+**Deferred** (documented limitations):
+- Nested tables inside cells → returns None
+- Block-level / inline-formatted content inside cells → flattened to plain text
+- Hand-authored `<table>` with unescaped `&` in cell text may fail `quick_xml` parse → None fallback
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH, 1 W3 bug fixed, suggestions documented):
+- W3 (fixed): self-closing `<td/>` silently dropped — fixed by splitting Start/Empty arms
+- W1 (deferred): `<tablespoon>` false-positive on prefix check — acceptable tradeoff
+- W2 (deferred): heap alloc per tag in `local_name` — premature optimization
+- W4 (deferred): doc comment should mention round-trip limitations
+
+**검증**: `cargo clippy --all-targets -- -D clippy::pedantic` **0 warnings**, 1313 tests (0 failures)
 
 ### 2026-05-20 — v0.5.0 Sprint 44: Preserve-Existing Bool Parsing
 
