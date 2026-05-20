@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 48 완료 (CI 복구 + 실 HWP 파일 평가)
+## 현재 상태: v0.5.0 Sprint 49 완료 (PARA_TEXT 제어 코드 수정 — 湰灧 버그 제거)
 
 ### 완료
 
@@ -233,6 +233,30 @@
 - 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
+
+### 2026-05-21 — v0.5.0 Sprint 49: PARA_TEXT 제어 코드 수정 (湰灧 버그 제거)
+
+**S49-01: `extract_paragraph_text` 제어 코드 범위 수정** (`src/hwp/reader.rs`, `src/hwp/reader_tests.rs`):
+
+근본 원인: HWP 5.0 PARA_TEXT 스트림에서 0x000E–0x001F 범위(확장 인라인 제어 코드)가 14바이트 인라인 데이터를 동반함에도 `0x0000 | 0x000D` 그룹에 포함되어 건너뜀 없이 처리됨. 자동 번호 매기기 코드 0x0015의 인라인 데이터 첫 두 u16 값 `[0x6E70, 0x7067]`이 CJK 문자로 해석되어 `湰灧`(U+6E70 U+7067) 출력.
+
+수정: `0x000E..=0x001F`를 no-skip 그룹에서 `0x0001..=0x0008 | 0x000B..=0x000C | 0x000E..=0x001F` (14-byte skip 그룹)으로 이동. `0x000D`(섹션 나누기)는 인라인 데이터 없음 — 실 레코드로 검증.
+
+**회귀 테스트 3건 추가** (`src/hwp/reader_tests.rs`):
+- `extract_paragraph_text_extended_ctrl_0x0015_skips_14_bytes` — 湰灧 패턴 재현 후 0으로 확인
+- `extract_paragraph_text_extended_ctrl_0x000e_skips_14_bytes` — 범위 하한 검증
+- `extract_paragraph_text_section_break_0x000d_no_extra_bytes` — 0x000D 비대칭 검증
+
+**실 HWP 파일 검증**: moel_01~05 5개 파일 모두 깨진 문자 0개 (수정 전 4개 파일에서 발생)
+
+**Commits**: `5a0ba61`
+
+**검증**: 1162 tests, 0 failures. Clippy 0 warnings.
+
+**리뷰 (code-reviewer opus)**: H1 공유 헬퍼 추출, H2 실 픽스처 .md 재생성 권고.
+리뷰 전문: `~/.claude/references/2026-05-21_sprint49_para_text_control_codes_review.md`
+
+---
 
 ### 2026-05-21 — v0.5.0 Sprint 48: CI 복구 + 실 HWP 파일 평가
 
