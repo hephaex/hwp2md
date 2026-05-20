@@ -403,3 +403,20 @@ fn html_table_roundtrip_asymmetric_spans() {
     assert_eq!(cell.rowspan, 3, "rowspan must survive round-trip");
     assert_eq!(cell_text(cell), "corner");
 }
+
+// ── W3 regression: self-closing <td/> ────────────────────────────────────────
+
+#[test]
+fn parse_html_table_self_closing_td_not_dropped() {
+    let html = "<table><tr><td/><td>B</td></tr></table>";
+    let block = parse_html_table(html).expect("should parse table with self-closing <td/>");
+    if let ir::Block::Table { rows, col_count, .. } = block {
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].cells.len(), 2, "self-closing <td/> must not be dropped");
+        assert_eq!(col_count, 2);
+        assert_eq!(cell_text(&rows[0].cells[0]), "", "self-closing cell has empty text");
+        assert_eq!(cell_text(&rows[0].cells[1]), "B");
+    } else {
+        panic!("expected Block::Table");
+    }
+}

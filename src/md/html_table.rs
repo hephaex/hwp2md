@@ -60,6 +60,7 @@ pub(crate) fn parse_html_table(literal: &str) -> Option<ir::Block> {
 /// Walk `quick_xml` events for a `<table>` block and return completed rows.
 ///
 /// Returns `None` on nested tables, parse errors, or zero-row results.
+#[allow(clippy::too_many_lines)] // streaming state machine; extraction would reduce clarity
 fn walk_table_events(reader: &mut Reader<&[u8]>) -> Option<Vec<ir::TableRow>> {
     let mut table_depth: u32 = 0;
     let mut current_row: Option<RowBuilder> = None;
@@ -68,7 +69,7 @@ fn walk_table_events(reader: &mut Reader<&[u8]>) -> Option<Vec<ir::TableRow>> {
 
     loop {
         match reader.read_event() {
-            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
+            Ok(Event::Start(ref e)) => {
                 let local = local_name(e.name().as_ref());
                 match local.to_ascii_lowercase().as_str() {
                     "table" => {
@@ -96,6 +97,41 @@ fn walk_table_events(reader: &mut Reader<&[u8]>) -> Option<Vec<ir::TableRow>> {
                         let (colspan, rowspan) = parse_span_attrs(e);
                         current_cell =
                             Some(CellBuilder { text: String::new(), colspan, rowspan, is_th });
+                    }
+                    _ => {}
+                }
+            }
+            // Self-closing <td/> / <th/>: no End event will follow — push immediately.
+            Ok(Event::Empty(ref e)) => {
+                let local = local_name(e.name().as_ref());
+                match local.to_ascii_lowercase().as_str() {
+                    "table" => {
+                        table_depth += 1;
+                        if table_depth > 1 {
+                            tracing::warn!(
+                                "html_table: nested <table> not supported, returning None"
+                            );
+                            return None;
+                        }
+                    }
+                    "tr" => {
+                        if let Some(row) = current_row.take() {
+                            if !row.cells.is_empty() {
+                                rows.push(finish_row(row));
+                            }
+                        }
+                        current_row = Some(RowBuilder::default());
+                    }
+                    "th" | "td" => {
+                        if current_row.is_none() {
+                            current_row = Some(RowBuilder::default());
+                        }
+                        let is_th = local.eq_ignore_ascii_case("th");
+                        let (colspan, rowspan) = parse_span_attrs(e);
+                        let cell = CellBuilder { text: String::new(), colspan, rowspan, is_th };
+                        if let Some(row) = current_row.as_mut() {
+                            row.cells.push(cell);
+                        }
                     }
                     _ => {}
                 }
