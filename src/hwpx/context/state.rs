@@ -247,16 +247,24 @@ impl PageLayoutState {
 mod tests {
     use super::*;
 
-    // Build a BytesStart from an attrs string without leaking memory.
-    // `into_owned()` copies the byte data into a new allocation, so the
-    // local `xml` String can be dropped after the match.
-    fn make_in_margin(attrs: &str) -> quick_xml::events::BytesStart<'static> {
-        let xml = format!("<hp:inMargin {attrs}/>");
+    // Build a BytesStart for an empty XML element without leaking memory.
+    // `into_owned()` copies the byte data into a new allocation so the
+    // local `xml` String can drop at end of function — no Box::leak needed.
+    fn make_empty(tag: &str, attrs: &str) -> quick_xml::events::BytesStart<'static> {
+        let xml = if attrs.is_empty() {
+            format!("<{tag}/>")
+        } else {
+            format!("<{tag} {attrs}/>")
+        };
         let mut reader = quick_xml::Reader::from_str(&xml);
         match reader.read_event().unwrap() {
             quick_xml::events::Event::Empty(e) => e.into_owned(),
             ev => panic!("expected Event::Empty, got {ev:?}"),
         }
+    }
+
+    fn make_in_margin(attrs: &str) -> quick_xml::events::BytesStart<'static> {
+        make_empty("hp:inMargin", attrs)
     }
 
     #[test]
@@ -327,67 +335,36 @@ mod tests {
 
     // ── PageLayoutState parsers ───────────────────────────────────────────
 
-    fn make_page_size(attrs: &str) -> quick_xml::events::BytesStart<'static> {
-        let xml = format!("<hp:pageSize {attrs}/>");
-        let mut reader = quick_xml::Reader::from_str(&xml);
-        match reader.read_event().unwrap() {
-            quick_xml::events::Event::Empty(e) => e.into_owned(),
-            ev => panic!("expected Event::Empty, got {ev:?}"),
-        }
-    }
-
-    fn make_margin(attrs: &str) -> quick_xml::events::BytesStart<'static> {
-        let xml = format!("<hp:margin {attrs}/>");
-        let mut reader = quick_xml::Reader::from_str(&xml);
-        match reader.read_event().unwrap() {
-            quick_xml::events::Event::Empty(e) => e.into_owned(),
-            ev => panic!("expected Event::Empty, got {ev:?}"),
-        }
-    }
-
-    fn make_page_pr(attrs: &str) -> quick_xml::events::BytesStart<'static> {
-        let xml = format!("<hp:pagePr {attrs}/>");
-        let mut reader = quick_xml::Reader::from_str(&xml);
-        match reader.read_event().unwrap() {
-            quick_xml::events::Event::Empty(e) => e.into_owned(),
-            ev => panic!("expected Event::Empty, got {ev:?}"),
-        }
-    }
-
-    fn page_layout() -> PageLayoutState {
-        PageLayoutState::default()
-    }
-
     // parse_page_size ──────────────────────────────────────────────────────
 
     #[test]
     fn parse_page_size_both_dims() {
-        let mut s = page_layout();
-        s.parse_page_size(&make_page_size(r#"width="59528" height="84188""#));
+        let mut s = PageLayoutState::default();
+        s.parse_page_size(&make_empty("hp:pageSize", r#"width="59528" height="84188""#));
         assert_eq!(s.width, Some(59528));
         assert_eq!(s.height, Some(84188));
     }
 
     #[test]
     fn parse_page_size_hp_prefixed_attrs() {
-        let mut s = page_layout();
-        s.parse_page_size(&make_page_size(r#"hp:width="42000" hp:height="59528""#));
+        let mut s = PageLayoutState::default();
+        s.parse_page_size(&make_empty("hp:pageSize", r#"hp:width="42000" hp:height="59528""#));
         assert_eq!(s.width, Some(42000));
         assert_eq!(s.height, Some(59528));
     }
 
     #[test]
     fn parse_page_size_width_only_leaves_height_none() {
-        let mut s = page_layout();
-        s.parse_page_size(&make_page_size(r#"width="42000""#));
+        let mut s = PageLayoutState::default();
+        s.parse_page_size(&make_empty("hp:pageSize", r#"width="42000""#));
         assert_eq!(s.width, Some(42000));
         assert_eq!(s.height, None);
     }
 
     #[test]
     fn parse_page_size_invalid_value_keeps_none() {
-        let mut s = page_layout();
-        s.parse_page_size(&make_page_size(r#"width="auto" height="84188""#));
+        let mut s = PageLayoutState::default();
+        s.parse_page_size(&make_empty("hp:pageSize", r#"width="auto" height="84188""#));
         assert_eq!(s.width, None, "invalid width must stay None");
         assert_eq!(s.height, Some(84188));
     }
@@ -396,8 +373,8 @@ mod tests {
 
     #[test]
     fn parse_margin_all_axes() {
-        let mut s = page_layout();
-        s.parse_margin(&make_margin(r#"left="1701" right="1701" top="2000" bottom="1500""#));
+        let mut s = PageLayoutState::default();
+        s.parse_margin(&make_empty("hp:margin", r#"left="1701" right="1701" top="2000" bottom="1500""#));
         assert_eq!(s.margin_left,   Some(1701));
         assert_eq!(s.margin_right,  Some(1701));
         assert_eq!(s.margin_top,    Some(2000));
@@ -406,8 +383,8 @@ mod tests {
 
     #[test]
     fn parse_margin_hp_prefixed_attrs() {
-        let mut s = page_layout();
-        s.parse_margin(&make_margin(r#"hp:left="800" hp:right="900""#));
+        let mut s = PageLayoutState::default();
+        s.parse_margin(&make_empty("hp:margin", r#"hp:left="800" hp:right="900""#));
         assert_eq!(s.margin_left,  Some(800));
         assert_eq!(s.margin_right, Some(900));
         assert_eq!(s.margin_top,   None);
@@ -416,8 +393,8 @@ mod tests {
 
     #[test]
     fn parse_margin_partial_leaves_rest_none() {
-        let mut s = page_layout();
-        s.parse_margin(&make_margin(r#"top="2000""#));
+        let mut s = PageLayoutState::default();
+        s.parse_margin(&make_empty("hp:margin", r#"top="2000""#));
         assert_eq!(s.margin_left,   None);
         assert_eq!(s.margin_right,  None);
         assert_eq!(s.margin_top,    Some(2000));
@@ -426,8 +403,8 @@ mod tests {
 
     #[test]
     fn parse_margin_invalid_value_keeps_none() {
-        let mut s = page_layout();
-        s.parse_margin(&make_margin(r#"left="inherit" right="1000""#));
+        let mut s = PageLayoutState::default();
+        s.parse_margin(&make_empty("hp:margin", r#"left="inherit" right="1000""#));
         assert_eq!(s.margin_left,  None, "invalid value must stay None");
         assert_eq!(s.margin_right, Some(1000));
     }
@@ -436,37 +413,43 @@ mod tests {
 
     #[test]
     fn parse_page_pr_landscape_true() {
-        let mut s = page_layout();
-        s.parse_page_pr(&make_page_pr(r#"landscape="true""#));
+        let mut s = PageLayoutState::default();
+        s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="true""#));
         assert!(s.landscape);
     }
 
     #[test]
     fn parse_page_pr_landscape_one() {
-        let mut s = page_layout();
-        s.parse_page_pr(&make_page_pr(r#"landscape="1""#));
+        let mut s = PageLayoutState::default();
+        s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="1""#));
         assert!(s.landscape);
     }
 
     #[test]
     fn parse_page_pr_landscape_false() {
-        let mut s = page_layout();
-        s.landscape = true;
-        s.parse_page_pr(&make_page_pr(r#"landscape="false""#));
+        let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
+        s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="false""#));
         assert!(!s.landscape);
+    }
+
+    #[test]
+    fn parse_page_pr_landscape_zero_resets() {
+        let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
+        s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="0""#));
+        assert!(!s.landscape, "landscape=\"0\" must reset to false");
     }
 
     #[test]
     fn parse_page_pr_hp_prefixed_landscape() {
-        let mut s = page_layout();
-        s.parse_page_pr(&make_page_pr(r#"hp:landscape="true""#));
+        let mut s = PageLayoutState::default();
+        s.parse_page_pr(&make_empty("hp:pagePr", r#"hp:landscape="true""#));
         assert!(s.landscape);
     }
 
     #[test]
-    fn parse_page_pr_no_attrs_leaves_landscape_false() {
-        let mut s = page_layout();
-        s.parse_page_pr(&make_page_pr(""));
-        assert!(!s.landscape);
+    fn parse_page_pr_no_attrs_preserves_existing_landscape() {
+        let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
+        s.parse_page_pr(&make_empty("hp:pagePr", ""));
+        assert!(s.landscape, "absent attr must not touch existing landscape");
     }
 }
