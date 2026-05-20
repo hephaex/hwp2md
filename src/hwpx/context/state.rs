@@ -81,7 +81,7 @@ impl Default for TableState {
 impl TableState {
     /// Parse `<hp:inMargin>` attributes into `self.inner_margin`.
     pub(crate) fn parse_in_margin(&mut self, e: &quick_xml::events::BytesStart) {
-        let mut m = ir::TableInnerMargin { left: 0, right: 0, top: 0, bottom: 0 };
+        let mut m = ir::TableInnerMargin { left: 141, right: 141, top: 141, bottom: 141 };
         for attr in e.attributes().flatten() {
             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
             let val: u32 = attr.unescape_value().unwrap_or_default().parse().unwrap_or(0);
@@ -234,5 +234,64 @@ impl PageLayoutState {
                 self.landscape = val.as_ref() == "true" || val.as_ref() == "1";
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quick_xml::events::BytesStart;
+
+    fn make_in_margin(attrs: &str) -> BytesStart<'static> {
+        let xml = format!("<hp:inMargin {attrs}/>");
+        let mut reader = quick_xml::Reader::from_str(Box::leak(xml.into_boxed_str()));
+        match reader.read_event().unwrap() {
+            quick_xml::events::Event::Empty(e) => e.into_owned(),
+            _ => panic!("expected empty element"),
+        }
+    }
+
+    #[test]
+    fn parse_in_margin_all_axes_explicit() {
+        let mut state = TableState::default();
+        state.parse_in_margin(&make_in_margin(r#"left="11" right="22" top="33" bottom="44""#));
+        let m = state.inner_margin.unwrap();
+        assert_eq!(m.left, 11);
+        assert_eq!(m.right, 22);
+        assert_eq!(m.top, 33);
+        assert_eq!(m.bottom, 44);
+    }
+
+    #[test]
+    fn parse_in_margin_partial_left_only_defaults_to_141() {
+        let mut state = TableState::default();
+        state.parse_in_margin(&make_in_margin(r#"left="200""#));
+        let m = state.inner_margin.unwrap();
+        assert_eq!(m.left, 200, "left must be overridden");
+        assert_eq!(m.right, 141, "right must default to 141");
+        assert_eq!(m.top, 141, "top must default to 141");
+        assert_eq!(m.bottom, 141, "bottom must default to 141");
+    }
+
+    #[test]
+    fn parse_in_margin_partial_top_bottom_defaults_to_141() {
+        let mut state = TableState::default();
+        state.parse_in_margin(&make_in_margin(r#"top="50" bottom="50""#));
+        let m = state.inner_margin.unwrap();
+        assert_eq!(m.left, 141, "left must default to 141");
+        assert_eq!(m.right, 141, "right must default to 141");
+        assert_eq!(m.top, 50, "top must be overridden");
+        assert_eq!(m.bottom, 50, "bottom must be overridden");
+    }
+
+    #[test]
+    fn parse_in_margin_no_attrs_all_default_to_141() {
+        let mut state = TableState::default();
+        state.parse_in_margin(&make_in_margin(""));
+        let m = state.inner_margin.unwrap();
+        assert_eq!(m.left, 141);
+        assert_eq!(m.right, 141);
+        assert_eq!(m.top, 141);
+        assert_eq!(m.bottom, 141);
     }
 }
