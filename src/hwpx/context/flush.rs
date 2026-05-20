@@ -121,7 +121,7 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
     section.blocks.push(block);
 }
 
-/// Variant of [`flush_paragraph`] used during OWPML flat-paragraph list
+/// Variant of `flush_paragraph` used during OWPML flat-paragraph list
 /// parsing.  Returns a [`StagedBlock`] for the staging vector.
 pub(crate) fn flush_paragraph_staged(ctx: &mut ParseContext) -> Option<StagedBlock> {
     if !ctx.current_text.is_empty() {

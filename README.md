@@ -49,7 +49,7 @@ cargo build --release
 # Binary at: target/release/hwp2md
 ```
 
-Minimum supported Rust version: **1.75**.
+Minimum supported Rust version: **1.88**.
 
 ## CLI Usage
 

@@ -11,7 +11,7 @@ documentation = "https://docs.rs/hwp2md"
 readme = "README.md"
 keywords = ["hwp", "hwpx", "markdown", "converter", "hangul"]
 categories = ["command-line-utilities", "text-processing"]
-rust-version = "1.75"
+rust-version = "1.88"
 exclude = [
     ".github/",
     ".history/",
