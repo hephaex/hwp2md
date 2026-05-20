@@ -483,3 +483,43 @@ fn write_table_inner_margin_roundtrip() {
     assert_eq!(m.top,     50, "roundtrip top");
     assert_eq!(m.bottom,  50, "roundtrip bottom");
 }
+
+/// All four margin axes must survive the roundtrip independently — catches
+/// axis mix-ups (e.g. top written into bottom) that symmetric values hide.
+#[test]
+fn write_table_asymmetric_inner_margin_roundtrip() {
+    use ir::TableInnerMargin;
+    let rows = vec![text_row(&["X"], false)];
+    let doc = Document {
+        metadata: Metadata::default(),
+        sections: vec![Section {
+            blocks: vec![Block::Table {
+                rows,
+                col_count: 1,
+                inner_margin: Some(TableInnerMargin { left: 11, right: 22, top: 33, bottom: 44 }),
+            }],
+            page_layout: None,
+            ..Default::default()
+        }],
+        assets: Vec::new(),
+    };
+
+    let tmp = tempfile::NamedTempFile::new().expect("tmp file");
+    write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+    let read_back = read_hwpx(tmp.path()).expect("read_hwpx");
+
+    let m = read_back
+        .sections
+        .into_iter()
+        .flat_map(|s| s.blocks)
+        .find_map(|b| match b {
+            Block::Table { inner_margin, .. } => inner_margin,
+            _ => None,
+        })
+        .expect("inner_margin must be Some after roundtrip");
+
+    assert_eq!(m.left,   11, "roundtrip left");
+    assert_eq!(m.right,  22, "roundtrip right");
+    assert_eq!(m.top,    33, "roundtrip top");
+    assert_eq!(m.bottom, 44, "roundtrip bottom");
+}

@@ -78,6 +78,25 @@ impl Default for TableState {
     }
 }
 
+impl TableState {
+    /// Parse `<hp:inMargin>` attributes into `self.inner_margin`.
+    pub(crate) fn parse_in_margin(&mut self, e: &quick_xml::events::BytesStart) {
+        let mut m = ir::TableInnerMargin { left: 0, right: 0, top: 0, bottom: 0 };
+        for attr in e.attributes().flatten() {
+            let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+            let val: u32 = attr.unescape_value().unwrap_or_default().parse().unwrap_or(0);
+            match key {
+                "left"   | "hp:left"   => m.left   = val,
+                "right"  | "hp:right"  => m.right  = val,
+                "top"    | "hp:top"    => m.top     = val,
+                "bottom" | "hp:bottom" => m.bottom  = val,
+                _ => {}
+            }
+        }
+        self.inner_margin = Some(m);
+    }
+}
+
 /// List parsing accumulator.
 #[derive(Debug, Default)]
 pub(crate) struct ListState {

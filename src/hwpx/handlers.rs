@@ -63,28 +63,7 @@ pub(super) fn handle_start_element(
                 }
             }
         }
-        "inMargin" | "hp:inMargin" if ctx.table.active => {
-            let mut left = 0u32;
-            let mut right = 0u32;
-            let mut top = 0u32;
-            let mut bottom = 0u32;
-            for attr in e.attributes().flatten() {
-                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                let val: u32 = attr
-                    .unescape_value()
-                    .unwrap_or_default()
-                    .parse()
-                    .unwrap_or(0);
-                match key {
-                    "left" | "hp:left" => left = val,
-                    "right" | "hp:right" => right = val,
-                    "top" | "hp:top" => top = val,
-                    "bottom" | "hp:bottom" => bottom = val,
-                    _ => {}
-                }
-            }
-            ctx.table.inner_margin = Some(ir::TableInnerMargin { left, right, top, bottom });
-        }
+        "inMargin" | "hp:inMargin" if ctx.table.active => ctx.table.parse_in_margin(e),
         "tr" | "hp:tr" => {
             ctx.table.current_row_cells.clear();
         }
@@ -263,9 +242,10 @@ pub(super) fn handle_end_element(
                     .max()
                     .unwrap_or(0),
             );
+            let inner_margin = ctx.table.inner_margin.take();
             if !ctx.table.rows.is_empty() {
                 let rows = std::mem::take(&mut ctx.table.rows);
-                staged.push(StagedBlock::Plain(ir::Block::Table { rows, col_count, inner_margin: ctx.table.inner_margin.take() }));
+                staged.push(StagedBlock::Plain(ir::Block::Table { rows, col_count, inner_margin }));
             }
             ctx.table.active = false;
         }
@@ -465,28 +445,7 @@ pub(super) fn handle_empty_element(
                 }
             }
         }
-        "inMargin" | "hp:inMargin" if ctx.table.active => {
-            let mut left = 0u32;
-            let mut right = 0u32;
-            let mut top = 0u32;
-            let mut bottom = 0u32;
-            for attr in e.attributes().flatten() {
-                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                let val: u32 = attr
-                    .unescape_value()
-                    .unwrap_or_default()
-                    .parse()
-                    .unwrap_or(0);
-                match key {
-                    "left" | "hp:left" => left = val,
-                    "right" | "hp:right" => right = val,
-                    "top" | "hp:top" => top = val,
-                    "bottom" | "hp:bottom" => bottom = val,
-                    _ => {}
-                }
-            }
-            ctx.table.inner_margin = Some(ir::TableInnerMargin { left, right, top, bottom });
-        }
+        "inMargin" | "hp:inMargin" if ctx.table.active => ctx.table.parse_in_margin(e),
         "charPr" | "hp:charPr" => apply_charpr_attrs(e, ctx),
         "fieldBegin" | "hp:fieldBegin" => {
             let mut field_type = String::new();
