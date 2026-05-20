@@ -153,6 +153,29 @@ impl From<String> for HeaderFooterType {
     }
 }
 
+/// Paragraph break-flow settings from OWPML `hh:breakSetting`.
+///
+/// Stored at the section level because HWPX encodes these values inside
+/// `hh:paraPr` entries in `header.xml` rather than per-paragraph in
+/// `section.xml`.  The default (`BreakSetting::default()`) corresponds to
+/// all four flags being `false`, matching the OWPML schema default.
+///
+/// The four fields map directly to OWPML boolean attributes and are
+/// semantically independent, so four `bool` fields is the correct
+/// representation here.
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct BreakSetting {
+    /// Prevent lone lines at the top or bottom of a page (widow/orphan control).
+    pub widow_orphan: bool,
+    /// Keep this paragraph on the same page as the following paragraph.
+    pub keep_with_next: bool,
+    /// Keep all lines of this paragraph on the same page.
+    pub keep_lines: bool,
+    /// Force a page break before this paragraph.
+    pub page_break_before: bool,
+}
+
 /// A logical section of a document containing an ordered sequence of blocks.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Section {
@@ -180,6 +203,12 @@ pub struct Section {
     /// This specifies which pages the header/footer applies to.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub header_footer_type: Option<HeaderFooterType>,
+    /// Break-flow settings parsed from `hh:breakSetting` in header.xml.
+    ///
+    /// Defaults to all-`false` when header.xml is absent or contains no
+    /// `hh:breakSetting` element (which matches the OWPML schema default).
+    #[serde(default)]
+    pub break_setting: BreakSetting,
 }
 
 /// A block-level content element within a section.

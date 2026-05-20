@@ -476,6 +476,7 @@ fn header_footer_in_markdown() {
             inlines: vec![plain("Page footer")],
         }]),
         header_footer_type: None,
+        ..Default::default()
     });
 
     let md = write_markdown(&doc, false);
@@ -520,6 +521,7 @@ fn header_footer_markers_before_body() {
         }]),
         footer: None,
         header_footer_type: None,
+        ..Default::default()
     });
 
     let md = write_markdown(&doc, false);

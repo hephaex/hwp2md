@@ -294,6 +294,7 @@ fn header_footer_ir_to_hwpx_to_ir() {
             inlines: vec![plain(footer_text)],
         }]),
         header_footer_type: None,
+        ..Default::default()
     });
 
     // Write to a temp file and read back.
@@ -389,6 +390,7 @@ fn header_footer_md_roundtrip() {
             inlines: vec![plain(footer_text)],
         }]),
         header_footer_type: None,
+        ..Default::default()
     });
 
     // IR → MD

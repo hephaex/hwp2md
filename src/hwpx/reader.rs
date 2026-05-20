@@ -41,6 +41,7 @@ pub fn read_hwpx(path: &Path) -> Result<ir::Document, Hwp2MdError> {
         doc.metadata = metadata;
     }
     let face_names = parse_face_names(&header_xml);
+    let break_setting = parse_break_setting(&header_xml);
 
     // Build the BinData ID -> full ZIP path map before parsing sections so that
     // binaryItemIDRef references can be resolved immediately.
@@ -53,6 +54,7 @@ pub fn read_hwpx(path: &Path) -> Result<ir::Document, Hwp2MdError> {
         match read_section_xml(&mut archive, section_path, &face_names) {
             Ok(mut section) => {
                 resolve_bin_refs(&mut section, &bin_map);
+                section.break_setting = break_setting.clone();
                 doc.sections.push(section);
             }
             Err(e) => {
@@ -264,6 +266,76 @@ pub(crate) fn parse_face_names(xml: &str) -> Vec<String> {
     names
 }
 
+/// Parse the `hh:breakSetting` attributes from the **first** (id=0) `hh:paraPr`
+/// element found in a header.xml string.
+///
+/// HWPX header.xml stores paragraph break-flow settings inside `hh:paraPr`
+/// children of `<hh:paraProperties>`.  We read the `id=0` entry (the default
+/// paragraph style) and extract `widowOrphan`, `keepWithNext`, `keepLines`,
+/// and `pageBreakBefore`.  Any attribute not present falls back to `false`.
+///
+/// Returns `BreakSetting::default()` (all false) when header.xml is absent,
+/// contains no `hh:paraPr`, or the first entry omits the attributes entirely.
+pub(crate) fn parse_break_setting(xml: &str) -> ir::BreakSetting {
+    let mut result = ir::BreakSetting::default();
+    let mut in_para_pr_id0 = false;
+    let mut reader = Reader::from_str(xml);
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e) | Event::Empty(ref e)) => {
+                let local_name = e.local_name();
+                let local = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
+                match local {
+                    "paraPr" => {
+                        // Enter the first paraPr with id="0".
+                        let id_val = e.attributes().flatten().find_map(|a| {
+                            let k = std::str::from_utf8(a.key.as_ref()).unwrap_or("");
+                            if k == "id" {
+                                a.unescape_value().ok().map(std::borrow::Cow::into_owned)
+                            } else {
+                                None
+                            }
+                        });
+                        in_para_pr_id0 = id_val.as_deref() == Some("0");
+                    }
+                    "breakSetting" if in_para_pr_id0 => {
+                        for attr in e.attributes().flatten() {
+                            let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                            let val = attr.unescape_value().unwrap_or_default();
+                            let flag = matches!(val.as_ref(), "true" | "1");
+                            match key {
+                                "widowOrphan" => result.widow_orphan = flag,
+                                "keepWithNext" => result.keep_with_next = flag,
+                                "keepLines" => result.keep_lines = flag,
+                                "pageBreakBefore" => result.page_break_before = flag,
+                                _ => {}
+                            }
+                        }
+                        // Found what we need — no further scanning required.
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                let local_name = e.local_name();
+                let local = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
+                if local == "paraPr" && in_para_pr_id0 {
+                    // The id=0 paraPr closed without a breakSetting child — stop.
+                    break;
+                }
+            }
+            Ok(Event::Eof) | Err(_) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    result
+}
+
 fn find_section_files(archive: &mut zip::ZipArchive<std::fs::File>) -> Vec<String> {
     let mut sections = Vec::new();
 
@@ -371,6 +443,7 @@ pub(crate) fn parse_section_xml_with_face_names(
         header: None,
         footer: None,
         header_footer_type: None,
+        break_setting: ir::BreakSetting::default(),
     };
     let mut reader = Reader::from_str(xml);
     let mut buf = Vec::new();
@@ -559,3 +632,7 @@ mod tests_page_layout;
 #[cfg(test)]
 #[path = "reader_tests_header_footer.rs"]
 mod tests_header_footer;
+
+#[cfg(test)]
+#[path = "reader_tests_break_setting.rs"]
+mod tests_break_setting;

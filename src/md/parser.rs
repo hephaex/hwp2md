@@ -101,6 +101,7 @@ pub fn parse_markdown(input: &str) -> ir::Document {
             Some(footer_blocks)
         },
         header_footer_type: None,
+        break_setting: ir::BreakSetting::default(),
     };
 
     doc.sections.push(section);

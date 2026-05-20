@@ -31,6 +31,7 @@ fn header_footer_emitted_in_section_xml() {
         header: Some(vec![plain_para("Header line")]),
         footer: Some(vec![plain_para("Footer line")]),
         header_footer_type: None,
+        ..Default::default()
     };
     let xml = section_xml_with_hf(&sec);
 
@@ -75,6 +76,7 @@ fn header_footer_emitted_before_sec_pr() {
         header: Some(vec![plain_para("hdr")]),
         footer: None,
         header_footer_type: None,
+        ..Default::default()
     };
     let xml = section_xml_with_hf(&sec);
 
@@ -97,6 +99,7 @@ fn no_header_footer_when_both_none() {
         header: None,
         footer: None,
         header_footer_type: None,
+        ..Default::default()
     };
     let xml = section_xml_with_hf(&sec);
 
@@ -116,6 +119,7 @@ fn no_header_footer_when_both_empty_vecs() {
         header: Some(vec![]),
         footer: Some(vec![]),
         header_footer_type: None,
+        ..Default::default()
     };
     let xml = section_xml_with_hf(&sec);
 
@@ -134,6 +138,7 @@ fn header_only_no_footer_element() {
         header: Some(vec![plain_para("header only")]),
         footer: None,
         header_footer_type: None,
+        ..Default::default()
     };
     let xml = section_xml_with_hf(&sec);
 
@@ -157,6 +162,7 @@ fn header_footer_type_both() {
         header: Some(vec![plain_para("Header")]),
         footer: None,
         header_footer_type: Some(ir::HeaderFooterType::Both),
+        ..Default::default()
     };
     let xml = section_xml_with_hf(&sec);
 
@@ -175,6 +181,7 @@ fn header_footer_type_even() {
         header: Some(vec![plain_para("Header")]),
         footer: Some(vec![plain_para("Footer")]),
         header_footer_type: Some(ir::HeaderFooterType::Even),
+        ..Default::default()
     };
     let xml = section_xml_with_hf(&sec);
 
@@ -193,6 +200,7 @@ fn header_footer_type_odd() {
         header: Some(vec![plain_para("Header")]),
         footer: Some(vec![plain_para("Footer")]),
         header_footer_type: Some(ir::HeaderFooterType::Odd),
+        ..Default::default()
     };
     let xml = section_xml_with_hf(&sec);
 
@@ -211,6 +219,7 @@ fn header_footer_type_none_not_emitted() {
         header: Some(vec![plain_para("Header")]),
         footer: None,
         header_footer_type: None,
+        ..Default::default()
     };
     let xml = section_xml_with_hf(&sec);
 

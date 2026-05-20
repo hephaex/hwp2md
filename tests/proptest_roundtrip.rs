@@ -191,6 +191,7 @@ fn simple_document() -> impl Strategy<Value = Document> {
                 header: None,
                 footer: None,
                 header_footer_type: None,
+                ..Default::default()
             };
             let mut doc = Document::new();
             doc.sections.push(section);
@@ -346,6 +347,7 @@ proptest! {
                 header: None,
                 footer: None,
                 header_footer_type: None,
+                ..Default::default()
             }],
             assets: Vec::new(),
         };

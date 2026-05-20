@@ -37,6 +37,17 @@ const LIST_D0_MARGIN_LEFT: &str = "400";
 /// Left margin (HWP units) applied to nested list item paragraphs (depth ≥ 1).
 const LIST_D1_MARGIN_LEFT: &str = "800";
 
+/// Compile-time default `BreakSetting` — all flags false.
+///
+/// Used as a fallback when the document contains no sections and therefore
+/// has no section-level `break_setting` to source.
+const DEFAULT_BREAK_SETTING: ir::BreakSetting = ir::BreakSetting {
+    widow_orphan: false,
+    keep_with_next: false,
+    keep_lines: false,
+    page_break_before: false,
+};
+
 pub(super) fn generate_header_xml(
     doc: &ir::Document,
     tables: &RefTables,
@@ -69,10 +80,17 @@ pub(super) fn generate_header_xml(
     // and numbering definitions.
     w.write_event(Event::Start(BytesStart::new("hh:refList")))?;
 
+    // Use the break_setting from the first section, falling back to all-false
+    // defaults when the document has no sections.
+    let break_setting = doc
+        .sections
+        .first()
+        .map_or(&DEFAULT_BREAK_SETTING, |s| &s.break_setting);
+
     write_font_faces(&mut w, tables)?;
     write_border_fills(&mut w, tables)?;
     write_char_properties(&mut w, tables)?;
-    write_para_properties(&mut w, tables)?;
+    write_para_properties(&mut w, tables, break_setting)?;
     write_styles(&mut w, tables)?;
 
     // <hh:numberingList> must be inside <hh:refList> per OWPML schema.
@@ -373,6 +391,7 @@ impl<'a> ParaPrConfig<'a> {
 fn write_para_properties<W: Write>(
     w: &mut Writer<W>,
     tables: &RefTables,
+    break_setting: &ir::BreakSetting,
 ) -> Result<(), quick_xml::Error> {
     // Five paraPr entries:
     //   id=0: default paragraph (no left indent, 160% line spacing)
@@ -385,21 +404,23 @@ fn write_para_properties<W: Write>(
     w.write_event(Event::Start(para_properties))?;
 
     // ── paraPr id=0: default (no left indent, standard line spacing) ──
-    write_single_para_pr(w, &ParaPrConfig::standard("0", "0"))?;
+    write_single_para_pr(w, &ParaPrConfig::standard("0", "0"), break_setting)?;
 
     // ── paraPr id=1: block-quote (left indent) ──
-    write_single_para_pr(w, &ParaPrConfig::standard("1", QUOTE_MARGIN_LEFT))?;
+    write_single_para_pr(w, &ParaPrConfig::standard("1", QUOTE_MARGIN_LEFT), break_setting)?;
 
     // ── paraPr id=2: top-level list item ──
     write_single_para_pr(
         w,
         &ParaPrConfig::standard(PARA_PR_LIST_D0, LIST_D0_MARGIN_LEFT),
+        break_setting,
     )?;
 
     // ── paraPr id=3: nested list item (depth ≥ 1) ──
     write_single_para_pr(
         w,
         &ParaPrConfig::standard(PARA_PR_LIST_D1, LIST_D1_MARGIN_LEFT),
+        break_setting,
     )?;
 
     // ── paraPr id=4: heading (wider line spacing for readability) ──
@@ -412,6 +433,7 @@ fn write_para_properties<W: Write>(
     write_single_para_pr(
         w,
         &ParaPrConfig::with_spacing(PARA_PR_HEADING, "0", &heading_spacing_str, "0"),
+        break_setting,
     )?;
 
     w.write_event(Event::End(BytesEnd::new("hh:paraProperties")))?;
@@ -424,9 +446,11 @@ fn write_para_properties<W: Write>(
 /// `<hh:margin>`.  `config.line_spacing` controls the `<hh:lineSpacing>` value
 /// attribute (percentage string).  `config.first_indent` sets the `<hh:intent>`
 /// first-line indent (HWP units).  All other margin children are emitted as `"0"`.
+/// `bs` supplies the four boolean break-flow flags from the IR.
 fn write_single_para_pr<W: Write>(
     w: &mut Writer<W>,
     config: &ParaPrConfig<'_>,
+    bs: &ir::BreakSetting,
 ) -> Result<(), quick_xml::Error> {
     let mut para_pr = BytesStart::new("hh:paraPr");
     para_pr.push_attribute(("id", config.id));
@@ -446,15 +470,19 @@ fn write_single_para_pr<W: Write>(
     w.write_event(Event::Empty(heading))?;
 
     // breakSetting requires all seven attributes (schema: all required).
-    let mut break_setting = BytesStart::new("hh:breakSetting");
-    break_setting.push_attribute(("breakLatinWord", "KEEP_WORD"));
-    break_setting.push_attribute(("breakNonLatinWord", "KEEP_WORD"));
-    break_setting.push_attribute(("widowOrphan", "false"));
-    break_setting.push_attribute(("keepWithNext", "false"));
-    break_setting.push_attribute(("keepLines", "false"));
-    break_setting.push_attribute(("pageBreakBefore", "false"));
-    break_setting.push_attribute(("lineWrap", "BREAK"));
-    w.write_event(Event::Empty(break_setting))?;
+    // Four boolean flags are driven by the IR BreakSetting; the remaining
+    // three (breakLatinWord, breakNonLatinWord, lineWrap) are structural
+    // constants whose values are not yet modelled in the IR.
+    let bool_str = |b: bool| if b { "true" } else { "false" };
+    let mut break_setting_el = BytesStart::new("hh:breakSetting");
+    break_setting_el.push_attribute(("breakLatinWord", "KEEP_WORD"));
+    break_setting_el.push_attribute(("breakNonLatinWord", "KEEP_WORD"));
+    break_setting_el.push_attribute(("widowOrphan", bool_str(bs.widow_orphan)));
+    break_setting_el.push_attribute(("keepWithNext", bool_str(bs.keep_with_next)));
+    break_setting_el.push_attribute(("keepLines", bool_str(bs.keep_lines)));
+    break_setting_el.push_attribute(("pageBreakBefore", bool_str(bs.page_break_before)));
+    break_setting_el.push_attribute(("lineWrap", "BREAK"));
+    w.write_event(Event::Empty(break_setting_el))?;
 
     let mut line_spacing = BytesStart::new("hh:lineSpacing");
     line_spacing.push_attribute(("type", "PERCENT"));

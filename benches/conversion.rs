@@ -132,6 +132,27 @@ fn bench_hwpx_table_heavy_roundtrip(c: &mut Criterion) {
     });
 }
 
+/// Benchmark HTML table parsing with a larger 100×10 table to measure
+/// per-tag heap allocation cost in `local_name`.
+fn bench_parse_html_table_large(c: &mut Criterion) {
+    // Build a 100-row × 10-col HTML table string once outside the hot loop.
+    let mut html = String::from("<table>");
+    for _ in 0..100 {
+        html.push_str("<tr>");
+        for col in 0..10u8 {
+            html.push_str("<td>cell");
+            html.push(char::from(b'0' + col));
+            html.push_str("</td>");
+        }
+        html.push_str("</tr>");
+    }
+    html.push_str("</table>");
+
+    c.bench_function("parse_html_table_large_100x10", |b| {
+        b.iter(|| hwp2md::md::html_table::parse_html_table(black_box(&html)));
+    });
+}
+
 criterion_group!(
     benches,
     bench_md_to_ir,
@@ -140,6 +161,7 @@ criterion_group!(
     bench_hwpx_to_ir,
     bench_roundtrip,
     bench_ir_to_hwpx_table_heavy,
-    bench_hwpx_table_heavy_roundtrip
+    bench_hwpx_table_heavy_roundtrip,
+    bench_parse_html_table_large
 );
 criterion_main!(benches);

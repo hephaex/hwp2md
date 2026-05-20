@@ -324,6 +324,7 @@ fn header_footer_markers_roundtrip_via_write_then_parse() {
             inlines: vec![ir::Inline::plain(footer_text)],
         }]),
         header_footer_type: None,
+        ..Default::default()
     });
 
     let md = write_markdown(&doc, false);
@@ -654,6 +655,7 @@ fn ruby_roundtrip_via_write_then_parse() {
         header: None,
         footer: None,
         header_footer_type: None,
+        ..Default::default()
     });
 
     let md = write_markdown(&doc, false);
