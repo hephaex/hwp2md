@@ -452,4 +452,92 @@ mod tests {
         s.parse_page_pr(&make_empty("hp:pagePr", ""));
         assert!(s.landscape, "absent attr must not touch existing landscape");
     }
+
+    // ── Group A: parse_page_size edge cases ──────────────────────────────
+
+    #[test]
+    fn parse_page_size_invalid_value_preserves_existing_some() {
+        let mut s = PageLayoutState { width: Some(59528), height: Some(84188), ..PageLayoutState::default() };
+        s.parse_page_size(&make_empty("hp:pageSize", r#"width="bogus""#));
+        assert_eq!(s.width, Some(59528), "invalid parse must not reset existing Some");
+        assert_eq!(s.height, Some(84188), "unmentioned field unchanged");
+    }
+
+    #[test]
+    fn parse_page_size_negative_value_preserves_existing_some() {
+        let mut s = PageLayoutState { width: Some(42000), ..PageLayoutState::default() };
+        s.parse_page_size(&make_empty("hp:pageSize", r#"width="-1""#));
+        assert_eq!(s.width, Some(42000), "negative fails u32 parse; existing Some preserved");
+    }
+
+    #[test]
+    fn parse_page_size_overflow_value_preserves_existing_some() {
+        let mut s = PageLayoutState { width: Some(42000), ..PageLayoutState::default() };
+        s.parse_page_size(&make_empty("hp:pageSize", r#"width="4294967296""#));
+        assert_eq!(s.width, Some(42000), "u32::MAX+1 overflow; existing Some preserved");
+    }
+
+    // ── Group B: parse_margin edge cases ─────────────────────────────────
+
+    #[test]
+    fn parse_margin_invalid_value_preserves_existing_some() {
+        let mut s = PageLayoutState { margin_left: Some(1701), margin_right: Some(1701), ..PageLayoutState::default() };
+        s.parse_margin(&make_empty("hp:margin", r#"left="oops" right="2000""#));
+        assert_eq!(s.margin_left, Some(1701), "invalid left: existing Some preserved");
+        assert_eq!(s.margin_right, Some(2000), "valid right: updated");
+    }
+
+    #[test]
+    fn parse_margin_negative_value_preserves_existing_some() {
+        let mut s = PageLayoutState { margin_top: Some(2000), ..PageLayoutState::default() };
+        s.parse_margin(&make_empty("hp:margin", r#"top="-50""#));
+        assert_eq!(s.margin_top, Some(2000), "negative top fails u32 parse; existing Some preserved");
+    }
+
+    #[test]
+    fn parse_margin_overflow_value_preserves_existing_some() {
+        let mut s = PageLayoutState { margin_bottom: Some(1500), ..PageLayoutState::default() };
+        s.parse_margin(&make_empty("hp:margin", r#"bottom="4294967296""#));
+        assert_eq!(s.margin_bottom, Some(1500), "overflow bottom; existing Some preserved");
+    }
+
+    // ── Group C: parse_page_pr edge cases ──────────────────────────────────
+
+    #[test]
+    fn parse_page_pr_unknown_value_resets_to_false() {
+        let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
+        s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="yes""#));
+        assert!(!s.landscape, "unrecognised value falls through to false");
+    }
+
+    #[test]
+    fn parse_page_pr_empty_value_resets_to_false() {
+        let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
+        s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="""#));
+        assert!(!s.landscape, "empty string value resets to false");
+    }
+
+    #[test]
+    fn parse_page_pr_uppercase_true_does_not_match() {
+        let mut s = PageLayoutState::default();
+        s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="TRUE""#));
+        assert!(!s.landscape, "match is case-sensitive; TRUE does not set true");
+    }
+
+    #[test]
+    fn parse_page_pr_unknown_attribute_ignored_preserves_landscape() {
+        let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
+        s.parse_page_pr(&make_empty("hp:pagePr", r#"numbering="continuous""#));
+        assert!(s.landscape, "unknown attribute is silently ignored; existing state preserved");
+    }
+
+    #[test]
+    fn parse_page_pr_mixed_known_and_unknown_attrs() {
+        let mut s = PageLayoutState::default();
+        s.parse_page_pr(&make_empty(
+            "hp:pagePr",
+            r#"numbering="continuous" landscape="true" footnote="endOfPage""#,
+        ));
+        assert!(s.landscape, "landscape parsed correctly among unknown attrs");
+    }
 }
