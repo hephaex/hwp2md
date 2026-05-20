@@ -392,10 +392,16 @@ impl Inline {
     }
 }
 
+/// OWPML default inner-cell gap in HWP units when `<hp:inMargin>` axes are unspecified.
+///
+/// Used by the HWPX reader as the default for missing axes and cross-referenced by
+/// `TABLE_INNER_MARGIN` in `hwpx::writer_section` (its `&str` counterpart for XML emission).
+pub(crate) const DEFAULT_TABLE_INNER_MARGIN: u32 = 141;
+
 /// Inner margin between cells in a `Block::Table`, in HWP units (1/7200 inch).
 ///
 /// Corresponds to `<hp:tblPr><hp:inMargin>` in OWPML. When `None`, the writer
-/// falls back to `TABLE_INNER_MARGIN` ("141" ≈ 1 mm).
+/// falls back to `DEFAULT_TABLE_INNER_MARGIN` (141 HWP units ≈ 1.4 mm).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableInnerMargin {
     /// Left inner margin in HWP units.

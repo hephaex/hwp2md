@@ -357,7 +357,8 @@ const TABLE_CELL_WIDTH: usize = 8_000;
 /// Default row height in HWP units (1 000 ≈ 10 mm) used for table sizing.
 const TABLE_CELL_HEIGHT: usize = 1_000;
 
-/// Inner margin between table cells (left/right/top/bottom), ~1 mm in HWP units.
+/// Inner margin between table cells (left/right/top/bottom), ~1.4 mm in HWP units.
+/// String form of `ir::DEFAULT_TABLE_INNER_MARGIN` used directly in XML attribute emission.
 const TABLE_INNER_MARGIN: &str = "141";
 
 /// Horizontal cell padding (left and right inner padding), ~3.6 mm in HWP units.

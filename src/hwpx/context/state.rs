@@ -80,11 +80,17 @@ impl Default for TableState {
 
 impl TableState {
     /// Parse `<hp:inMargin>` attributes into `self.inner_margin`.
+    ///
+    /// Axes absent from the element default to [`ir::DEFAULT_TABLE_INNER_MARGIN`].
+    /// Axes with non-numeric values are silently skipped (default preserved).
     pub(crate) fn parse_in_margin(&mut self, e: &quick_xml::events::BytesStart) {
-        let mut m = ir::TableInnerMargin { left: 141, right: 141, top: 141, bottom: 141 };
+        let d = ir::DEFAULT_TABLE_INNER_MARGIN;
+        let mut m = ir::TableInnerMargin { left: d, right: d, top: d, bottom: d };
         for attr in e.attributes().flatten() {
             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-            let val: u32 = attr.unescape_value().unwrap_or_default().parse().unwrap_or(0);
+            let Ok(val) = attr.unescape_value().unwrap_or_default().parse::<u32>() else {
+                continue;
+            };
             match key {
                 "left"   | "hp:left"   => m.left   = val,
                 "right"  | "hp:right"  => m.right  = val,
@@ -240,14 +246,16 @@ impl PageLayoutState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use quick_xml::events::BytesStart;
 
-    fn make_in_margin(attrs: &str) -> BytesStart<'static> {
+    // Build a BytesStart from an attrs string without leaking memory.
+    // `into_owned()` copies the byte data into a new allocation, so the
+    // local `xml` String can be dropped after the match.
+    fn make_in_margin(attrs: &str) -> quick_xml::events::BytesStart<'static> {
         let xml = format!("<hp:inMargin {attrs}/>");
-        let mut reader = quick_xml::Reader::from_str(Box::leak(xml.into_boxed_str()));
+        let mut reader = quick_xml::Reader::from_str(&xml);
         match reader.read_event().unwrap() {
             quick_xml::events::Event::Empty(e) => e.into_owned(),
-            _ => panic!("expected empty element"),
+            ev => panic!("expected Event::Empty, got {ev:?}"),
         }
     }
 
@@ -291,6 +299,28 @@ mod tests {
         let m = state.inner_margin.unwrap();
         assert_eq!(m.left, 141);
         assert_eq!(m.right, 141);
+        assert_eq!(m.top, 141);
+        assert_eq!(m.bottom, 141);
+    }
+
+    #[test]
+    fn parse_in_margin_hp_prefixed_attrs() {
+        let mut state = TableState::default();
+        state.parse_in_margin(&make_in_margin(r#"hp:left="77" hp:bottom="88""#));
+        let m = state.inner_margin.unwrap();
+        assert_eq!(m.left, 77, "hp:left must be recognised");
+        assert_eq!(m.right, 141, "right must default to 141");
+        assert_eq!(m.top, 141, "top must default to 141");
+        assert_eq!(m.bottom, 88, "hp:bottom must be recognised");
+    }
+
+    #[test]
+    fn parse_in_margin_invalid_value_keeps_default() {
+        let mut state = TableState::default();
+        state.parse_in_margin(&make_in_margin(r#"left="oops" right="50""#));
+        let m = state.inner_margin.unwrap();
+        assert_eq!(m.left, 141, "invalid value must preserve 141 default");
+        assert_eq!(m.right, 50);
         assert_eq!(m.top, 141);
         assert_eq!(m.bottom, 141);
     }
