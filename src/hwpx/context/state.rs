@@ -237,7 +237,14 @@ impl PageLayoutState {
             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
             let val = attr.unescape_value().unwrap_or_default();
             if key == "landscape" || key == "hp:landscape" {
-                self.landscape = val.as_ref() == "true" || val.as_ref() == "1";
+                // Strict boolean: only "true"/"1" or "false"/"0" mutate state.
+                // Unknown values preserve prior state, consistent with
+                // parse_page_size / parse_margin skip-on-parse-failure semantics.
+                match val.as_ref() {
+                    "true" | "1"  => self.landscape = true,
+                    "false" | "0" => self.landscape = false,
+                    _ => {}
+                }
             }
         }
     }
@@ -504,24 +511,31 @@ mod tests {
     // ── Group C: parse_page_pr edge cases ──────────────────────────────────
 
     #[test]
-    fn parse_page_pr_unknown_value_resets_to_false() {
+    fn parse_page_pr_unknown_value_preserves_existing() {
         let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
         s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="yes""#));
-        assert!(!s.landscape, "unrecognised value falls through to false");
+        assert!(s.landscape, "unrecognised value preserves prior true state");
     }
 
     #[test]
-    fn parse_page_pr_empty_value_resets_to_false() {
+    fn parse_page_pr_empty_value_preserves_existing() {
         let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
         s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="""#));
-        assert!(!s.landscape, "empty string value resets to false");
+        assert!(s.landscape, "empty string value preserves prior true state");
     }
 
     #[test]
-    fn parse_page_pr_uppercase_true_does_not_match() {
+    fn parse_page_pr_uppercase_true_preserves_false() {
         let mut s = PageLayoutState::default();
         s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="TRUE""#));
-        assert!(!s.landscape, "match is case-sensitive; TRUE does not set true");
+        assert!(!s.landscape, "case-sensitive: TRUE preserves prior false state");
+    }
+
+    #[test]
+    fn parse_page_pr_unknown_value_preserves_false() {
+        let mut s = PageLayoutState::default(); // landscape: false
+        s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="yes""#));
+        assert!(!s.landscape, "unrecognised value preserves prior false state");
     }
 
     #[test]

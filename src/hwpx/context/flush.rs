@@ -3,6 +3,16 @@ use crate::ir::{self, InlineFormat};
 use super::state::FormattingState;
 use super::ParseContext;
 
+/// Parse a boolean XML attribute value, preserving the existing value for
+/// unrecognised strings (i.e. neither "true"/"1" nor "false"/"0").
+fn parse_bool_preserve(val: &str, current: bool) -> bool {
+    match val {
+        "true" | "1" => true,
+        "false" | "0" => false,
+        _ => current,
+    }
+}
+
 /// Parse `bold`, `italic`, `underline`, `strikeout`, and font-face attributes
 /// from a `<charPr>` or `<hp:charPr>` element and write them onto `ctx`.
 ///
@@ -16,9 +26,11 @@ pub(crate) fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut Pa
         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
         let val = attr.unescape_value().unwrap_or_default();
         match key {
-            "bold" | "hp:bold" => ctx.fmt.bold = val.as_ref() == "true" || val.as_ref() == "1",
+            "bold" | "hp:bold" => {
+                ctx.fmt.bold = parse_bool_preserve(val.as_ref(), ctx.fmt.bold);
+            }
             "italic" | "hp:italic" => {
-                ctx.fmt.italic = val.as_ref() == "true" || val.as_ref() == "1";
+                ctx.fmt.italic = parse_bool_preserve(val.as_ref(), ctx.fmt.italic);
             }
             "underline" | "hp:underline" => {
                 ctx.fmt.underline =

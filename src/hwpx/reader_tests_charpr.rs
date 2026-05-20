@@ -455,3 +455,79 @@ fn parse_face_names_empty_string_yields_empty_vec() {
     let face_names = super::parse_face_names("");
     assert!(face_names.is_empty());
 }
+
+// -----------------------------------------------------------------------
+// apply_charpr_attrs — parse_bool_preserve (bold / italic)
+// -----------------------------------------------------------------------
+
+#[test]
+fn apply_charpr_attrs_bold_garbage_value_preserves_existing() {
+    use quick_xml::events::BytesStart;
+
+    // Build a BytesStart with bold="yes" (an unrecognised value).
+    let xml_bytes = make_bytes_start_with_attrs("charPr", &[("bold", "yes")]);
+    let start_bytes = xml_bytes
+        .iter()
+        .take_while(|&&b| b != b'>')
+        .copied()
+        .collect::<Vec<_>>();
+    let e = BytesStart::from_content(
+        std::str::from_utf8(&start_bytes[1..]).unwrap(),
+        "charPr".len(),
+    );
+
+    // Pre-set bold = true so we can confirm it is preserved.
+    let mut ctx = super::context::ParseContext {
+        fmt: super::context::FormattingState {
+            bold: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    super::context::apply_charpr_attrs(&e, &mut ctx);
+
+    assert!(
+        ctx.fmt.bold,
+        "garbage bold value must preserve existing true"
+    );
+}
+
+#[test]
+fn apply_charpr_attrs_italic_garbage_value_preserves_existing() {
+    use quick_xml::events::BytesStart;
+
+    let xml_bytes = make_bytes_start_with_attrs("charPr", &[("italic", "yes")]);
+    let start_bytes = xml_bytes
+        .iter()
+        .take_while(|&&b| b != b'>')
+        .copied()
+        .collect::<Vec<_>>();
+    let e = BytesStart::from_content(
+        std::str::from_utf8(&start_bytes[1..]).unwrap(),
+        "charPr".len(),
+    );
+
+    let mut ctx = super::context::ParseContext {
+        fmt: super::context::FormattingState {
+            italic: true,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    super::context::apply_charpr_attrs(&e, &mut ctx);
+
+    assert!(
+        ctx.fmt.italic,
+        "garbage italic value must preserve existing true"
+    );
+}
+
+#[test]
+fn apply_charpr_attrs_bold_numeric_one_sets_true() {
+    // bold starts false; "1" must flip it to true.
+    let ctx = apply_attrs_via_xml("charPr", &[("bold", "1")]);
+    assert!(
+        ctx.fmt.bold,
+        "bold=\"1\" must set bold to true"
+    );
+}
