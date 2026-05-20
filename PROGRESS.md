@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 41 완료 (partial inMargin axis defaults + parser robustness)
+## 현재 상태: v0.5.0 Sprint 42 완료 (PageLayoutState parser unit tests + make_empty helper)
 
 ### 완료
 
@@ -233,6 +233,33 @@
 - 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
+
+### 2026-05-20 — v0.5.0 Sprint 42: PageLayoutState Parser Unit Tests + make_empty Helper
+
+**S42-01~03: 13 unit tests for 3 previously-untested PageLayoutState parsers**:
+- `parse_page_size` (4 tests): all axes, width-only, height-only, no attrs
+- `parse_margin` (4 tests): all 4 axes, left+right only, top+bottom only, no attrs
+- `parse_page_pr` (5 tests): landscape true/false, "0" → false, hp: prefix, no attrs preserves existing
+
+**Follow-up S1: `make_empty(tag, attrs)` unified helper**:
+- Collapsed 3 near-identical helpers (`make_page_size`, `make_margin`, `make_page_pr`) into parameterized `make_empty`
+- Existing `make_in_margin` kept as thin wrapper — 6 Sprint 41 tests unchanged
+- `page_layout()` factory deleted; all tests use `PageLayoutState::default()` directly
+- `PageLayoutState { landscape: true, ..PageLayoutState::default() }` struct-update syntax → satisfies `clippy::field_reassign_with_default`
+
+**Follow-up S3: landscape edge cases**:
+- `parse_page_pr_landscape_zero_resets`: `landscape="0"` sets false (numeric string support)
+- `parse_page_pr_no_attrs_preserves_existing_landscape`: absent attr is a no-op
+
+**Commits**: `dc1827c` (Sprint 42), `f881380` (follow-up)
+
+**리뷰 결과** (0 CRITICAL, 0 HIGH):
+- M: `parse_page_size` — invalid value with prior `Some(n)` state untested (Sprint 43 candidate)
+- M: `parse_page_pr` — unknown value like `"yes"` silently resets to false (behavior unverified)
+- L: Unknown attributes in `parse_page_pr` are silently ignored (graceful but unverified)
+- L: Negative/overflow numeric values not tested across any parser
+
+**검증**: `cargo clippy --all-targets -- -D clippy::pedantic` **0 warnings**, 1278 tests (0 failures)
 
 ### 2026-05-07 — v0.5.0 Sprint 15: README Doc Refresh + Style Template CLI Test
 
