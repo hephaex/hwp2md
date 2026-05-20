@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 39 완료 (table margin const extraction + criterion bench baseline)
+## 현재 상태: v0.5.0 Sprint 40 완료 (TableInnerMargin IR + roundtrip preservation)
 
 ### 완료
 
@@ -277,6 +277,41 @@
 **리뷰 follow-up**: `write_table_2x3_has_required_elements`에 `<hp:cellMargin>` 속성값 assertion 추가 (left/right=510, top/bottom=141)
 
 **검증**: `cargo clippy --all-targets -- -W clippy::pedantic` **0 warnings**, 1254 tests (0 failures)
+
+### 2026-05-20 — v0.5.0 Sprint 40: TableInnerMargin IR Field + Roundtrip Preservation
+
+**S40-01: `TableInnerMargin` struct** (`src/ir.rs`):
+- `pub struct TableInnerMargin { left, right, top, bottom: u32 }` — OWPML `<hp:inMargin>` values
+- `inner_margin: Option<TableInnerMargin>` field added to `Block::Table` variant
+- `None` = use writer default (141 HWP units); field fully doc-commented
+
+**S40-02: All Block::Table sites updated** (28 files, ~62 sites):
+- Construction sites: `inner_margin: None` (backward-compatible defaults)
+- Exhaustive match arms: `..` wildcard (forward-compatible)
+
+**S40-03: Writer wiring** (`src/hwpx/writer_section.rs`):
+- `write_table` signature: `inner_margin: Option<&ir::TableInnerMargin>` parameter
+- `Some(m)` → emit custom values; `None` → fall back to `TABLE_INNER_MARGIN` const
+
+**S40-04: Reader wiring** (`src/hwpx/handlers.rs` + `context/state.rs`):
+- `TableState.inner_margin: Option<ir::TableInnerMargin>` accumulator
+- `"inMargin" | "hp:inMargin"` handler in both `handle_start_element` and `handle_empty_element` (required: our writer emits `<hp:inMargin/>` as Empty event)
+- `handle_end_element` propagates `inner_margin.take()` into `Block::Table`
+
+**S40-05: 3 new tests** + follow-up 1 (4 total):
+- `write_table_custom_inner_margin_emitted` — writer emits custom values
+- `write_table_default_inner_margin_when_none` — None → 141 fallback unchanged
+- `write_table_inner_margin_roundtrip` — full write→read roundtrip (left=right=300, top=bottom=50)
+- `write_table_asymmetric_inner_margin_roundtrip` — all four axes distinct (11/22/33/44)
+
+**리뷰 follow-up** (W1+W2+S3-P1):
+- `TableState::parse_in_margin()` helper extracted to `state.rs` — eliminates 40-line duplicate in Start/Empty handlers
+- `inner_margin.take()` moved outside empty-rows guard → always cleared on `</hp:tbl>`
+- Asymmetric roundtrip test added
+
+**Commits**: `88b04fa` (main Sprint 40), `c6b79cf` (follow-up)
+
+**검증**: `cargo clippy --all-targets -- -D clippy::pedantic` **0 warnings**, 1262 tests (0 failures)
 
 ### 2026-05-19 — v0.5.0 Sprint 37: colspan cellSz Scaling + HWPX Span Proptest + Publish Prep
 
