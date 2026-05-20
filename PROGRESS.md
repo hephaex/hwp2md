@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 45 완료 (MD parser HTML &lt;table&gt; → IR with colspan/rowspan)
+## 현재 상태: v0.5.0 Sprint 46 완료 (hh:breakSetting IR roundtrip)
 
 ### 완료
 
@@ -233,6 +233,28 @@
 - 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
+
+### 2026-05-21 — v0.5.0 Sprint 46: hh:breakSetting IR roundtrip
+
+**S46-01: `hh:breakSetting` IR roundtrip** (`src/ir.rs`, `src/hwpx/reader.rs`, `src/hwpx/writer_header.rs`):
+- New `BreakSetting` struct: `widow_orphan`, `keep_with_next`, `keep_lines`, `page_break_before` (all `bool`, `#[allow(clippy::struct_excessive_bools)]`)
+- `Section.break_setting: BreakSetting` — default all false; serde default
+- `parse_break_setting(xml: &str) -> ir::BreakSetting` in `reader.rs`: scans `hh:paraPr id="0"` → `hh:breakSetting` attributes from header.xml; cloned into every section
+- `write_single_para_pr` now accepts `bs: &ir::BreakSetting`; emits IR values instead of hardcoded `"false"` for all four boolean attributes
+- New `src/hwpx/reader_tests_break_setting.rs`: 13 tests (8 unit + 5 write→read roundtrip)
+
+**S46-02: html_table Known Limitations doc** (`src/md/html_table.rs`):
+- Added `# Known Limitations` section to module doc comment
+- Documents: nested tables → None, block content in cells → plain text, inline formatting stripped, unescaped `&` → None fallback
+
+**S46-03: `local_name` heap alloc benchmark + decision** (`benches/conversion.rs`):
+- `bench_parse_html_table_large_100x10`: 290 µs for 100×10 table (~2202 `local_name` calls)
+- Decision: keep `String` return — heap alloc cost is negligible vs XML tokenizer + IR builder
+- `local_name` annotated with measurement note
+
+**Commits**: `53be398`
+
+**검증**: `cargo clippy --all-targets -- -D clippy::pedantic` 0 warnings, 1326 tests (0 failures)
 
 ### 2026-05-20 — v0.5.0 Sprint 45: MD Parser HTML `<table>` → IR
 
