@@ -339,16 +339,32 @@ fn detect_korean_regulation_heading_wrong_suffix_returns_none() {
 }
 
 #[test]
-fn detect_korean_regulation_heading_leading_whitespace_not_matched() {
-    // A paragraph with leading whitespace is NOT a chapter marker.
-    // trim_start is intentionally absent to prevent mis-promoting indented citations.
-    assert_eq!(detect_korean_regulation_heading(" 제1장 총칙"), None);
+fn detect_korean_regulation_heading_leading_whitespace_matched() {
+    // HWP authors often embed leading spaces in chapter headings as indentation.
+    // trim_start() is applied so "   제1장" is correctly detected as H1.
+    assert_eq!(detect_korean_regulation_heading("   제1장 총칙"), Some(1));
+    assert_eq!(detect_korean_regulation_heading("    제1절 운영"), Some(2));
 }
 
 #[test]
 fn detect_korean_regulation_heading_amendment_notation_jo_ui_n() {
     // "제N조의M" (amendment sub-articles) should match 조 → H2.
     assert_eq!(detect_korean_regulation_heading("제5조의2 특례"), Some(2));
+}
+
+#[test]
+fn detect_korean_regulation_heading_jang_jeol_jo_hierarchy() {
+    // S55-02: validate that 장→H1, 절→H2, 조→H2 in a document that has all three.
+    // 절 and 조 are at the same level to avoid H1→H3 gap in documents without 절.
+    assert_eq!(detect_korean_regulation_heading("제1장 총칙"), Some(1));
+    assert_eq!(detect_korean_regulation_heading("제1절 일반사항"), Some(2));
+    assert_eq!(detect_korean_regulation_heading("제1조 목적"), Some(2));
+    // 절 and 조 must produce the same level.
+    assert_eq!(
+        detect_korean_regulation_heading("제2절 운영"),
+        detect_korean_regulation_heading("제3조 적용범위"),
+        // both must be H2
+    );
 }
 
 #[test]

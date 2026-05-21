@@ -554,11 +554,21 @@ pub(crate) fn detect_heading_level(para: &HwpParagraph, doc_info: &DocInfo) -> O
 /// - 제N장 (chapter) → H1
 /// - 제N절 (section) → H2
 /// - 제N조 (article) → H2
+///
+/// `trim_start()` is intentional: Korean HWP documents commonly embed leading
+/// spaces in chapter/section headings as visual indentation (e.g. `"   제1장"`).
+/// HWP's indentation is normally stored in para_shape, but some authors use raw
+/// spaces in the text stream.  Stripping them is safe because tier-4 only runs
+/// after tier 1–3 have already returned `None`; an indented inline citation
+/// whose paragraph text starts with `"제N조"` is a legitimate article heading.
+///
+/// Extension note (편/관): large Korean statutes (민법, 형법) use an additional
+/// level 편 (part, above 장) and occasionally 관 (subsection, between 절 and 조).
+/// Supporting 편 would require shifting 장→H2 and 절/조→H3, which would break
+/// golden files that rely on 장→H1.  Defer until a 편-bearing HWP fixture is
+/// available to validate the level shift end-to-end.
 fn detect_korean_regulation_heading(text: &str) -> Option<u8> {
-    // Use raw paragraph text — HWP paragraph boundaries are authoritative.
-    // Do NOT trim: an indented paragraph whose text begins with "제" is not
-    // a chapter marker.
-    let rest = text.strip_prefix('제')?;
+    let rest = text.trim_start().strip_prefix('제')?;
     // Must be followed by one or more ASCII digits
     let digit_end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
     if digit_end == 0 {
