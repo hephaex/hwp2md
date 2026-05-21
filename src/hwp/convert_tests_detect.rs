@@ -401,9 +401,9 @@ fn detect_korean_regulation_heading_tab_indented_matched() {
 
 #[test]
 fn detect_korean_regulation_heading_tab_between_marker_and_title() {
-    // Tab AFTER the suffix boundary (not as leading indent) is caught by
-    // is_heading_terminator('\t') via is_whitespace(). Different code path from
-    // tab_indented_matched which exercises trim_start().
+    // Tab AFTER the suffix boundary — caught by is_heading_terminator('\t') via is_whitespace().
+    // Isolates the tab-as-terminator path. tab_indented_matched exercises trim_start() on the
+    // leading tab and then hits a space terminator; here we exercise the tab terminator alone.
     assert_eq!(
         detect_korean_regulation_heading("제3조\t참조"),
         Some(2),
@@ -438,7 +438,7 @@ fn detect_korean_regulation_heading_ideographic_space_treated_as_heading() {
         "NBSP (U+00A0) after 조 should yield Some(2)"
     );
     // U+202F (NARROW NO-BREAK SPACE) — is_whitespace() = true. Used in formatted Korean
-    // numbers and sometimes injected by HWP between the article marker and a bracket.
+    // numbers and some HWP authoring tools emit it as a no-break separator.
     assert_eq!(
         detect_korean_regulation_heading("제3조\u{202F}참조"),
         Some(2),
