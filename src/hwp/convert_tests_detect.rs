@@ -418,7 +418,7 @@ fn detect_korean_regulation_heading_tier4_integration() {
 }
 
 // -----------------------------------------------------------------------
-// S57-P3: is_heading_terminator policy test
+// S57-P3 / S58-P2 / S59-P2: is_heading_terminator policy test
 // -----------------------------------------------------------------------
 
 #[test]
@@ -431,15 +431,23 @@ fn is_heading_terminator_canonical_allowed_set() {
     assert!(is_heading_terminator(')'), "close paren");
     assert!(is_heading_terminator('['), "open bracket");
     assert!(is_heading_terminator(']'), "close bracket");
-    // CJK quotes
-    assert!(is_heading_terminator('「'), "CJK open");
-    assert!(is_heading_terminator('」'), "CJK close");
+    // CJK quotes (open/close symmetric — review enforces symmetry)
+    assert!(is_heading_terminator('「'), "CJK open guillemet");
+    assert!(is_heading_terminator('」'), "CJK close guillemet");
+    // CJK title brackets — canonical Korean title delimiters
+    assert!(is_heading_terminator('《'), "CJK double open");
+    assert!(is_heading_terminator('》'), "CJK double close");
+    assert!(is_heading_terminator('〈'), "CJK single open");
+    assert!(is_heading_terminator('〉'), "CJK single close");
     // Fullwidth parens (common in OCR'd Korean docs)
     assert!(is_heading_terminator('（'), "fullwidth open");
     assert!(is_heading_terminator('）'), "fullwidth close");
-    // Punctuation — ASCII
+    // Punctuation — ASCII (including separators that appear after 조/절/장)
     assert!(is_heading_terminator('.'), "period");
     assert!(is_heading_terminator(':'), "colon");
+    assert!(is_heading_terminator(','), "comma");
+    assert!(is_heading_terminator('-'), "hyphen");
+    assert!(is_heading_terminator('~'), "tilde");
     assert!(is_heading_terminator('·'), "middle dot");
     assert!(is_heading_terminator('ㆍ'), "Korean middle dot");
     assert!(is_heading_terminator('…'), "ellipsis");
@@ -447,6 +455,7 @@ fn is_heading_terminator_canonical_allowed_set() {
     assert!(is_heading_terminator('：'), "fullwidth colon");
     assert!(is_heading_terminator('．'), "fullwidth period");
     assert!(is_heading_terminator('；'), "fullwidth semicolon");
+    assert!(is_heading_terminator('，'), "fullwidth comma");
 }
 
 #[test]
