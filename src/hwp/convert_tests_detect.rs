@@ -400,6 +400,23 @@ fn detect_korean_regulation_heading_tab_indented_matched() {
 }
 
 #[test]
+fn detect_korean_regulation_heading_ideographic_space_treated_as_heading() {
+    // U+3000 (IDEOGRAPHIC SPACE) is caught by is_whitespace() per Unicode spec.
+    // HWP/HWPX documents often separate 조/장 from the title with U+3000 instead of U+0020.
+    // Using escape form (\u{3000}) to make the codepoint unambiguous in source.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조\u{3000}참조"),
+        Some(2),
+        "ideographic space (U+3000) after 조 should yield Some(2)"
+    );
+    assert_eq!(
+        detect_korean_regulation_heading("제1장\u{3000}총칙"),
+        Some(1),
+        "ideographic space (U+3000) after 장 should yield Some(1)"
+    );
+}
+
+#[test]
 fn detect_korean_regulation_heading_long_article_body_not_promoted() {
     // Real-world moel_02 pattern: article marker + full body in one PARA_HEADER.
     // A paragraph >= 100 chars must NOT be promoted, regardless of prefix.
@@ -423,9 +440,11 @@ fn detect_korean_regulation_heading_tier4_integration() {
 
 #[test]
 fn is_heading_terminator_canonical_allowed_set() {
-    // Whitespace variants
+    // Whitespace variants — is_whitespace() covers all Unicode whitespace
     assert!(is_heading_terminator(' '), "space");
     assert!(is_heading_terminator('\t'), "tab");
+    assert!(is_heading_terminator('\u{3000}'), "U+3000 ideographic space");
+    assert!(is_heading_terminator('\u{00A0}'), "U+00A0 non-breaking space");
     // ASCII parens and brackets (both directions)
     assert!(is_heading_terminator('('), "open paren");
     assert!(is_heading_terminator(')'), "close paren");

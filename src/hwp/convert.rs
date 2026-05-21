@@ -571,6 +571,15 @@ pub(crate) fn detect_heading_level(para: &HwpParagraph, doc_info: &DocInfo) -> O
 /// above 장) and 관 (subsection, between 절 and 조).  Supporting 편 would shift
 /// 장→H2 and 절/조→H3, breaking golden files.  Defer until a 편-bearing HWP
 /// fixture (e.g. 민법 / 형법) lands in `tests/fixtures/real/`.
+/// Returns true if `c` is a valid boundary character immediately after 장/절/조.
+///
+/// `is_whitespace()` covers all Unicode whitespace: U+0020 (space), U+0009 (tab),
+/// U+00A0 (NBSP), U+3000 (ideographic space), and others per the Unicode spec.
+///
+/// Policy note — ASCII vs fullwidth semicolons:
+/// - `'；'` (U+FF1B, fullwidth) is in the allowlist.
+/// - `';'` (U+003B, ASCII) is intentionally excluded; it does not appear after
+///   장/절/조 in Korean statute text, and promoting it could mask typos.
 fn is_heading_terminator(c: char) -> bool {
     c.is_whitespace()
         || matches!(
