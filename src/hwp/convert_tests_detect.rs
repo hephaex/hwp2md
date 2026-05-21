@@ -400,6 +400,23 @@ fn detect_korean_regulation_heading_tab_indented_matched() {
 }
 
 #[test]
+fn detect_korean_regulation_heading_tab_between_marker_and_title() {
+    // Tab AFTER the suffix boundary (not as leading indent) is caught by
+    // is_heading_terminator('\t') via is_whitespace(). Different code path from
+    // tab_indented_matched which exercises trim_start().
+    assert_eq!(
+        detect_korean_regulation_heading("제3조\t참조"),
+        Some(2),
+        "tab (U+0009) between marker and title should yield Some(2)"
+    );
+    assert_eq!(
+        detect_korean_regulation_heading("제1장\t총칙"),
+        Some(1),
+        "tab (U+0009) after 장 should yield Some(1)"
+    );
+}
+
+#[test]
 fn detect_korean_regulation_heading_ideographic_space_treated_as_heading() {
     // U+3000 (IDEOGRAPHIC SPACE) is caught by is_whitespace() per Unicode spec.
     // HWP/HWPX documents often separate 조/장 from the title with U+3000 instead of U+0020.
@@ -419,6 +436,13 @@ fn detect_korean_regulation_heading_ideographic_space_treated_as_heading() {
         detect_korean_regulation_heading("제3조\u{00A0}참조"),
         Some(2),
         "NBSP (U+00A0) after 조 should yield Some(2)"
+    );
+    // U+202F (NARROW NO-BREAK SPACE) — is_whitespace() = true. Used in formatted Korean
+    // numbers and sometimes injected by HWP between the article marker and a bracket.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조\u{202F}참조"),
+        Some(2),
+        "narrow NBSP (U+202F) after 조 should yield Some(2)"
     );
     // U+200B (ZERO WIDTH SPACE) is NOT Unicode White_Space → not a heading terminator.
     // Regression pin: if a future change makes ZWSP a terminator, this test trips.
@@ -453,11 +477,12 @@ fn detect_korean_regulation_heading_tier4_integration() {
 
 #[test]
 fn is_heading_terminator_canonical_allowed_set() {
-    // Whitespace variants — is_whitespace() covers all Unicode whitespace
+    // Whitespace variants — is_whitespace() covers all Unicode White_Space chars
     assert!(is_heading_terminator(' '), "space");
     assert!(is_heading_terminator('\t'), "tab");
     assert!(is_heading_terminator('\u{3000}'), "U+3000 ideographic space");
     assert!(is_heading_terminator('\u{00A0}'), "U+00A0 non-breaking space");
+    assert!(is_heading_terminator('\u{202F}'), "U+202F narrow non-breaking space");
     // ASCII parens and brackets (both directions)
     assert!(is_heading_terminator('('), "open paren");
     assert!(is_heading_terminator(')'), "close paren");
