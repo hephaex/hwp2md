@@ -459,7 +459,8 @@ fn detect_korean_regulation_heading_ideographic_space_treated_as_heading() {
         "ZWSP (U+200B) after 조 is not is_whitespace() — should yield None"
     );
     // U+FEFF (BOM/ZWNBSP) is NOT Unicode White_Space → not a heading terminator.
-    // Regression pin: completes the negative-pin pair with U+200B.
+    // Regression pin: Sprint 68 negative-pin partner to U+205F (positive pin above);
+    // together with U+200B these complete the White_Space coverage table.
     assert_eq!(
         detect_korean_regulation_heading("제3조\u{FEFF}참조"),
         None,
@@ -554,7 +555,8 @@ fn is_heading_terminator_blocked_set() {
     // ASCII semicolon ';' is NOT in the allowlist — only the fullwidth variant '；' is.
     // This guards against accidentally promoting ASCII ';' to terminator status.
     assert!(!is_heading_terminator(';'), "ASCII semicolon (fullwidth ； is allowed, ASCII ';' is not)");
-    // U+FEFF (BOM / ZERO WIDTH NO-BREAK SPACE) is NOT Unicode White_Space → not a terminator.
+    // Zero-width chars that look whitespace-adjacent but are NOT Unicode White_Space.
+    assert!(!is_heading_terminator('\u{200B}'), "U+200B ZWSP is not is_whitespace() — must NOT terminate");
     assert!(!is_heading_terminator('\u{FEFF}'), "U+FEFF BOM/ZWNBSP is not is_whitespace() — must NOT terminate");
 }
 
