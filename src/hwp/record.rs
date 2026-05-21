@@ -2,6 +2,25 @@ use crate::error::Hwp2MdError;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::Read;
 
+/// Number of inline parameter bytes that follow a control code in a
+/// HWP 5.0 PARA_TEXT stream (applies to codes 0x0001–0x0008, 0x000B–0x000C,
+/// 0x000E–0x001F; does NOT apply to 0x0009 tab, 0x000A newline, 0x000D
+/// paragraph end, or 0x0020+ plain text).
+pub(crate) const CTRL_INLINE_PARAM_BYTES: usize = 14;
+
+/// Returns `true` if the PARA_TEXT code unit `ch` is a control code that
+/// carries a 14-byte inline parameter block.
+///
+/// Excludes:
+/// - 0x0000: null / paragraph end
+/// - 0x0009: tab (emitted as `\t`, no params)
+/// - 0x000A: line break (emitted as `\n`, no params)
+/// - 0x000D: section/column break (no params — verified from real records)
+/// - 0x0020+: plain text
+pub(crate) fn is_inline_ctrl_code(ch: u16) -> bool {
+    matches!(ch, 0x0001..=0x0008 | 0x000B..=0x000C | 0x000E..=0x001F)
+}
+
 pub const HWPTAG_BEGIN: u16 = 0x0010;
 
 pub const HWPTAG_DOCUMENT_PROPERTIES: u16 = HWPTAG_BEGIN;
@@ -134,6 +153,35 @@ pub fn read_utf16le_str(data: &[u8], offset: usize) -> (String, usize) {
     let count = u16::from_le_bytes([data[offset], data[offset + 1]]) as usize;
     let s = read_utf16le(data, offset + 2, count);
     (s, (offset + 2 + count * 2).min(data.len()))
+}
+
+#[cfg(test)]
+mod inline_ctrl_tests {
+    use super::is_inline_ctrl_code;
+
+    #[test]
+    fn inline_ctrl_code_true_cases() {
+        // Inner boundary
+        assert!(is_inline_ctrl_code(0x0001));
+        assert!(is_inline_ctrl_code(0x0003)); // ruby marker
+        assert!(is_inline_ctrl_code(0x0008));
+        // Skipping 0x0009 (tab), 0x000A (newline)
+        assert!(is_inline_ctrl_code(0x000B));
+        assert!(is_inline_ctrl_code(0x000C));
+        // Skipping 0x000D (para end)
+        assert!(is_inline_ctrl_code(0x000E));
+        assert!(is_inline_ctrl_code(0x001F));
+    }
+
+    #[test]
+    fn inline_ctrl_code_false_cases() {
+        assert!(!is_inline_ctrl_code(0x0000)); // null
+        assert!(!is_inline_ctrl_code(0x0009)); // tab
+        assert!(!is_inline_ctrl_code(0x000A)); // newline
+        assert!(!is_inline_ctrl_code(0x000D)); // para end / section break
+        assert!(!is_inline_ctrl_code(0x0020)); // space (plain text)
+        assert!(!is_inline_ctrl_code(0xAC00)); // Korean char
+    }
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
 use crate::hwp::model::{HwpControl, HwpParagraph};
-use crate::hwp::record::{read_utf16le_str, Record};
+use crate::hwp::record::{read_utf16le_str, Record, CTRL_INLINE_PARAM_BYTES};
 
 /// Control characters in HWP `PARA_TEXT` that occupy a 2-byte code unit plus a
 /// 14-byte inline parameter block.  The range 0x0001..=0x001F covers all such
@@ -10,10 +10,6 @@ const CTRL_CHAR_HIGH: u16 = 0x001F;
 /// The specific code unit that marks an extended control (Ruby, Table, ...) in
 /// the paragraph text stream.
 const CTRL_MARKER: u16 = 0x0003;
-
-/// Byte count of the inline parameter block that immediately follows each
-/// extended control code unit in the `PARA_TEXT` stream.
-const CTRL_PARAM_BYTES: usize = 14;
 
 /// Fix up the `base_text` field of every `Ruby` control inside `para`.
 ///
@@ -52,12 +48,12 @@ pub(crate) fn fixup_ruby_base_text(para: &mut HwpParagraph) {
             // Record the plain-text run that ends just before this marker.
             base_ranges.push((run_start, i));
             // Skip the 2-byte code unit plus the 14-byte parameter block.
-            i += 2 + CTRL_PARAM_BYTES;
+            i += 2 + CTRL_INLINE_PARAM_BYTES;
             // The next run starts after the parameter block.
             run_start = i;
         } else if (CTRL_CHAR_LOW..=CTRL_CHAR_HIGH).contains(&ch) {
             // Other extended control characters: skip 2-byte code unit + 14-byte block.
-            i += 2 + CTRL_PARAM_BYTES;
+            i += 2 + CTRL_INLINE_PARAM_BYTES;
             // These characters are not text, so they break the run.  Start a
             // new run after the parameter block so we do not accidentally
             // include the following bytes in the previous base_text.
@@ -230,7 +226,7 @@ mod tests {
         // Append the 0x0003 marker.
         raw.extend_from_slice(&CTRL_MARKER.to_le_bytes());
         // Append the 14-byte parameter block.
-        raw.extend_from_slice(&[0u8; CTRL_PARAM_BYTES]);
+        raw.extend_from_slice(&[0u8; CTRL_INLINE_PARAM_BYTES]);
         raw
     }
 
@@ -255,7 +251,7 @@ mod tests {
     fn fixup_ruby_base_text_empty_base_at_paragraph_start() {
         // 0x0003 is the very first code unit -- base_text should be empty.
         let mut raw = CTRL_MARKER.to_le_bytes().to_vec();
-        raw.extend_from_slice(&[0u8; CTRL_PARAM_BYTES]);
+        raw.extend_from_slice(&[0u8; CTRL_INLINE_PARAM_BYTES]);
         let mut para = make_para_with_ruby(raw, "ルビ");
         fixup_ruby_base_text(&mut para);
         if let HwpControl::Ruby { base_text, .. } = &para.controls[0] {
@@ -275,10 +271,10 @@ mod tests {
         let units_cd: Vec<u16> = "CD".encode_utf16().collect();
         let mut raw = encode_u16s(&units_ab);
         raw.extend_from_slice(&CTRL_MARKER.to_le_bytes());
-        raw.extend_from_slice(&[0u8; CTRL_PARAM_BYTES]);
+        raw.extend_from_slice(&[0u8; CTRL_INLINE_PARAM_BYTES]);
         raw.extend_from_slice(&encode_u16s(&units_cd));
         raw.extend_from_slice(&CTRL_MARKER.to_le_bytes());
-        raw.extend_from_slice(&[0u8; CTRL_PARAM_BYTES]);
+        raw.extend_from_slice(&[0u8; CTRL_INLINE_PARAM_BYTES]);
 
         let mut para = HwpParagraph {
             text: String::new(),
@@ -342,10 +338,10 @@ mod tests {
         raw.extend_from_slice(&encode_u16s(&units_hi));
         // 0x0001 control char + 14-byte param block.
         raw.extend_from_slice(&0x0001u16.to_le_bytes());
-        raw.extend_from_slice(&[0u8; CTRL_PARAM_BYTES]);
+        raw.extend_from_slice(&[0u8; CTRL_INLINE_PARAM_BYTES]);
         // Immediately followed by 0x0003 (no normal text between them).
         raw.extend_from_slice(&CTRL_MARKER.to_le_bytes());
-        raw.extend_from_slice(&[0u8; CTRL_PARAM_BYTES]);
+        raw.extend_from_slice(&[0u8; CTRL_INLINE_PARAM_BYTES]);
 
         let mut para = make_para_with_ruby(raw, "ann");
         fixup_ruby_base_text(&mut para);
