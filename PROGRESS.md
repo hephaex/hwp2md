@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 54 완료 (한국 정부 공문서 텍스트 패턴 헤딩 감지 + 황금 파일 정확 비교 활성화)
+## 현재 상태: v0.5.0 Sprint 55 완료 (trim_start 복원 + 100자 상한 + 황금 파일 재생성)
 
 ### 완료
 
@@ -267,6 +267,43 @@
 
 **리뷰 (code-reviewer opus)**: 승인. W1/W2 모두 follow-up에서 해결. S1(편/관) 향후.
 리뷰 전문: `~/.claude/references/2026-05-21_sprint54_korean_regulation_heading_review.md`
+
+### 2026-05-21 — v0.5.0 Sprint 55: trim_start 복원 + 100자 상한 + 계층 테스트
+
+**S55-01: moel_02 조사 + trim_start 복원** (`src/hwp/convert.rs`):
+
+Sprint 54 W2 수정(trim_start 제거)이 실제 정부 문서(moel_02_vocational_training.hwp)에서 장 제목
+(`"   제1장 총 칙"` — HWP 텍스트 스트림에 앞 공백 포함)을 무시하게 했음을 확인.
+`trim_start()` 복원. 상세 doc comment 추가 (moel_02 증거 + 편/관 연기 사유).
+
+**S55-02: 계층 테스트 강화** (`src/hwp/convert_tests_detect.rs`):
+- `detect_korean_regulation_heading_jang_jeol_jo_hierarchy`: 절/조 각각 Some(2) 명시 어서션
+- `detect_korean_regulation_heading_leading_whitespace_matched`: Some(1)/Some(2) 검증 (was None)
+- `detect_korean_regulation_heading_tab_indented_matched`: \t 앞 공백 커버
+
+**리뷰 follow-up (2daa7a7 → 추가 follow-up)**:
+
+code-reviewer(opus) 리뷰 주요 지적:
+- H1: 400자 기사 본문 단락(제1조(목적) 이 고시는…)이 H2로 승격되는 문제
+- M1: doc comment "tier 1-3 None → 헤딩 보장" 논리 오류
+- M3: 계층 테스트 절==조 어서션이 None==None도 통과하는 문제
+- M4: 탭 들여쓰기 테스트 누락
+
+**100자 상한 추가** (review H1):
+- `text.chars().count() >= 100 → None` (tier-3 가드와 동일)
+- 실제 장/절/조 단독 제목은 항상 100자 미만; 기사 본문 포함 단락은 보통 100자 초과
+- `detect_korean_regulation_heading_long_article_body_not_promoted` 회귀 테스트 추가
+
+**황금 파일 재생성** (100자 상한으로 긴 기사 본문 필터링):
+- moel_01: 57 → 39 (H1:7 H2:32)
+- moel_02: 103 → 45 (H1:5 H2:40)
+- moel_03: 21 → 15 (H2:15)
+- moel_04: 21 → 16 (H2:16)
+- moel_05: 53 → 28 (H1:10 H2:18)
+
+**Commits**: `24cc39b` (feat), `2daa7a7` (follow-up)
+
+**검증**: 1199 tests (0 ignored), 0 failures. Clippy 0 warnings.
 
 ---
 
