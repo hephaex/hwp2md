@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 49 완료 (PARA_TEXT 제어 코드 수정 — 湰灧 버그 제거)
+## 현재 상태: v0.5.0 Sprint 50 완료 (HWPTAG 상수 수정 + 단락 스타일 헤딩 감지)
 
 ### 완료
 
@@ -233,6 +233,34 @@
 - 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
+
+### 2026-05-21 — v0.5.0 Sprint 50: HWPTAG 상수 수정 + 단락 스타일 헤딩 감지
+
+**S50-01: Clippy pedantic 경고 3건 수정** (`src/hwp/summary.rs`, `src/hwpx/writer_content.rs`):
+- `map_or(true, ...)` → `is_none_or(...)` (summary.rs:64)
+- `% 4 != 0` → `!is_multiple_of(4)` (summary.rs:182, writer_content.rs:308 ×2)
+
+**S50-02: HWPTAG 상수 수정 + 스타일 기반 헤딩 감지** (`src/hwp/record.rs`, `model.rs`, `reader.rs`, `control/dispatcher.rs`, `convert.rs`):
+
+근본 원인: `HWPTAG_CHAR_SHAPE = HWPTAG_BEGIN + 8` (실제 BULLET 태그), `HWPTAG_PARA_SHAPE = HWPTAG_BEGIN + 14` (실제 DOC_CHANGE_TRACK_INFO) — 프로젝트 초기부터 잘못된 상수. 실 DocInfo 덤프로 확인 (0x0015=167건 CHAR_SHAPE, 0x0019=146건 PARA_SHAPE, 0x001A=30건 STYLE).
+
+수정:
+- `HWPTAG_CHAR_SHAPE = HWPTAG_BEGIN + 5` (0x0015)
+- `HWPTAG_PARA_SHAPE = HWPTAG_BEGIN + 9` (0x0019)
+- `HWPTAG_STYLE = HWPTAG_BEGIN + 10` (0x001A) 신규 추가
+- `DocInfo.styles: Vec<String>` 추가, HWPTAG_STYLE 파싱
+- `HwpParagraph.style_id: u16` 추가, PARA_HEADER bytes[6-7] 읽기
+- `detect_heading_level`: "Outline N"/"개요 N" 스타일명 기반 경로 추가
+- `detect_heading_level`: `&& cs.bold` 요구 제거 (실 정부 HWP 문서는 non-bold 헤딩 사용)
+
+**Commits**: `828130d`
+
+**검증**: 1162 tests, 0 failures. Clippy 0 warnings (pedantic 포함).
+
+**리뷰 (code-reviewer opus)**: HIGH-1 STYLE 파서 오프셋 가정, HIGH-2 테스트 0건, HIGH-3 PARA_HEADER 오프셋 검증, HIGH-4 스타일명 매칭 범위 협소.
+리뷰 전문: `~/.claude/references/2026-05-21_sprint50_hwptag_constants_heading_detection_review.md`
+
+---
 
 ### 2026-05-21 — v0.5.0 Sprint 49: PARA_TEXT 제어 코드 수정 (湰灧 버그 제거)
 
