@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 59 완료 (is_heading_terminator CJK brackets + separator 테스트)
+## 현재 상태: v0.5.0 Sprint 60 완료 (is_heading_terminator 『』 + behavioral range/bracket 테스트)
 
 ### 완료
 
@@ -391,6 +391,27 @@ Sprint 58 리뷰 LOW-1/LOW-2 해결. 구현 변경 없음 — 테스트 + 주석
 - S2 (Sprint 60 P2): `『』` match arm에 있으나 미테스트
 - S3 (Sprint 60 P3): `제3조-제5조` 범위 표현 행동 테스트 추가 권고
 리뷰 전문: `~/.claude/references/2026-05-21_sprint59_cjk_brackets_separator_tests_review.md`
+
+### 2026-05-21 — v0.5.0 Sprint 60: is_heading_terminator 『』 + behavioral range/bracket 테스트
+
+**S60-P2/P3: 허용 집합 보강 + 행동 테스트** (`src/hwp/convert_tests_detect.rs`):
+
+Sprint 59 리뷰 S2/S3 해결. 구현 변경 없음 — 테스트 + 주석만 수정.
+
+- 허용 집합에 `『`/`』` (CJK double guillemets, open+close 대칭) 추가
+- 행동 테스트 2건: `"제3조-제5조"` → `Some(2)`, `"제5장《한국》"` → `Some(1)`
+- 섹션 주석 스프린트 목록 → `git log` 참조로 축약
+- Review follow-up: 범위 표현 테스트 주석을 "의도적 정책"이 아닌 "terminator allowlist 부산물"로 명확화
+
+**Commits**: `7e653a9` (feat) + `72afc93` (follow-up comment fix)
+
+**검증**: 1208 tests (0 ignored), 0 failures. Clippy 0 warnings.
+
+**리뷰 (code-reviewer opus)**: APPROVE. CRITICAL/HIGH/MEDIUM 없음. LOW 3건:
+- S1: 범위 표현 테스트 주석 과도 주장 (follow-up에서 수정됨)
+- S2 (Sprint 61 P2): `『』` behavioral test (`"제3조『인용』"` → Some(2)) + closer 대칭 테스트
+- S3 (Sprint 61 P3): `"제3조-제5조는 적용 제외"` 행동 확인 — 현재 `Some(2)` 반환 (dash가 '-'로 분기, 뒤의 조사 '는' 미도달); 버그인지 정책인지 테스트로 고정 필요
+리뷰 전문: `~/.claude/references/2026-05-21_sprint60_guillemet_range_bracket_behavioral_tests_review.md`
 
 ---
 
