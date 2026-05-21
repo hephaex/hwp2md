@@ -479,6 +479,9 @@ fn is_heading_terminator_blocked_set() {
     assert!(!is_heading_terminator('&'), "ampersand");
     assert!(!is_heading_terminator('/'), "slash");
     assert!(!is_heading_terminator('"'), "double quote");
+    // ASCII semicolon ';' is NOT in the allowlist — only the fullwidth variant '；' is.
+    // This guards against accidentally promoting ASCII ';' to terminator status.
+    assert!(!is_heading_terminator(';'), "ASCII semicolon (fullwidth ；ↄis allowed, ASCII ';' is not)");
 }
 
 #[test]
@@ -717,6 +720,28 @@ fn detect_korean_regulation_heading_fullwidth_comma_treated_as_heading() {
         detect_korean_regulation_heading("제3조，제5조"),
         Some(2),
         "'제3조，제5조' fullwidth comma after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_ascii_comma_treated_as_heading() {
+    // "제3조,제5조": ',' (U+002C) ASCII comma is in the allowlist → Some(2).
+    // Symmetric with detect_korean_regulation_heading_fullwidth_comma_treated_as_heading.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조,제5조"),
+        Some(2),
+        "'제3조,제5조' ASCII comma after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_ascii_paren_close_treated_as_heading() {
+    // "제3조)참조": ')' is in the allowlist. Orphaned close-paren at the suffix boundary.
+    // Complements the implicit open-paren coverage in tier4_integration ("제1장(총칙)").
+    assert_eq!(
+        detect_korean_regulation_heading("제3조)참조"),
+        Some(2),
+        "'제3조)참조' ASCII paren-close after 조 should yield Some(2)"
     );
 }
 
