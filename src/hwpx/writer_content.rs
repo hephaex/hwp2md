@@ -305,7 +305,7 @@ pub(super) fn base64_decode(input: &str) -> Result<Vec<u8>, Hwp2MdError> {
         .filter(|b| !b.is_ascii_whitespace() && *b != b'=')
         .collect();
 
-    if clean.len() % 4 != 0 && (clean.len() + pad) % 4 != 0 {
+    if !clean.len().is_multiple_of(4) && !(clean.len() + pad).is_multiple_of(4) {
         // Allow length not divisible by 4 if padding was stripped.
     }
 

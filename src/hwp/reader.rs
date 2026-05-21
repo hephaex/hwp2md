@@ -262,6 +262,10 @@ fn read_doc_info(
             HWPTAG_PARA_SHAPE => {
                 doc_info.para_shapes.push(parse_para_shape(&rec.data));
             }
+            HWPTAG_STYLE => {
+                let name = read_utf16le_str(&rec.data, 8).0;
+                doc_info.styles.push(name);
+            }
             HWPTAG_BIN_DATA => {
                 if let Some(entry) = parse_bin_data_entry(&rec.data) {
                     doc_info.bin_data_entries.push(entry);

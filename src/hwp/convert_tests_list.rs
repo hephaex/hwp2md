@@ -17,6 +17,7 @@ fn make_para(text: &str) -> HwpParagraph {
         text: text.to_string(),
         char_shape_ids: Vec::new(),
         para_shape_id: 0,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     }
@@ -27,6 +28,7 @@ fn make_para_with_ps(text: &str, ps_id: u16) -> HwpParagraph {
         text: text.to_string(),
         char_shape_ids: Vec::new(),
         para_shape_id: ps_id,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     }

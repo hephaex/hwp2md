@@ -157,6 +157,7 @@ mod tests {
             text: String::new(),
             char_shape_ids: Vec::new(),
             para_shape_id: 0,
+            style_id: 0,
             controls: vec![HwpControl::Ruby {
                 base_text: String::new(),
                 ruby_text: ruby_text.to_string(),
@@ -283,6 +284,7 @@ mod tests {
             text: String::new(),
             char_shape_ids: Vec::new(),
             para_shape_id: 0,
+            style_id: 0,
             controls: vec![
                 HwpControl::Ruby {
                     base_text: String::new(),
@@ -317,6 +319,7 @@ mod tests {
             text: String::new(),
             char_shape_ids: Vec::new(),
             para_shape_id: 0,
+            style_id: 0,
             controls: vec![HwpControl::Ruby {
                 base_text: String::new(),
                 ruby_text: "ann".to_string(),

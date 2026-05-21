@@ -10,6 +10,7 @@ fn make_para(text: &str, para_shape_id: u16) -> HwpParagraph {
         text: text.to_string(),
         char_shape_ids: Vec::new(),
         para_shape_id,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     }
@@ -50,6 +51,7 @@ fn build_inlines_with_bold_char_shape() {
         text: "Bold text".to_string(),
         char_shape_ids: vec![(0, 0)], // position 0, shape 0
         para_shape_id: 0,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     };
@@ -72,6 +74,7 @@ fn build_inlines_with_italic_char_shape() {
         text: "Italic text".to_string(),
         char_shape_ids: vec![(0, 0)],
         para_shape_id: 0,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     };
@@ -88,6 +91,7 @@ fn build_inlines_unknown_cs_id_falls_back_to_plain() {
         text: "Plain fallback".to_string(),
         char_shape_ids: vec![(0, 99)], // cs_id 99 doesn't exist
         para_shape_id: 0,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     };
@@ -103,6 +107,7 @@ fn build_inlines_position_past_end_stops() {
         text: "Hi".to_string(),
         char_shape_ids: vec![(100, 0)], // position 100 > text length 2
         para_shape_id: 0,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     };
@@ -126,6 +131,7 @@ fn build_inlines_multiple_segments() {
         text: "BoldNormal".to_string(),
         char_shape_ids: vec![(0, 0), (4, 1)],
         para_shape_id: 0,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     };
@@ -154,6 +160,7 @@ fn build_inlines_non_black_color_sets_css_hex() {
         text: "Red text".to_string(),
         char_shape_ids: vec![(0, 0)],
         para_shape_id: 0,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     };
@@ -175,6 +182,7 @@ fn build_inlines_black_color_is_none() {
         text: "Black text".to_string(),
         char_shape_ids: vec![(0, 0)],
         para_shape_id: 0,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     };
@@ -197,6 +205,7 @@ fn build_inlines_bgr_green_color_maps_correctly() {
         text: "Green".to_string(),
         char_shape_ids: vec![(0, 0)],
         para_shape_id: 0,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     };
@@ -224,6 +233,7 @@ fn build_inlines_face_id_resolves_font_name() {
         text: "Korean".to_string(),
         char_shape_ids: vec![(0, 0)],
         para_shape_id: 0,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     };
@@ -246,6 +256,7 @@ fn build_inlines_face_id_out_of_bounds_font_name_is_none() {
         text: "Text".to_string(),
         char_shape_ids: vec![(0, 0)],
         para_shape_id: 0,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     };

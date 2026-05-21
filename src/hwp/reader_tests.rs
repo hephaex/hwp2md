@@ -406,3 +406,4 @@ fn read_file_header_drm_bit_sets_has_drm() {
     let props = u32::from_le_bytes([buf[36], buf[37], buf[38], buf[39]]);
     assert!((props & 0x10) != 0, "has_drm bit should be set");
 }
+

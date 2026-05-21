@@ -36,10 +36,16 @@ pub(crate) fn extract_paragraphs_from_range(
                 } else {
                     0
                 };
+                let style_id = if rec.data.len() >= 8 {
+                    u16::from_le_bytes([rec.data[6], rec.data[7]])
+                } else {
+                    0
+                };
                 current = Some(HwpParagraph {
                     text: String::new(),
                     char_shape_ids: Vec::new(),
                     para_shape_id,
+                    style_id,
                     controls: Vec::new(),
                     raw_para_text: None,
                 });

@@ -506,19 +506,35 @@ pub(crate) fn detect_heading_level(para: &HwpParagraph, doc_info: &DocInfo) -> O
         }
     }
 
+    // Style-based detection using style names from DocInfo.
+    // Korean outline styles: "개요 1"–"개요 7", English: "Outline 1"–"Outline 7".
+    let style_id = para.style_id as usize;
+    if style_id < doc_info.styles.len() {
+        let style_name = &doc_info.styles[style_id];
+        for prefix in &["Outline ", "개요 "] {
+            if let Some(rest) = style_name.strip_prefix(prefix) {
+                if let Ok(n) = rest.trim().parse::<u8>() {
+                    if (1..=6).contains(&n) {
+                        return Some(n);
+                    }
+                }
+            }
+        }
+    }
+
     let text = para.text.trim();
     if text.chars().count() < 100 {
         if let Some(first_cs) = para.char_shape_ids.first() {
             let cs_id = first_cs.1 as usize;
             if cs_id < doc_info.char_shapes.len() {
                 let cs = &doc_info.char_shapes[cs_id];
-                if cs.height >= HEADING1_MIN_HEIGHT && cs.bold {
+                if cs.height >= HEADING1_MIN_HEIGHT {
                     return Some(1);
                 }
-                if cs.height >= HEADING2_MIN_HEIGHT && cs.bold {
+                if cs.height >= HEADING2_MIN_HEIGHT {
                     return Some(2);
                 }
-                if cs.height >= HEADING3_MIN_HEIGHT && cs.bold {
+                if cs.height >= HEADING3_MIN_HEIGHT {
                     return Some(3);
                 }
             }

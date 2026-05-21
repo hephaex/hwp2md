@@ -77,6 +77,7 @@ fn make_para(text: &str, para_shape_id: u16) -> HwpParagraph {
         text: text.to_string(),
         char_shape_ids: Vec::new(),
         para_shape_id,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     }
@@ -87,6 +88,7 @@ fn make_para_with_cs(text: &str, cs_id: u16) -> HwpParagraph {
         text: text.to_string(),
         char_shape_ids: vec![(0, cs_id)],
         para_shape_id: 0,
+        style_id: 0,
         controls: Vec::new(),
         raw_para_text: None,
     }
@@ -192,7 +194,8 @@ fn detect_heading_level_bold_small_font_returns_h3() {
 }
 
 #[test]
-fn detect_heading_level_not_bold_returns_none() {
+fn detect_heading_level_not_bold_large_font_returns_h1() {
+    // Bold is no longer required — large font size alone triggers heading detection.
     let mut doc_info = DocInfo::default();
     doc_info.para_shapes.push(ParaShape::default());
     let cs = CharShape {
@@ -203,7 +206,7 @@ fn detect_heading_level_not_bold_returns_none() {
     doc_info.char_shapes.push(cs);
 
     let para = make_para_with_cs("Large not bold", 0);
-    assert_eq!(detect_heading_level(&para, &doc_info), None);
+    assert_eq!(detect_heading_level(&para, &doc_info), Some(1));
 }
 
 #[test]

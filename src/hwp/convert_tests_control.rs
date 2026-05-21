@@ -76,6 +76,7 @@ fn control_to_block_table_groups_cells_into_rows() {
             text: text.to_string(),
             char_shape_ids: Vec::new(),
             para_shape_id: 0,
+            style_id: 0,
             controls: Vec::new(),
             raw_para_text: None,
         }],

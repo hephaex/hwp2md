@@ -61,7 +61,7 @@ pub(crate) fn parse_summary_bytes(
     let dir_end = prop_count
         .checked_mul(8)
         .and_then(|n| dir_start.checked_add(n));
-    if dir_end.map_or(true, |e| e > raw.len()) {
+    if dir_end.is_none_or(|e| e > raw.len()) {
         tracing::debug!("SummaryInformation: property directory truncated");
         return empty();
     }
@@ -179,7 +179,7 @@ mod tests {
             prop_data.extend_from_slice(bytes);
             prop_data.push(0); // NUL
                                // Pad to 4-byte alignment
-            while prop_data.len() % 4 != 0 {
+            while !prop_data.len().is_multiple_of(4) {
                 prop_data.push(0);
             }
         }
