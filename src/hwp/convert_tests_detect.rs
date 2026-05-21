@@ -480,8 +480,11 @@ fn is_heading_terminator_blocked_set() {
 
 #[test]
 fn detect_korean_regulation_heading_range_expression_treated_as_heading() {
-    // "제3조-제5조": dash is a heading terminator, so the full string is
-    // classified as an article heading (Some(2)), not rejected as a reference.
+    // "제3조-제5조": dash is in the terminator allowlist so the check at
+    // the first char after '조' succeeds and yields Some(2). Tier-4 fires
+    // only when tier-1/2/3 format signals are absent, so a bare range line
+    // is treated as a heading-like fragment. Inline-particle references
+    // ("제3조에서…", "제3조는…") are caught by the particle rejection path.
     assert_eq!(
         detect_korean_regulation_heading("제3조-제5조"),
         Some(2),
