@@ -488,7 +488,7 @@ fn detect_korean_regulation_heading_range_expression_treated_as_heading() {
     assert_eq!(
         detect_korean_regulation_heading("제3조-제5조"),
         Some(2),
-        "range expression 제3조-제5조 should yield article heading level"
+        "'제3조-제5조' range expression should yield article heading level Some(2)"
     );
 }
 
@@ -498,7 +498,7 @@ fn detect_korean_regulation_heading_cjk_title_bracket_treated_as_heading() {
     assert_eq!(
         detect_korean_regulation_heading("제5장《한국》"),
         Some(1),
-        "CJK title bracket after 장 should yield chapter heading level"
+        "'제5장《한국》' CJK title bracket should yield chapter heading level Some(1)"
     );
 }
 
@@ -508,7 +508,7 @@ fn detect_korean_regulation_heading_cjk_guillemet_open_treated_as_heading() {
     assert_eq!(
         detect_korean_regulation_heading("제3조『인용』"),
         Some(2),
-        "CJK double-guillemet open after 조 should yield article heading level"
+        "'제3조『인용』' CJK double-guillemet open after 조 should yield Some(2)"
     );
 }
 
@@ -519,7 +519,28 @@ fn detect_korean_regulation_heading_cjk_guillemet_close_treated_as_heading() {
     assert_eq!(
         detect_korean_regulation_heading("제3조』참조"),
         Some(2),
-        "CJK double-guillemet close after 조 should yield article heading level"
+        "'제3조』참조' CJK double-guillemet close after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_cjk_single_guillemet_open_treated_as_heading() {
+    // "제3조「참조」": 「 is in the terminator allowlist → Some(2).
+    // Symmetric with the 『』 pair added in Sprint 61.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조「참조」"),
+        Some(2),
+        "'제3조「참조」' CJK single-guillemet open after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_cjk_single_guillemet_close_treated_as_heading() {
+    // Closer symmetry: 」 is also in the allowlist.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조」참조"),
+        Some(2),
+        "'제3조」참조' CJK single-guillemet close after 조 should yield Some(2)"
     );
 }
 
@@ -535,7 +556,7 @@ fn detect_korean_regulation_heading_dash_then_particle_still_classifies_as_headi
     assert_eq!(
         detect_korean_regulation_heading("제3조-제5조는 적용 제외"),
         Some(2),
-        "dash terminates before particle — known tier-4 limitation"
+        "'제3조-제5조는 적용 제외' dash terminates before particle — known tier-4 limitation"
     );
 }
 
