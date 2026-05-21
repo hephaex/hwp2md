@@ -426,21 +426,27 @@ fn is_heading_terminator_canonical_allowed_set() {
     // Whitespace variants
     assert!(is_heading_terminator(' '), "space");
     assert!(is_heading_terminator('\t'), "tab");
-    // ASCII parens (both directions)
+    // ASCII parens and brackets (both directions)
     assert!(is_heading_terminator('('), "open paren");
     assert!(is_heading_terminator(')'), "close paren");
+    assert!(is_heading_terminator('['), "open bracket");
+    assert!(is_heading_terminator(']'), "close bracket");
     // CJK quotes
     assert!(is_heading_terminator('「'), "CJK open");
     assert!(is_heading_terminator('」'), "CJK close");
     // Fullwidth parens (common in OCR'd Korean docs)
     assert!(is_heading_terminator('（'), "fullwidth open");
     assert!(is_heading_terminator('）'), "fullwidth close");
-    // Punctuation
+    // Punctuation — ASCII
     assert!(is_heading_terminator('.'), "period");
     assert!(is_heading_terminator(':'), "colon");
     assert!(is_heading_terminator('·'), "middle dot");
     assert!(is_heading_terminator('ㆍ'), "Korean middle dot");
     assert!(is_heading_terminator('…'), "ellipsis");
+    // Punctuation — fullwidth variants
+    assert!(is_heading_terminator('：'), "fullwidth colon");
+    assert!(is_heading_terminator('．'), "fullwidth period");
+    assert!(is_heading_terminator('；'), "fullwidth semicolon");
 }
 
 #[test]
@@ -454,6 +460,11 @@ fn is_heading_terminator_blocked_set() {
     // ASCII letters and digits — must NOT terminate
     assert!(!is_heading_terminator('a'), "ASCII letter");
     assert!(!is_heading_terminator('1'), "ASCII digit");
+    // Non-Korean punctuation not in the allowed set — must NOT terminate
+    assert!(!is_heading_terminator('%'), "percent");
+    assert!(!is_heading_terminator('&'), "ampersand");
+    assert!(!is_heading_terminator('/'), "slash");
+    assert!(!is_heading_terminator('"'), "double quote");
 }
 
 // -----------------------------------------------------------------------
