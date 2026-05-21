@@ -414,6 +414,19 @@ fn detect_korean_regulation_heading_ideographic_space_treated_as_heading() {
         Some(1),
         "ideographic space (U+3000) after 장 should yield Some(1)"
     );
+    // U+00A0 (NBSP) — also caught by is_whitespace(). Common in copy-pasted statute text.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조\u{00A0}참조"),
+        Some(2),
+        "NBSP (U+00A0) after 조 should yield Some(2)"
+    );
+    // U+200B (ZERO WIDTH SPACE) is NOT Unicode White_Space → not a heading terminator.
+    // Regression pin: if a future change makes ZWSP a terminator, this test trips.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조\u{200B}참조"),
+        None,
+        "ZWSP (U+200B) after 조 is not is_whitespace() — should yield None"
+    );
 }
 
 #[test]

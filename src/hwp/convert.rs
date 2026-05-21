@@ -546,35 +546,12 @@ pub(crate) fn detect_heading_level(para: &HwpParagraph, doc_info: &DocInfo) -> O
     None
 }
 
-/// Tier-4: Korean regulation document text patterns.
-/// Applies when all format-based signals (tier 1–3) are absent.
-///
-/// Mapping (장→H1 captures the common 장/조 two-level structure; 절 and 조
-/// both map to H2 so documents without 절 do not produce orphan H3 headings):
-/// - 제N장 (chapter) → H1
-/// - 제N절 (section) → H2
-/// - 제N조 (article) → H2
-///
-/// `trim_start()` is intentional: Korean HWP documents commonly embed leading
-/// spaces in chapter/section headings as visual indentation (e.g. `"   제1장"`).
-/// HWP's indentation is normally stored in para_shape, but some authors use raw
-/// spaces in the text stream (confirmed in moel_02_vocational_training.hwp).
-///
-/// 100-char ceiling: Korean regulation HWP documents sometimes pack the article
-/// marker and the full article body text into a single PARA_HEADER (e.g.
-/// `"제1조(목적) 이 고시는 「국민 평생 직업능력 개발법」 … (400 chars)"`).
-/// Promoting such a paragraph to H2 produces an 800-char heading that breaks
-/// TOC generators.  The ceiling mirrors the tier-3 guard at line 523; genuine
-/// chapter/section/article titles are always shorter.
-///
-/// Extension note (편/관): large Korean statutes (민법, 형법) use 편 (part,
-/// above 장) and 관 (subsection, between 절 and 조).  Supporting 편 would shift
-/// 장→H2 and 절/조→H3, breaking golden files.  Defer until a 편-bearing HWP
-/// fixture (e.g. 민법 / 형법) lands in `tests/fixtures/real/`.
 /// Returns true if `c` is a valid boundary character immediately after 장/절/조.
 ///
-/// `is_whitespace()` covers all Unicode whitespace: U+0020 (space), U+0009 (tab),
-/// U+00A0 (NBSP), U+3000 (ideographic space), and others per the Unicode spec.
+/// `is_whitespace()` follows Rust's Unicode White_Space property: U+0020, U+0009
+/// (tab), U+00A0 (NBSP), U+3000 (ideographic space), U+202F (narrow NBSP), etc.
+/// Note: zero-width chars (U+200B ZWSP, U+FEFF BOM) are NOT White_Space and will
+/// NOT match this branch.
 ///
 /// Policy note — ASCII vs fullwidth semicolons:
 /// - `'；'` (U+FF1B, fullwidth) is in the allowlist.
@@ -597,6 +574,31 @@ fn is_heading_terminator(c: char) -> bool {
         )
 }
 
+/// Tier-4: Korean regulation document text patterns.
+/// Applies when all format-based signals (tier 1–3) are absent.
+///
+/// Mapping (장→H1 captures the common 장/조 two-level structure; 절 and 조
+/// both map to H2 so documents without 절 do not produce orphan H3 headings):
+/// - 제N장 (chapter) → H1
+/// - 제N절 (section) → H2
+/// - 제N조 (article) → H2
+///
+/// `trim_start()` is intentional: Korean HWP documents commonly embed leading
+/// spaces in chapter/section headings as visual indentation (e.g. `"   제1장"`).
+/// HWP's indentation is normally stored in para_shape, but some authors use raw
+/// spaces in the text stream (confirmed in moel_02_vocational_training.hwp).
+///
+/// 100-char ceiling: Korean regulation HWP documents sometimes pack the article
+/// marker and the full article body text into a single PARA_HEADER (e.g.
+/// `"제1조(목적) 이 고시는 「국민 평생 직업능력 개발법」 … (400 chars)"`).
+/// Promoting such a paragraph to H2 produces an 800-char heading that breaks
+/// TOC generators.  The ceiling mirrors the tier-3 guard; genuine
+/// chapter/section/article titles are always shorter.
+///
+/// Extension note (편/관): large Korean statutes (민법, 형법) use 편 (part,
+/// above 장) and 관 (subsection, between 절 and 조).  Supporting 편 would shift
+/// 장→H2 and 절/조→H3, breaking golden files.  Defer until a 편-bearing HWP
+/// fixture (e.g. 민법 / 형법) lands in `tests/fixtures/real/`.
 fn detect_korean_regulation_heading(text: &str) -> Option<u8> {
     // Long paragraphs are article bodies, not headings.
     if text.chars().count() >= 100 {
