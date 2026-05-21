@@ -561,9 +561,11 @@ fn pyeon_detected_as_h1_via_tier4() {
 
     let blocks: Vec<&ir::Block> = doc.sections.iter().flat_map(|s| &s.blocks).collect();
 
-    assert!(
-        !blocks.is_empty(),
-        "expected at least 3 blocks; got none"
+    assert_eq!(
+        blocks.len(),
+        3,
+        "expected exactly 3 blocks; got {}",
+        blocks.len()
     );
 
     // 제1편 총칙 → H1 (tier-4: 편 marker)

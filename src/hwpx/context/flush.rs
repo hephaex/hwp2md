@@ -165,6 +165,8 @@ pub(crate) fn flush_paragraph_staged(ctx: &mut ParseContext) -> Option<StagedBlo
         ir::Block::Paragraph { inlines }
     };
 
+    // Heading wins over list-indent: a tier-4 regulation heading (e.g. "제1편 총칙")
+    // must not be re-staged as a ListPara even if paraPrIDRef looks list-like.
     let is_heading = effective_level.is_some();
     let list_depth: Option<u32> = if is_heading {
         None

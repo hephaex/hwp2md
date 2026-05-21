@@ -1,17 +1,27 @@
 /// Tier-4: Korean regulation document text patterns.
+/// Applies when all format-based signals (tiers 1–3) are absent.
 ///
-/// Returns `Some(level)` when `text` matches a Korean statute heading marker:
-/// - 제N편 (part)    → H1
+/// Mapping:
+/// - 제N편 (part)    → H1 — same level as 장: in real statutes (민법, 형법)
+///   only one of 편/장 is used as the top-level divider, so collapsing them
+///   to H1 avoids a level shift that would break golden files.
 /// - 제N장 (chapter) → H1
-/// - 제N절 (section) → H2
+/// - 제N절 (section) → H2 — 절 and 조 share H2 so documents without 절 do
+///   not produce an orphan H1→H3 heading gap.
 /// - 제N조 (article) → H2
 ///
-/// Returns `None` for body paragraphs, paragraphs ≥ 100 chars, or patterns
-/// that do not meet the heading-terminator boundary rule.
+/// 100-char ceiling: Korean regulation HWPs sometimes pack the article marker
+/// and the full body text into a single PARA_HEADER paragraph (e.g. "제1조(목적)
+/// 이 고시는…"). Promoting such a paragraph would produce an 800-char heading
+/// that breaks TOC generators. The ceiling matches the tier-3 guard.
+///
+/// `trim_start()`: Korean HWP documents embed leading spaces on indented
+/// paragraphs (confirmed in moel_02_vocational_training.hwp — "   제1장 총 칙").
+/// Without trim_start() those paragraphs would not match.
 ///
 /// This function is shared by the HWP binary reader (`hwp::convert`) and the
-/// HWPX reader (`hwpx::context::flush`) so that the same tier-4 detection
-/// fires regardless of the source format.
+/// HWPX reader (`hwpx::context::flush`) so the same tier-4 detection fires
+/// regardless of source format.
 pub(crate) fn detect_korean_regulation_heading(text: &str) -> Option<u8> {
     // Long paragraphs are article bodies, not headings.
     if text.chars().count() >= 100 {
