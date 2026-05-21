@@ -418,7 +418,7 @@ fn detect_korean_regulation_heading_tier4_integration() {
 }
 
 // -----------------------------------------------------------------------
-// S57-P3 / S58-P2 / S59-P2: is_heading_terminator policy test
+// is_heading_terminator policy tests (see git log for sprint history)
 // -----------------------------------------------------------------------
 
 #[test]
@@ -431,14 +431,16 @@ fn is_heading_terminator_canonical_allowed_set() {
     assert!(is_heading_terminator(')'), "close paren");
     assert!(is_heading_terminator('['), "open bracket");
     assert!(is_heading_terminator(']'), "close bracket");
-    // CJK quotes (open/close symmetric — review enforces symmetry)
+    // CJK quotes — all open/close pairs (symmetric — review enforces symmetry)
     assert!(is_heading_terminator('「'), "CJK open guillemet");
     assert!(is_heading_terminator('」'), "CJK close guillemet");
+    assert!(is_heading_terminator('『'), "CJK double open guillemet");
+    assert!(is_heading_terminator('』'), "CJK double close guillemet");
     // CJK title brackets — canonical Korean title delimiters
-    assert!(is_heading_terminator('《'), "CJK double open");
-    assert!(is_heading_terminator('》'), "CJK double close");
-    assert!(is_heading_terminator('〈'), "CJK single open");
-    assert!(is_heading_terminator('〉'), "CJK single close");
+    assert!(is_heading_terminator('《'), "CJK double open angle");
+    assert!(is_heading_terminator('》'), "CJK double close angle");
+    assert!(is_heading_terminator('〈'), "CJK single open angle");
+    assert!(is_heading_terminator('〉'), "CJK single close angle");
     // Fullwidth parens (common in OCR'd Korean docs)
     assert!(is_heading_terminator('（'), "fullwidth open");
     assert!(is_heading_terminator('）'), "fullwidth close");
@@ -474,6 +476,27 @@ fn is_heading_terminator_blocked_set() {
     assert!(!is_heading_terminator('&'), "ampersand");
     assert!(!is_heading_terminator('/'), "slash");
     assert!(!is_heading_terminator('"'), "double quote");
+}
+
+#[test]
+fn detect_korean_regulation_heading_range_expression_treated_as_heading() {
+    // "제3조-제5조": dash is a heading terminator, so the full string is
+    // classified as an article heading (Some(2)), not rejected as a reference.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조-제5조"),
+        Some(2),
+        "range expression 제3조-제5조 should yield article heading level"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_cjk_title_bracket_treated_as_heading() {
+    // "제5장《한국》": CJK double-angle bracket is a heading terminator.
+    assert_eq!(
+        detect_korean_regulation_heading("제5장《한국》"),
+        Some(1),
+        "CJK title bracket after 장 should yield chapter heading level"
+    );
 }
 
 // -----------------------------------------------------------------------
