@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 64 완료 (bracket matrix complete + punctuation behavioral coverage)
+## 현재 상태: v0.5.0 Sprint 65 완료 (terminator matrix finalized + ASCII/fullwidth semicolon guard)
 
 ### 완료
 
@@ -500,6 +500,30 @@ Sprint 63 리뷰 nit 해결. 구현 변경 없음.
 - LOW-2: ASCII `)` 고아 닫힘 괄호 behavioral 테스트 없음 (쌍으로만 사용됨)
 Sprint 65 제안: ASCII `,` + `)` orphan-close 2건 추가로 matrix 완성.
 리뷰 전문: `~/.claude/references/2026-05-22_sprint64_bracket_matrix_complete_punctuation_behavioral_review.md`
+
+### 2026-05-22 — v0.5.0 Sprint 65: terminator matrix finalized + ASCII/fullwidth semicolon guard
+
+**S65-P2/P3: ASCII matrix 완성 + 부정 가드** (`src/hwp/convert_tests_detect.rs`):
+
+Sprint 64 리뷰 LOW-1/LOW-2 + P3 해결. 구현 변경 없음.
+
+- `"제3조,제5조"` → `Some(2)` (ASCII 쉼표 — 전각 `，` 와 대칭)
+- `"제3조)참조"` → `Some(2)` (ASCII 닫힘 괄호 고아)
+- `is_heading_terminator_blocked_set`에 ASCII `;` 부정 단언 추가 (전각 `；` 허용, ASCII `;` 차단 명시)
+
+**리뷰 follow-up** (`1dfcc37`):
+- HIGH fix: 단언 메시지에서 U+2184 ("ↄ") 아티팩트 제거
+- LOW fix: `ascii_paren_close` 주석의 cross-reference 수정 (`tier4_integration` → `terminator_chars_still_match`)
+
+**Commits**: `5145947` (feat) + `1dfcc37` (follow-up)
+
+**검증**: 1232 tests (0 ignored), 0 failures. Clippy 0 warnings.
+
+**리뷰 (code-reviewer opus)**: APPROVE. HIGH 1건 (follow-up에서 해결):
+- HIGH: 단언 메시지에 U+2184 오타 → 공백으로 교체
+- LOW: cross-reference 함수명 오류 → 수정
+- terminator matrix 완성 확인 (allowlist 전 문자 커버)
+리뷰 전문: `~/.claude/references/2026-05-22_sprint65_terminator_matrix_finalized_review.md`
 
 ---
 
