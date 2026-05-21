@@ -534,7 +534,107 @@ fn fixture_empty_title_and_author_do_not_panic() {
 }
 
 // ---------------------------------------------------------------------------
-// 11. DRM-protected HWP file detection
+// 11. Tier-4 Korean regulation heading detection via HWPX pipeline
+// ---------------------------------------------------------------------------
+
+/// 편(Part) paragraphs with no `styleIDRef` fall through to tier-4 text-pattern
+/// detection and must be promoted to H1 through the full HWPX pipeline.
+///
+/// Tier-4 fires when tier-1 (styleIDRef), tier-2 (bold+large font), and
+/// tier-3 (font-size) all produce nothing.  A plain `<hp:p>` with no style
+/// attribute satisfies this precondition.
+#[test]
+fn pyeon_detected_as_h1_via_tier4() {
+    let hwpx = HwpxFixture::new()
+        .section(&para_xml("제1편 총칙"))
+        .section(&para_xml("제1장 일반규정"))
+        .section(&para_xml("일반 본문입니다"))
+        .build();
+
+    let (_dir, path) = {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("pyeon.hwpx");
+        std::fs::write(&path, &hwpx).expect("write hwpx fixture");
+        (dir, path)
+    };
+    let doc = hwpx::read_hwpx(&path).expect("read_hwpx failed");
+
+    let blocks: Vec<&ir::Block> = doc.sections.iter().flat_map(|s| &s.blocks).collect();
+
+    assert!(
+        !blocks.is_empty(),
+        "expected at least 3 blocks; got none"
+    );
+
+    // 제1편 총칙 → H1 (tier-4: 편 marker)
+    assert!(
+        matches!(blocks[0], ir::Block::Heading { level: 1, .. }),
+        "제1편 총칙 should be H1 via tier-4; got {:?}",
+        blocks[0]
+    );
+
+    // 제1장 일반규정 → H1 (tier-4: 장 marker)
+    assert!(
+        matches!(blocks[1], ir::Block::Heading { level: 1, .. }),
+        "제1장 일반규정 should be H1 via tier-4; got {:?}",
+        blocks[1]
+    );
+
+    // 일반 본문입니다 → Paragraph (no regulation marker)
+    assert!(
+        matches!(blocks[2], ir::Block::Paragraph { .. }),
+        "body text should be Paragraph; got {:?}",
+        blocks[2]
+    );
+}
+
+/// 편 heading text is preserved in the IR inlines.
+#[test]
+fn pyeon_heading_text_preserved() {
+    let hwpx = HwpxFixture::new()
+        .section(&para_xml("제3편 채권"))
+        .build();
+
+    let (_dir, path) = {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("pyeon_text.hwpx");
+        std::fs::write(&path, &hwpx).expect("write hwpx fixture");
+        (dir, path)
+    };
+    let doc = hwpx::read_hwpx(&path).expect("read_hwpx failed");
+
+    let found = doc.sections.iter().flat_map(|s| &s.blocks).any(|b| {
+        matches!(b, ir::Block::Heading { level: 1, inlines }
+            if inlines.iter().any(|i| i.text.contains("제3편 채권")))
+    });
+
+    assert!(found, "제3편 채권 heading with text not found in IR");
+}
+
+/// 편 → H1 renders as `# 제N편 …` in Markdown output.
+#[test]
+fn pyeon_rendered_as_atx_h1_in_markdown() {
+    let hwpx = HwpxFixture::new()
+        .section(&para_xml("제2편 물권"))
+        .build();
+
+    let (_dir, path) = {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("pyeon_md.hwpx");
+        std::fs::write(&path, &hwpx).expect("write hwpx fixture");
+        (dir, path)
+    };
+    let doc = hwpx::read_hwpx(&path).expect("read_hwpx failed");
+    let md = md::write_markdown(&doc, false);
+
+    assert!(
+        md.contains("# 제2편 물권"),
+        "expected '# 제2편 물권' in markdown; got: {md:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 12. DRM-protected HWP file detection
 // ---------------------------------------------------------------------------
 
 fn create_drm_protected_hwp_fixture() -> (tempfile::TempDir, std::path::PathBuf) {

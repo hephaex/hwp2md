@@ -1,3 +1,4 @@
+use crate::hwp::heading_style::detect_korean_regulation_heading;
 use crate::ir::{self, InlineFormat};
 
 use super::state::FormattingState;
@@ -113,7 +114,12 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
         return;
     }
 
-    let block = if let Some(level) = ctx.heading_level {
+    let effective_level = ctx.heading_level.or_else(|| {
+        let combined: String = inlines.iter().map(|i| i.text.as_str()).collect();
+        detect_korean_regulation_heading(&combined)
+    });
+
+    let block = if let Some(level) = effective_level {
         ir::Block::Heading { level, inlines }
     } else {
         ir::Block::Paragraph { inlines }
@@ -144,13 +150,22 @@ pub(crate) fn flush_paragraph_staged(ctx: &mut ParseContext) -> Option<StagedBlo
         return Some(StagedBlock::Plain(ir::Block::CodeBlock { language, code }));
     }
 
-    let block = if let Some(level) = ctx.heading_level {
+    // Tier-1/2/3: style-based heading level from styleIDRef attribute.
+    // Tier-4: text-pattern detection (제N편/장/절/조) fires when all
+    // format-based signals are absent, matching the HWP binary reader's
+    // behaviour for regulation documents.
+    let effective_level = ctx.heading_level.or_else(|| {
+        let combined: String = inlines.iter().map(|i| i.text.as_str()).collect();
+        detect_korean_regulation_heading(&combined)
+    });
+
+    let block = if let Some(level) = effective_level {
         ir::Block::Heading { level, inlines }
     } else {
         ir::Block::Paragraph { inlines }
     };
 
-    let is_heading = ctx.heading_level.is_some();
+    let is_heading = effective_level.is_some();
     let list_depth: Option<u32> = if is_heading {
         None
     } else {

@@ -1,4 +1,6 @@
 use crate::hwp::eqedit::eqedit_to_latex;
+// Re-export so convert_tests_detect can reach it via `use super::*`.
+pub(crate) use crate::hwp::heading_style::detect_korean_regulation_heading;
 use crate::hwp::heading_style::parse_heading_style;
 use crate::hwp::model::{DocInfo, HwpControl, HwpDocument, HwpParagraph, HwpTableCell};
 use crate::ir::{self, InlineFormat};
@@ -544,98 +546,6 @@ pub(crate) fn detect_heading_level(para: &HwpParagraph, doc_info: &DocInfo) -> O
     }
 
     None
-}
-
-/// Returns true if `c` is a valid boundary character immediately after 장/절/조.
-///
-/// `is_whitespace()` follows Rust's Unicode White_Space property: U+0020, U+0009
-/// (tab), U+00A0 (NBSP), U+3000 (ideographic space), U+202F (narrow NBSP), etc.
-/// Note: zero-width chars (U+200B ZWSP, U+FEFF BOM) are NOT White_Space and will
-/// NOT match this branch.
-///
-/// Policy note — ASCII vs fullwidth semicolons:
-/// - `'；'` (U+FF1B, fullwidth) is in the allowlist.
-/// - `';'` (U+003B, ASCII) is intentionally excluded; it does not appear after
-///   장/절/조 in Korean statute text, and promoting it could mask typos.
-fn is_heading_terminator(c: char) -> bool {
-    c.is_whitespace()
-        || matches!(
-            c,
-            // ASCII openers / closers
-            '(' | ')' | '[' | ']'
-            // CJK openers
-            | '「' | '『' | '<' | '《' | '〈'
-            // CJK closers (symmetric — "제3조」" in citations is not a heading-start)
-            | '」' | '』' | '>' | '》' | '〉'
-            // Fullwidth parens (common in older Korean OCR documents)
-            | '（' | '）'
-            // Punctuation
-            | ':' | '：' | '.' | '．' | ',' | '，' | '-' | '~' | '·' | 'ㆍ' | '；' | '…'
-        )
-}
-
-/// Tier-4: Korean regulation document text patterns.
-/// Applies when all format-based signals (tier 1–3) are absent.
-///
-/// Mapping (장→H1 captures the common 장/조 two-level structure; 절 and 조
-/// both map to H2 so documents without 절 do not produce orphan H3 headings):
-/// - 제N장 (chapter) → H1
-/// - 제N절 (section) → H2
-/// - 제N조 (article) → H2
-///
-/// `trim_start()` is intentional: Korean HWP documents commonly embed leading
-/// spaces in chapter/section headings as visual indentation (e.g. `"   제1장"`).
-/// HWP's indentation is normally stored in para_shape, but some authors use raw
-/// spaces in the text stream (confirmed in moel_02_vocational_training.hwp).
-///
-/// 100-char ceiling: Korean regulation HWP documents sometimes pack the article
-/// marker and the full article body text into a single PARA_HEADER (e.g.
-/// `"제1조(목적) 이 고시는 「국민 평생 직업능력 개발법」 … (400 chars)"`).
-/// Promoting such a paragraph to H2 produces an 800-char heading that breaks
-/// TOC generators.  The ceiling mirrors the tier-3 guard; genuine
-/// chapter/section/article titles are always shorter.
-///
-/// Extension note (편/관): large Korean statutes (민법, 형법) use 편 (part,
-/// above 장) and 관 (subsection, between 절 and 조).  Supporting 편 would shift
-/// 장→H2 and 절/조→H3, breaking golden files.  Defer until a 편-bearing HWP
-/// fixture (e.g. 민법 / 형법) lands in `tests/fixtures/real/`.
-fn detect_korean_regulation_heading(text: &str) -> Option<u8> {
-    // Long paragraphs are article bodies, not headings.
-    if text.chars().count() >= 100 {
-        return None;
-    }
-    let trimmed = text.trim_start();
-    let rest = trimmed.strip_prefix('제')?;
-    // Must be followed by one or more ASCII digits
-    let digit_end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
-    if digit_end == 0 {
-        return None;
-    }
-    let suffix = &rest[digit_end..];
-    let (level, after_suffix) = if let Some(r) = suffix.strip_prefix('장') {
-        (1u8, r)
-    } else if let Some(r) = suffix.strip_prefix('절') {
-        (2u8, r)
-    } else if let Some(r) = suffix.strip_prefix('조') {
-        (2u8, r)
-    } else {
-        return None;
-    };
-    // The character after 장/절/조 must be a heading terminator or end-of-string.
-    // Exception: "의" followed by digits is amendment sub-article notation (제N조의M).
-    match after_suffix.chars().next() {
-        None => Some(level),
-        Some(c) if is_heading_terminator(c) => Some(level),
-        Some('의') => {
-            let after_ui = &after_suffix['의'.len_utf8()..];
-            if after_ui.chars().next().is_some_and(|d| d.is_ascii_digit()) {
-                Some(level)
-            } else {
-                None
-            }
-        }
-        Some(_) => None,
-    }
 }
 
 pub(crate) fn build_inlines(para: &HwpParagraph, doc_info: &DocInfo) -> Vec<ir::Inline> {

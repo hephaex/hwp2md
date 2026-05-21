@@ -1,4 +1,5 @@
 use super::*;
+use crate::hwp::heading_style::is_heading_terminator;
 use crate::hwp::model::{CharShape, DocInfo, HwpParagraph, ParaShape};
 
 // -----------------------------------------------------------------------
@@ -336,6 +337,90 @@ fn detect_korean_regulation_heading_no_digits_returns_none() {
 #[test]
 fn detect_korean_regulation_heading_wrong_suffix_returns_none() {
     assert_eq!(detect_korean_regulation_heading("제3과"), None);
+}
+
+#[test]
+fn detect_korean_regulation_heading_pyeon_returns_h1() {
+    assert_eq!(
+        detect_korean_regulation_heading("제1편 총칙"),
+        Some(1),
+        r#""제1편 총칙" should yield Some(1) — 편 maps to H1 like 장"#
+    );
+    assert_eq!(
+        detect_korean_regulation_heading("제3편 채권"),
+        Some(1),
+        r#""제3편 채권" should yield Some(1)"#
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_pyeon_multi_digit() {
+    assert_eq!(
+        detect_korean_regulation_heading("제10편 총칙"),
+        Some(1),
+        r#""제10편 총칙" should yield Some(1) — multi-digit 편"#
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_pyeon_leading_whitespace() {
+    assert_eq!(
+        detect_korean_regulation_heading("  제2편 물권"),
+        Some(1),
+        r#""  제2편 물권" should yield Some(1) — trim_start() handles leading spaces"#
+    );
+    assert_eq!(
+        detect_korean_regulation_heading("\t제2편 물권"),
+        Some(1),
+        r#""\t제2편 물권" should yield Some(1) — leading tab stripped"#
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_pyeon_particle_rejection() {
+    // "제3편은" — the 조사 '은' immediately after 편 is NOT a terminator → None.
+    assert_eq!(
+        detect_korean_regulation_heading("제3편은 적용한다"),
+        None,
+        r#""제3편은 적용한다" should yield None — '은' after 편 is a particle, not a terminator"#
+    );
+    assert_eq!(
+        detect_korean_regulation_heading("제1편에서"),
+        None,
+        r#""제1편에서" should yield None — '에' after 편 is a particle"#
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_pyeon_terminator_chars() {
+    // Terminator characters immediately after 편 — should all yield Some(1)
+    assert_eq!(
+        detect_korean_regulation_heading("제2편(총칙)"),
+        Some(1),
+        r#""제2편(총칙)" should yield Some(1) — open paren is a terminator"#
+    );
+    assert_eq!(
+        detect_korean_regulation_heading("제2편: 총칙"),
+        Some(1),
+        r#""제2편: 총칙" should yield Some(1) — colon is a terminator"#
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_pyeon_jang_both_h1() {
+    // 편 and 장 both map to H1 — they do not co-occur as top-level in the same
+    // statute, so no level shift is needed. This test documents the intentional
+    // "same bucket" policy.
+    assert_eq!(
+        detect_korean_regulation_heading("제1편 총칙"),
+        Some(1),
+        r#""제1편 총칙" → Some(1)"#
+    );
+    assert_eq!(
+        detect_korean_regulation_heading("제1장 총칙"),
+        Some(1),
+        r#""제1장 총칙" → Some(1) — same level as 편"#
+    );
 }
 
 #[test]
