@@ -558,17 +558,26 @@ pub(crate) fn detect_heading_level(para: &HwpParagraph, doc_info: &DocInfo) -> O
 /// `trim_start()` is intentional: Korean HWP documents commonly embed leading
 /// spaces in chapter/section headings as visual indentation (e.g. `"   제1장"`).
 /// HWP's indentation is normally stored in para_shape, but some authors use raw
-/// spaces in the text stream.  Stripping them is safe because tier-4 only runs
-/// after tier 1–3 have already returned `None`; an indented inline citation
-/// whose paragraph text starts with `"제N조"` is a legitimate article heading.
+/// spaces in the text stream (confirmed in moel_02_vocational_training.hwp).
 ///
-/// Extension note (편/관): large Korean statutes (민법, 형법) use an additional
-/// level 편 (part, above 장) and occasionally 관 (subsection, between 절 and 조).
-/// Supporting 편 would require shifting 장→H2 and 절/조→H3, which would break
-/// golden files that rely on 장→H1.  Defer until a 편-bearing HWP fixture is
-/// available to validate the level shift end-to-end.
+/// 100-char ceiling: Korean regulation HWP documents sometimes pack the article
+/// marker and the full article body text into a single PARA_HEADER (e.g.
+/// `"제1조(목적) 이 고시는 「국민 평생 직업능력 개발법」 … (400 chars)"`).
+/// Promoting such a paragraph to H2 produces an 800-char heading that breaks
+/// TOC generators.  The ceiling mirrors the tier-3 guard at line 523; genuine
+/// chapter/section/article titles are always shorter.
+///
+/// Extension note (편/관): large Korean statutes (민법, 형법) use 편 (part,
+/// above 장) and 관 (subsection, between 절 and 조).  Supporting 편 would shift
+/// 장→H2 and 절/조→H3, breaking golden files.  Defer until a 편-bearing HWP
+/// fixture (e.g. 민법 / 형법) lands in `tests/fixtures/real/`.
 fn detect_korean_regulation_heading(text: &str) -> Option<u8> {
-    let rest = text.trim_start().strip_prefix('제')?;
+    // Long paragraphs are article bodies, not headings.
+    if text.chars().count() >= 100 {
+        return None;
+    }
+    let trimmed = text.trim_start();
+    let rest = trimmed.strip_prefix('제')?;
     // Must be followed by one or more ASCII digits
     let digit_end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
     if digit_end == 0 {

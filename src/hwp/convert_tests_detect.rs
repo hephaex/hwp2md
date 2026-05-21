@@ -359,12 +359,29 @@ fn detect_korean_regulation_heading_jang_jeol_jo_hierarchy() {
     assert_eq!(detect_korean_regulation_heading("제1장 총칙"), Some(1));
     assert_eq!(detect_korean_regulation_heading("제1절 일반사항"), Some(2));
     assert_eq!(detect_korean_regulation_heading("제1조 목적"), Some(2));
-    // 절 and 조 must produce the same level.
-    assert_eq!(
-        detect_korean_regulation_heading("제2절 운영"),
-        detect_korean_regulation_heading("제3조 적용범위"),
-        // both must be H2
-    );
+    // Both must be H2 — compare against a concrete value so None==None would fail.
+    let jeol = detect_korean_regulation_heading("제2절 운영");
+    let jo = detect_korean_regulation_heading("제3조 적용범위");
+    assert_eq!(jeol, Some(2));
+    assert_eq!(jo, Some(2));
+    assert_eq!(jeol, jo);
+}
+
+#[test]
+fn detect_korean_regulation_heading_tab_indented_matched() {
+    // trim_start() covers \t as well as spaces.
+    assert_eq!(detect_korean_regulation_heading("\t제1장 총칙"), Some(1));
+    assert_eq!(detect_korean_regulation_heading("\t\t제3조 적용"), Some(2));
+}
+
+#[test]
+fn detect_korean_regulation_heading_long_article_body_not_promoted() {
+    // Real-world moel_02 pattern: article marker + full body in one PARA_HEADER.
+    // A paragraph >= 100 chars must NOT be promoted, regardless of prefix.
+    let body = "제1조(목적) 이 고시는 「국민 평생 직업능력 개발법」 제12조ㆍ제15조ㆍ제16조ㆍ제17조에서 \
+                위임된 사항과 그 시행에 필요한 사항을 규정함으로써 근로자의 직업능력향상을 목적으로 한다.";
+    assert!(body.chars().count() >= 100);
+    assert_eq!(detect_korean_regulation_heading(body), None);
 }
 
 #[test]
