@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 65 완료 (terminator matrix finalized + ASCII/fullwidth semicolon guard)
+## 현재 상태: v0.5.0 Sprint 66 완료 (U+3000 behavioral + is_heading_terminator doc comment)
 
 ### 완료
 
@@ -524,6 +524,32 @@ Sprint 64 리뷰 LOW-1/LOW-2 + P3 해결. 구현 변경 없음.
 - LOW: cross-reference 함수명 오류 → 수정
 - terminator matrix 완성 확인 (allowlist 전 문자 커버)
 리뷰 전문: `~/.claude/references/2026-05-22_sprint65_terminator_matrix_finalized_review.md`
+
+### 2026-05-22 — v0.5.0 Sprint 66: U+3000 ideographic space behavioral + doc comment
+
+**S66-P2/P3: 공백 behavioral + 생산 코드 doc comment** (`src/hwp/convert.rs`, `src/hwp/convert_tests_detect.rs`):
+
+Sprint 65 리뷰 제안 해결.
+
+- U+3000 / U+00A0 단위 허용 집합 테스트 추가
+- `"제3조\u{3000}참조"` → `Some(2)`, `"제1장\u{3000}총칙"` → `Some(1)` behavioral 테스트
+- `is_heading_terminator` doc comment: whitespace 정책(Unicode White_Space) + ASCII `;` 제외 정책 명시
+
+**리뷰 follow-up** (`6c85228`):
+- HIGH fix: `///` 블록 오귀속 — `detect_korean_regulation_heading` 매핑/trim/상한/편 doc 분리
+- MEDIUM fix: "모든 Unicode 공백" → "Unicode White_Space property" (ZWSP/BOM 비포함 명시)
+- LOW: U+00A0 behavioral 단언 추가
+- LOW: U+200B (ZWSP) 부정 회귀 고정 → `None`
+
+**Commits**: `db30eab` (feat) + `6c85228` (follow-up)
+
+**검증**: 1233 tests (0 ignored), 0 failures. Clippy 0 warnings.
+
+**리뷰 (code-reviewer opus)**: APPROVE. HIGH 1건 (follow-up에서 해결):
+- HIGH: `///` 블록 오귀속 — `is_heading_terminator`에 `detect_korean_regulation_heading` 내용 귀속됨
+- MEDIUM: whitespace "모든 Unicode" 표현 과장 → ZWSP/BOM 제외 명시
+- LOW: U+00A0 behavioral 미커버, ZWSP 부정 회귀 고정 누락
+리뷰 전문: `~/.claude/references/2026-05-22_sprint66_ideographic_space_doc_comment_review.md`
 
 ---
 

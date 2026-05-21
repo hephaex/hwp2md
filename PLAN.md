@@ -201,13 +201,13 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 66 로드맵
+## Sprint 67 로드맵
 
-Sprint 65 완료 (2026-05-22). Terminator matrix 완성. 다음 스프린트 우선순위:
+Sprint 66 완료 (2026-05-22). 다음 스프린트 우선순위:
 
 - **P1**: 편(part, 장보다 상위) 감지 — 대형 법전(민법, 형법)에 필요. **BLOCKER: 픽스처 없음.**
-- **P2**: U+3000 (이데오그래픽 공백) behavioral 테스트 — HWP/HWPX 문서에서 `제N장　제목` 형식으로 자주 사용; `is_whitespace()` 브랜치 커버 (Sprint 65 리뷰 제안)
-- **P3**: `is_heading_terminator` 생산 코드 doc comment 추가 — ASCII `;` 제외 + 전각 `；` 허용 정책 명시
+- **P2**: U+202F (NARROW NBSP) behavioral 테스트 — `is_whitespace() = true`; 서식된 한국어 숫자 표기에 사용 가능 (Sprint 66 리뷰 제안 optional)
+- **P3**: `detect_korean_regulation_heading` 에 `\t` between marker and title behavioral 추가 — 현재 `tab_indented_matched`는 leading `\t` 만 커버하고 marker 직후 `\t`는 미커버 (Sprint 66 LOW 제안)
 - **P4**: 기사 제목 vs 기사 본문 분리 — 현재 100자 상한은 합리적 근사치; 실제 반례 발생 시 재검토.
 
 ## 라이선스
