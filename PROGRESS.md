@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 51 완료 (STYLE BSTR 수정 + 헤딩 스타일 헬퍼 추출 + 픽스처 하네스)
+## 현재 상태: v0.5.0 Sprint 52 완료 (헤딩 false positive 수정 + 헬퍼 강화 + 픽스처 테스트 활성화)
 
 ### 완료
 
@@ -233,6 +233,32 @@
 - 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
+
+### 2026-05-21 — v0.5.0 Sprint 52: 헤딩 false positive 수정 + 헬퍼 강화 + 픽스처 테스트 활성화
+
+**S52-01: parse_hwpx_style_ref 단위 테스트** (`src/hwpx/handlers.rs`):
+4건 추가 (numeric range/out-of-range/name-precedence/garbage). private 유지.
+
+**S52-02: parse_heading_style 강화** (`src/hwp/heading_style.rs`):
+`strip_prefix(' ')` → `trim()` (이중 공백, 탭 처리), `is_ascii_digit` 가드 추가 (`"+1"` 거부). 테스트 3건 추가.
+
+**S52-04: 헤딩 false positive 수정** (`src/hwp/convert.rs`):
+
+근본 원인: Sprint 50의 `&& cs.bold` 제거가 한국 정부 공문서 14pt 본문(제2조, 목록 항목 등)을 모두 H2로 승격. moel_01에서 1122개 false heading 발생.
+
+수정: tier-3 font-size 모든 체크에 `&& cs.bold` 복원. 1122개 → 0개.
+
+**S52-03: 픽스처 golden 재생성 + 구조 테스트 활성화** (`tests/fixtures/real/*.md`, `tests/real_fixtures_hwp.rs`):
+5개 golden 파일 재생성 (Sprint 49 인코딩 수정 + Sprint 52 heading 수정 반영). 구조 비교 테스트 5건 `#[ignore]` 제거 → 활성화. `assert_heading_fidelity` 헬퍼 추출 (golden=0인 경우 false-positive guard로 명확 표현). `tests/fixtures/real/README.md` 추가 (공공누리 라이선스).
+
+**Commits**: `725777a` (feat), `57c417e` (refactor follow-up)
+
+**검증**: 1184 tests (5 ignored), 0 failures. Clippy 0 standard warnings.
+
+**리뷰 (code-reviewer opus)**: 승인. H1 zero-case tolerance 수정, M1 pub(super) 복원 완료. M2 non-bold heading detection 손실 — Sprint 53 비볼드 픽스처 추가 권고.
+리뷰 전문: `~/.claude/references/2026-05-21_sprint52_heading_false_positive_fix_review.md`
+
+---
 
 ### 2026-05-21 — v0.5.0 Sprint 51: STYLE BSTR 수정 + 헤딩 스타일 헬퍼 추출 + 픽스처 하네스
 
