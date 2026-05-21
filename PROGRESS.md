@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 53 완료 (인라인 제어 코드 상수 추출 + ruby.rs 정렬 + exhaustive 테스트)
+## 현재 상태: v0.5.0 Sprint 54 완료 (한국 정부 공문서 텍스트 패턴 헤딩 감지 + 황금 파일 정확 비교 활성화)
 
 ### 완료
 
@@ -233,6 +233,42 @@
 - 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
+
+### 2026-05-21 — v0.5.0 Sprint 54: 한국 정부 공문서 텍스트 패턴 헤딩 감지
+
+**S54-01: Tier-4 텍스트 패턴 헤딩 감지** (`src/hwp/convert.rs`):
+
+`detect_heading_level`에 tier-4 추가: `detect_korean_regulation_heading(text)` private 함수.
+- `^제\d+장` → H1 (장, chapter)
+- `^제\d+절` → H2 (절, section)
+- `^제\d+조` → H2 (조, article; 절과 동일 레벨 — 절 없는 문서에서 H1→H3 gap 방지)
+- `trim_start()` 미사용 — 들여쓰기된 인용 단락 오승급 방지
+- 매직 없음 — `strip_prefix('제')` + `find(!is_ascii_digit)` + suffix check
+
+**S54-02/03: 단위 테스트 9건** (`src/hwp/convert_tests_detect.rs`):
+- 장→H1, 절→H2, 조→H2, 개정 표기(조의N)→H2
+- 앞 공백 비매칭, 잘못된 접미사 None
+- 통합: empty DocInfo + "제5장" → Some(1)
+- tier-1 (heading_type=Some(0)) + bold=false → Some(1) (tier-1 bold와 무관)
+
+**S54-04: 황금 파일 재생성 + 정확 비교 테스트 활성화** (`tests/real_fixtures_hwp.rs`, `tests/fixtures/real/*.md`):
+- 5개 #[ignore] 제거 — 모든 11개 픽스처 테스트 활성화
+- 황금 파일 2회 재생성 (초기 tier-4 + follow-up 조→H2 수정)
+- moel_01: 57 headings, moel_03/04: 21, moel_05: 53, moel_02: 0 (패턴 없음)
+
+**리뷰 follow-up (870ec3e)**:
+- W1: 조→H3에서 조→H2로 변경 (H1→H3 gap 제거)
+- W2: `trim_start()` 제거 (들여쓰기 인용 오승급 방지)
+- S2: leading whitespace 비매칭 테스트, amendment notation 테스트 추가
+
+**Commits**: `0e3b22f` (feat), `870ec3e` (follow-up)
+
+**검증**: 1196 tests (0 ignored), 0 failures. Clippy 0 warnings.
+
+**리뷰 (code-reviewer opus)**: 승인. W1/W2 모두 follow-up에서 해결. S1(편/관) 향후.
+리뷰 전문: `~/.claude/references/2026-05-21_sprint54_korean_regulation_heading_review.md`
+
+---
 
 ### 2026-05-21 — v0.5.0 Sprint 53: 인라인 제어 코드 상수 추출 + ruby.rs 정렬
 

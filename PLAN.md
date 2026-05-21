@@ -201,15 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 54 로드맵
+## Sprint 55 로드맵
 
-Sprint 53 완료 (2026-05-21). 다음 스프린트 우선순위:
+Sprint 54 완료 (2026-05-21). 다음 스프린트 우선순위:
 
-- **P1**: 텍스트 패턴 기반 장/절 헤딩 감지 — `detect_heading_level`에 tier-4 추가:
-  `^제\d+장\s` → H1 (장), `^제\d+조` → H2 (조). ~30 LOC + 3 tests. 한국 정부 공문서 실제 구조 반영.
-- **P2**: 비볼드 대형 폰트 헤딩 픽스처 — heading_type=1 + bold=false인 최소 합성 HWP 픽스처로 tier-3 회귀 방지 (Sprint 52 M2 carryover)
-- **P3**: PARA_HEADER 오프셋 검증 — pyhwp/hwplib 스펙 대조 (Sprint 50 H3, 2회 연기)
-- **P4**: 실 픽스처 exact 비교 테스트 활성화 — moel_01~05 `#[ignore]` 제거
+- **P1**: 편(part, 장보다 상위) + 관(subsection, 절/조 사이) 감지 추가 — 대형 법전(민법, 형법)에 필요. `^제\d+편` → H1 (편+장 shift 필요), `^제\d+관` → H2.
+- **P2**: moel_02 동작 재확인 — 0 heading이 정상인지 실제 문서 내용 검토.
+- **P3**: PARA_HEADER 오프셋 검증 — pyhwp/hwplib 스펙 대조 (Sprint 50 H3, 3회 연기)
+- **P4**: 추가 실 HWP 픽스처 — 절/조 동시 사용 문서로 tier-4 계층 검증
 
 ## 라이선스
 
