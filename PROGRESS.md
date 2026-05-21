@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 52 완료 (헤딩 false positive 수정 + 헬퍼 강화 + 픽스처 테스트 활성화)
+## 현재 상태: v0.5.0 Sprint 53 완료 (인라인 제어 코드 상수 추출 + ruby.rs 정렬 + exhaustive 테스트)
 
 ### 완료
 
@@ -233,6 +233,34 @@
 - 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
+
+### 2026-05-21 — v0.5.0 Sprint 53: 인라인 제어 코드 상수 추출 + ruby.rs 정렬
+
+**S53-T1: CTRL_INLINE_PARAM_BYTES + is_inline_ctrl_code 추출** (`src/hwp/record.rs`, `src/hwp/reader.rs`, `src/hwp/control/ruby.rs`):
+
+`reader.rs`의 매직 리터럴 `14`와 `ruby.rs`의 독립 `const CTRL_PARAM_BYTES: usize = 14`를 `record.rs`로 통합.
+- `pub(crate) const CTRL_INLINE_PARAM_BYTES: usize = 14`
+- `pub(crate) fn is_inline_ctrl_code(ch: u16) -> bool` — 0x0001–0x0008, 0x000B–0x000C, 0x000E–0x001F (tab/LF/para-end 제외)
+- 2 단위 테스트 추가: 경계값 참/거짓 + exhaustive 범위 루프
+
+리뷰 follow-up (156174b):
+- ruby.rs else 분기를 `CTRL_CHAR_LOW..=CTRL_CHAR_HIGH` 범위에서 `is_inline_ctrl_code(ch)` 호출로 교체 — 의미 정확성 보장
+- reader.rs match 가드를 `_ if` → `ch if` (관용적 Rust)
+- record.rs doc comment "null / paragraph end" → "stream terminator / padding (no params)" 명확화
+- `inline_ctrl_code_exhaustive_range` 테스트 추가: 0x0000–0x0021 전 범위 루프 검증
+
+**S53-T2: Para_shape 신호 조사 spike**:
+
+한국 정부 공문서(훈령/고시)의 para_shape 필드(들여쓰기/줄 간격/정렬)로 장/절 제목 감지 불가 확인. 모든 단락이 style_id=0(Normal), 번호 관례(제N장/제N조)만 구분 수단. 텍스트 패턴 감지 권고 → Sprint 54 P1.
+
+**Commits**: `c51a8f1` (초기), `156174b` (review follow-up)
+
+**검증**: 1187 tests (5 ignored), 0 failures. Clippy 0 warnings.
+
+**리뷰 (code-reviewer opus)**: 승인. H2 ruby.rs 범위 불일치 수정, H3 match 가드 + exhaustive 테스트 수정. 모두 follow-up에서 해결.
+리뷰 전문: `~/.claude/references/2026-05-21_sprint53_inline_ctrl_extraction_review.md`
+
+---
 
 ### 2026-05-21 — v0.5.0 Sprint 52: 헤딩 false positive 수정 + 헬퍼 강화 + 픽스처 테스트 활성화
 
