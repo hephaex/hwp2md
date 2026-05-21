@@ -543,7 +543,7 @@ fn is_page_break_ctrl(id: &str) -> bool {
 ///
 /// Returns `Some(level)` if recognized as a heading level in 1–6, `None`
 /// otherwise.
-pub(super) fn parse_hwpx_style_ref(style_ref: &str) -> Option<u8> {
+fn parse_hwpx_style_ref(style_ref: &str) -> Option<u8> {
     // Try the shared style-name parser first.
     if let Some(level) = parse_heading_style(style_ref) {
         return Some(level);

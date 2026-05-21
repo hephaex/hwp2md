@@ -183,34 +183,38 @@ fn real_fixture_moel_05_quality_management_exact() {
 }
 
 // ---------------------------------------------------------------------------
-// Structural comparison tests (ignored until Sprint 52 golden regeneration)
+// Structural comparison tests
 //
-// These are lighter-weight alternatives to exact equality: they verify that
-// the heading structure is approximately preserved without being sensitive to
-// whitespace or minor textual differences.
+// Verifies garbled-char absence and heading-count fidelity.
+// When golden has 0 headings the assertion is a false-positive guard
+// (actual must also be 0); when golden has >0 headings the tolerance
+// is ±10%+1.
 // ---------------------------------------------------------------------------
 
-/// Structural comparison for moel_01: heading count must be within ±10% of
-/// the golden file's heading count, and no garbled characters may appear.
+fn assert_heading_fidelity(stem: &str, actual: &str, golden: &str) {
+    let actual_h = count_heading_lines(actual);
+    let golden_h = count_heading_lines(golden);
+    if golden_h == 0 {
+        assert!(
+            actual_h == 0,
+            "{stem}: golden has 0 headings (false-positive guard); actual produced {actual_h} heading(s)"
+        );
+    } else {
+        let tol = (golden_h as f64 * 0.10).ceil() as usize + 1;
+        assert!(
+            actual_h.abs_diff(golden_h) <= tol,
+            "{stem}: heading count mismatch — actual {actual_h}, golden {golden_h}, tolerance ±{tol}"
+        );
+    }
+}
+
 #[test]
 fn real_fixture_moel_01_goyang_center_structural() {
     let stem = "moel_01_goyang_center";
     let actual = convert_hwp_to_md(stem);
     let golden = load_golden(stem);
-
-    assert!(
-        !contains_garbled_chars(&actual),
-        "{stem}: converted output contains garbled characters"
-    );
-
-    let actual_headings = count_heading_lines(&actual);
-    let golden_headings = count_heading_lines(&golden);
-    let tolerance = (golden_headings as f64 * 0.10).ceil() as usize + 1;
-
-    assert!(
-        actual_headings.abs_diff(golden_headings) <= tolerance,
-        "{stem}: heading count mismatch — actual {actual_headings}, golden {golden_headings}, tolerance ±{tolerance}"
-    );
+    assert!(!contains_garbled_chars(&actual), "{stem}: garbled characters in output");
+    assert_heading_fidelity(stem, &actual, &golden);
 }
 
 #[test]
@@ -218,20 +222,8 @@ fn real_fixture_moel_02_vocational_training_structural() {
     let stem = "moel_02_vocational_training";
     let actual = convert_hwp_to_md(stem);
     let golden = load_golden(stem);
-
-    assert!(
-        !contains_garbled_chars(&actual),
-        "{stem}: converted output contains garbled characters"
-    );
-
-    let actual_headings = count_heading_lines(&actual);
-    let golden_headings = count_heading_lines(&golden);
-    let tolerance = (golden_headings as f64 * 0.10).ceil() as usize + 1;
-
-    assert!(
-        actual_headings.abs_diff(golden_headings) <= tolerance,
-        "{stem}: heading count mismatch — actual {actual_headings}, golden {golden_headings}, tolerance ±{tolerance}"
-    );
+    assert!(!contains_garbled_chars(&actual), "{stem}: garbled characters in output");
+    assert_heading_fidelity(stem, &actual, &golden);
 }
 
 #[test]
@@ -239,20 +231,8 @@ fn real_fixture_moel_03_livelihood_loan_structural() {
     let stem = "moel_03_livelihood_loan";
     let actual = convert_hwp_to_md(stem);
     let golden = load_golden(stem);
-
-    assert!(
-        !contains_garbled_chars(&actual),
-        "{stem}: converted output contains garbled characters"
-    );
-
-    let actual_headings = count_heading_lines(&actual);
-    let golden_headings = count_heading_lines(&golden);
-    let tolerance = (golden_headings as f64 * 0.10).ceil() as usize + 1;
-
-    assert!(
-        actual_headings.abs_diff(golden_headings) <= tolerance,
-        "{stem}: heading count mismatch — actual {actual_headings}, golden {golden_headings}, tolerance ±{tolerance}"
-    );
+    assert!(!contains_garbled_chars(&actual), "{stem}: garbled characters in output");
+    assert_heading_fidelity(stem, &actual, &golden);
 }
 
 #[test]
@@ -260,20 +240,8 @@ fn real_fixture_moel_04_instructor_education_structural() {
     let stem = "moel_04_instructor_education";
     let actual = convert_hwp_to_md(stem);
     let golden = load_golden(stem);
-
-    assert!(
-        !contains_garbled_chars(&actual),
-        "{stem}: converted output contains garbled characters"
-    );
-
-    let actual_headings = count_heading_lines(&actual);
-    let golden_headings = count_heading_lines(&golden);
-    let tolerance = (golden_headings as f64 * 0.10).ceil() as usize + 1;
-
-    assert!(
-        actual_headings.abs_diff(golden_headings) <= tolerance,
-        "{stem}: heading count mismatch — actual {actual_headings}, golden {golden_headings}, tolerance ±{tolerance}"
-    );
+    assert!(!contains_garbled_chars(&actual), "{stem}: garbled characters in output");
+    assert_heading_fidelity(stem, &actual, &golden);
 }
 
 #[test]
@@ -281,18 +249,6 @@ fn real_fixture_moel_05_quality_management_structural() {
     let stem = "moel_05_quality_management";
     let actual = convert_hwp_to_md(stem);
     let golden = load_golden(stem);
-
-    assert!(
-        !contains_garbled_chars(&actual),
-        "{stem}: converted output contains garbled characters"
-    );
-
-    let actual_headings = count_heading_lines(&actual);
-    let golden_headings = count_heading_lines(&golden);
-    let tolerance = (golden_headings as f64 * 0.10).ceil() as usize + 1;
-
-    assert!(
-        actual_headings.abs_diff(golden_headings) <= tolerance,
-        "{stem}: heading count mismatch — actual {actual_headings}, golden {golden_headings}, tolerance ±{tolerance}"
-    );
+    assert!(!contains_garbled_chars(&actual), "{stem}: garbled characters in output");
+    assert_heading_fidelity(stem, &actual, &golden);
 }
