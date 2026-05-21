@@ -571,6 +571,14 @@ pub(crate) fn detect_heading_level(para: &HwpParagraph, doc_info: &DocInfo) -> O
 /// above 장) and 관 (subsection, between 절 and 조).  Supporting 편 would shift
 /// 장→H2 and 절/조→H3, breaking golden files.  Defer until a 편-bearing HWP
 /// fixture (e.g. 민법 / 형법) lands in `tests/fixtures/real/`.
+fn is_heading_terminator(c: char) -> bool {
+    c.is_whitespace()
+        || matches!(
+            c,
+            '(' | '[' | '「' | '『' | '<' | '《' | ':' | '.' | ',' | '-' | '~' | '·' | 'ㆍ'
+        )
+}
+
 fn detect_korean_regulation_heading(text: &str) -> Option<u8> {
     // Long paragraphs are article bodies, not headings.
     if text.chars().count() >= 100 {
@@ -584,12 +592,29 @@ fn detect_korean_regulation_heading(text: &str) -> Option<u8> {
         return None;
     }
     let suffix = &rest[digit_end..];
-    if suffix.starts_with('장') {
-        Some(1)
-    } else if suffix.starts_with('절') || suffix.starts_with('조') {
-        Some(2)
+    let (level, after_suffix) = if let Some(r) = suffix.strip_prefix('장') {
+        (1u8, r)
+    } else if let Some(r) = suffix.strip_prefix('절') {
+        (2u8, r)
+    } else if let Some(r) = suffix.strip_prefix('조') {
+        (2u8, r)
     } else {
-        None
+        return None;
+    };
+    // The character after 장/절/조 must be a heading terminator or end-of-string.
+    // Exception: "의" followed by digits is amendment sub-article notation (제N조의M).
+    match after_suffix.chars().next() {
+        None => Some(level),
+        Some(c) if is_heading_terminator(c) => Some(level),
+        Some('의') => {
+            let after_ui = &after_suffix['의'.len_utf8()..];
+            if after_ui.chars().next().is_some_and(|d| d.is_ascii_digit()) {
+                Some(level)
+            } else {
+                None
+            }
+        }
+        Some(_) => None,
     }
 }
 

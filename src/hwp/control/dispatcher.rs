@@ -26,6 +26,11 @@ pub(crate) fn extract_paragraphs_from_range(
         let rec = &records[idx];
         match rec.tag_id {
             HWPTAG_PARA_HEADER => {
+                // HWP 5.0 PARA_HEADER layout (Hancom spec §3.2.1):
+                //   bytes[0..4]  UINT32  nChar         paragraph char count
+                //   bytes[4..6]  UINT16  nParaShapeID  PARA_SHAPE record index
+                //   bytes[6]     UINT8   nStyleID      style-sheet index (0 = Normal)
+                //   bytes[7]     UINT8   flags         heading/numbering flags
                 if let Some(mut p) = current.take() {
                     fixup_ruby_base_text(&mut p);
                     p.raw_para_text = None;
@@ -36,8 +41,10 @@ pub(crate) fn extract_paragraphs_from_range(
                 } else {
                     0
                 };
-                let style_id = if rec.data.len() >= 8 {
-                    u16::from_le_bytes([rec.data[6], rec.data[7]])
+                // nStyleID is UINT8 at byte[6]; reading two bytes would corrupt the
+                // value with the flags byte when any flag bit is set.
+                let style_id = if rec.data.len() >= 7 {
+                    u16::from(rec.data[6])
                 } else {
                     0
                 };
@@ -380,5 +387,22 @@ mod tests {
         let paras = extract_paragraphs_from_range(&records, 0, records.len());
         assert_eq!(paras.len(), 1);
         assert_eq!(paras[0].text, "");
+    }
+
+    #[test]
+    fn para_header_style_id_is_single_byte_not_corrupted_by_flags() {
+        // HWP spec §3.2.1: nStyleID is UINT8 at byte[6]; byte[7] is flags.
+        // Reading 2 bytes (u16) would corrupt the value when flags != 0.
+        let mut ph_data = vec![0u8; 8];
+        ph_data[4] = 1; // para_shape_id low byte
+        ph_data[5] = 0; // para_shape_id high byte
+        ph_data[6] = 3; // nStyleID = 3
+        ph_data[7] = 0xFF; // flags byte — must NOT bleed into style_id
+
+        let records = vec![make_record_with_data_plain(HWPTAG_PARA_HEADER, 2, ph_data)];
+        let paras = extract_paragraphs_from_range(&records, 0, records.len());
+        assert_eq!(paras.len(), 1);
+        assert_eq!(paras[0].para_shape_id, 1);
+        assert_eq!(paras[0].style_id, 3, "flags byte must not contaminate style_id");
     }
 }

@@ -90,7 +90,7 @@ pub struct DocInfo {
     pub bin_data_entries: Vec<BinDataEntry>,
     pub doc_properties: DocProperties,
     /// Style names in declaration order, parsed from `HWPTAG_STYLE` records (tag 0x001A).
-    /// Index matches the `style_id` field in `PARA_HEADER` bytes[6-7].
+    /// Index matches the `nStyleID` field in `PARA_HEADER` byte[6] (UINT8).
     pub styles: Vec<String>,
     /// Raw 256-byte seed payload from `DISTRIBUTE_DOC_DATA` (tag 0x0026).
     /// Present only in distribution (배포용) documents.
@@ -159,7 +159,7 @@ pub struct HwpParagraph {
     pub text: String,
     pub char_shape_ids: Vec<(u32, u16)>,
     pub para_shape_id: u16,
-    /// Style index into `DocInfo::styles`, parsed from `PARA_HEADER` bytes[6-7].
+    /// Style index into `DocInfo::styles`, parsed from `PARA_HEADER` byte[6] (UINT8 nStyleID).
     pub style_id: u16,
     pub controls: Vec<HwpControl>,
     /// Raw UTF-16LE bytes from the `PARA_TEXT` record, used during Ruby base-text

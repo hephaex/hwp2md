@@ -353,6 +353,23 @@ fn detect_korean_regulation_heading_amendment_notation_jo_ui_n() {
 }
 
 #[test]
+fn detect_korean_regulation_heading_inline_reference_particle_returns_none() {
+    // Korean grammatical particles directly after 장/절/조 signal an inline
+    // reference, not a heading (e.g. "제3장은 적용되지 않는다").
+    assert_eq!(detect_korean_regulation_heading("제3장은 적용되지 않는다"), None);
+    assert_eq!(detect_korean_regulation_heading("제5조에서 정한 사항"), None);
+    assert_eq!(detect_korean_regulation_heading("제2절의 규정"), None); // 의 + non-digit → None
+}
+
+#[test]
+fn detect_korean_regulation_heading_terminator_chars_still_match() {
+    // Headings followed by word-terminating punctuation must still be detected.
+    assert_eq!(detect_korean_regulation_heading("제1장(총칙)"), Some(1));
+    assert_eq!(detect_korean_regulation_heading("제1장. 총칙"), Some(1));
+    assert_eq!(detect_korean_regulation_heading("제3조:"), Some(2));
+}
+
+#[test]
 fn detect_korean_regulation_heading_jang_jeol_jo_hierarchy() {
     // S55-02: validate that 장→H1, 절→H2, 조→H2 in a document that has all three.
     // 절 and 조 are at the same level to avoid H1→H3 gap in documents without 절.
