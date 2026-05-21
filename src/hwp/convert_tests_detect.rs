@@ -502,6 +502,43 @@ fn detect_korean_regulation_heading_cjk_title_bracket_treated_as_heading() {
     );
 }
 
+#[test]
+fn detect_korean_regulation_heading_cjk_guillemet_open_treated_as_heading() {
+    // "제3조『인용』": 『 is in the terminator allowlist → Some(2).
+    assert_eq!(
+        detect_korean_regulation_heading("제3조『인용』"),
+        Some(2),
+        "CJK double-guillemet open after 조 should yield article heading level"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_cjk_guillemet_close_treated_as_heading() {
+    // Closer symmetry: 』 is also in the allowlist. A paragraph starting with
+    // "제3조』" (e.g. after an orphaned close-guillemet) still terminates.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조』참조"),
+        Some(2),
+        "CJK double-guillemet close after 조 should yield article heading level"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_dash_then_particle_still_classifies_as_heading() {
+    // Known limitation: the function checks only the first char after 장/절/조.
+    // "제3조-제5조는 적용 제외" starts with dash (a terminator), so the trailing
+    // "는" particle is never reached and the function returns Some(2) — even
+    // though this text is a cross-reference clause, not a heading.
+    // Tier-4 fires only when tier-1/2/3 signals are absent; in real HWP
+    // documents, such paragraphs usually carry non-zero style_id that satisfies
+    // tier-2 instead. Pinned here as a regression anchor, not a design intent.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조-제5조는 적용 제외"),
+        Some(2),
+        "dash terminates before particle — known tier-4 limitation"
+    );
+}
+
 // -----------------------------------------------------------------------
 // S54-03: Tier-1 heading_type works even when bold=false (Sprint 52 carryover)
 // -----------------------------------------------------------------------
