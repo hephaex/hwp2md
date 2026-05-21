@@ -201,13 +201,13 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 68 로드맵
+## Sprint 69 로드맵
 
-Sprint 67 완료 (2026-05-22). whitespace behavioral coverage 완성. 다음 스프린트 우선순위:
+Sprint 68 완료 (2026-05-22). Unicode White_Space behavioral coverage 표 완성. 다음 스프린트 우선순위:
 
 - **P1**: 편(part, 장보다 상위) 감지 — 대형 법전(민법, 형법)에 필요. **BLOCKER: 픽스처 없음.**
-- **P2**: U+FEFF (BOM/ZWNBSP) 부정 회귀 고정 (optional) — `is_whitespace()=false`; Sprint 67 커버리지 표 미완항목
-- **P3**: U+205F (MEDIUM MATH SPACE) 긍정 고정 (optional) — `is_whitespace()=true`; Sprint 67 커버리지 표 미완항목
+- **P2**: (whitespace coverage 완성 — 추가 대상 없음)
+- **P3**: (whitespace coverage 완성 — 추가 대상 없음)
 - **P4**: 기사 제목 vs 기사 본문 분리 — 현재 100자 상한은 합리적 근사치; 실제 반례 발생 시 재검토.
 
 ## 라이선스

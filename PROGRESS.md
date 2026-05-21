@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 67 완료 (tab terminator + U+202F narrow NBSP behavioral)
+## 현재 상태: v0.5.0 Sprint 68 완료 (U+FEFF negative pin + U+205F positive pin — whitespace coverage complete)
 
 ### 완료
 
@@ -577,6 +577,31 @@ Sprint 66 리뷰 제안 해결. 구현 변경 없음 — 테스트만 추가.
 - LOW-1: U+202F 주석이 픽스처와 불일치
 - LOW-2: tab terminator 격리 의도 불명확
 리뷰 전문: `~/.claude/references/2026-05-22_sprint67_tab_narrownbsp_whitespace_coverage_review.md`
+
+### 2026-05-22 — v0.5.0 Sprint 68: U+FEFF negative pin + U+205F positive pin (whitespace coverage complete)
+
+**S68-P2/P3: 공백 커버리지 표 완성** (`src/hwp/convert_tests_detect.rs`):
+
+Sprint 67 리뷰 선택적 항목 구현. 구현 변경 없음 — 테스트만 추가.
+
+- U+FEFF (BOM/ZWNBSP) 부정 고정: `is_heading_terminator_blocked_set` + `ideographic_space_treated_as_heading`에 None 단언 추가
+- U+205F (MEDIUM MATH SPACE) 긍정 고정: `is_heading_terminator_canonical_allowed_set` + `ideographic_space_treated_as_heading`에 Some(2) 단언 추가
+
+**리뷰 follow-up** (`29724b8`):
+- LOW-1: U+FEFF 주석 → Sprint 68 의도 + 표 완결 관계 명시
+- LOW-2: `is_heading_terminator_blocked_set`에 U+200B char-level 부정 단언 추가 (U+FEFF와 대칭)
+
+**Commits**: `3741706` (feat) + `29724b8` (follow-up)
+
+**검증**: 1234 tests (0 ignored), 0 failures. Clippy 0 warnings.
+
+**whitespace coverage 완성:**
+- U+0020 ✓ | U+0009 ✓x2 | U+00A0 ✓ | U+202F ✓ | U+3000 ✓ | U+200B ✓ | U+FEFF ✓ | U+205F ✓
+
+**리뷰 (code-reviewer opus)**: APPROVE. CRITICAL/HIGH/MEDIUM 없음. LOW 2건 (follow-up에서 해결):
+- LOW-1: U+FEFF 주석 과소 설명
+- LOW-2: U+200B char-level pin 비대칭
+리뷰 전문: `~/.claude/references/2026-05-22_sprint68_whitespace_coverage_complete_review.md`
 
 ---
 
