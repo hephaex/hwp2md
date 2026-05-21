@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 68 완료 (U+FEFF negative pin + U+205F positive pin — whitespace coverage complete)
+## 현재 상태: v0.5.0 Sprint 69 완료 (편(Part) detection + heading_style 모듈 추출)
 
 ### 완료
 
@@ -602,6 +602,39 @@ Sprint 67 리뷰 선택적 항목 구현. 구현 변경 없음 — 테스트만 
 - LOW-1: U+FEFF 주석 과소 설명
 - LOW-2: U+200B char-level pin 비대칭
 리뷰 전문: `~/.claude/references/2026-05-22_sprint68_whitespace_coverage_complete_review.md`
+
+### 2026-05-22 — v0.5.0 Sprint 69: 편(Part) detection + heading_style 모듈 추출
+
+**S69-01/02: 편 감지 구현 + 독스트링** (`src/hwp/heading_style.rs`):
+
+`detect_korean_regulation_heading`에 편 브랜치 추가. 편→H1 (장과 동일 레벨 — 편과 장은 같은 문서에 최상위로 공존하지 않음). 황금 파일 변화 없음 (moel_01-05는 모두 장 기반).
+
+함수와 `is_heading_terminator`를 `convert.rs`에서 `heading_style.rs`로 추출 — HWPX reader가 공유 가능하도록.
+
+**S69-03: 편 단위 테스트 6건** (`src/hwp/convert_tests_detect.rs`):
+- `pyeon_returns_h1`, `pyeon_multi_digit`, `pyeon_leading_whitespace`
+- `pyeon_particle_rejection`, `pyeon_terminator_chars`, `pyeon_jang_both_h1`
+
+**S69-04: HWPX tier-4 파이프라인 연동** (`src/hwpx/context/flush.rs`):
+- `flush_paragraph` + `flush_paragraph_staged` 양쪽에 tier-4 감지 연동
+- `is_heading = effective_level.is_some()` — heading이 list-indent보다 우선
+
+**S69-05: 통합 테스트 3건** (`tests/integration.rs`):
+- `pyeon_detected_as_h1_via_tier4`, `pyeon_heading_text_preserved`, `pyeon_rendered_as_atx_h1_in_markdown`
+
+**리뷰 follow-up** (`ba22a43`):
+- M1: 설계 근거 독스트링 복원 (100자 상한, trim_start, 절/조 H2 공유, 편/장 H1 공유)
+- M2: `is_heading` 의미론적 변경 주석 추가
+- L3: 통합 테스트 `assert_eq!(blocks.len(), 3)` 강화
+
+**Commits**: `30dba6e` (feat) + `ba22a43` (follow-up)
+
+**검증**: 1240 lib tests + 31 integration tests (0 ignored), 0 failures. Clippy -D warnings 0 경고.
+
+**리뷰 (code-reviewer opus)**: APPROVE. CRITICAL/HIGH 없음. MEDIUM 2건, LOW 4건 (M1/M2/L3 follow-up에서 해결):
+- M1: 설계 근거 독스트링 소실 → 복원
+- M2: is_heading 의미론 변경 미문서화 → 주석 추가
+리뷰 전문: `~/.claude/references/2026-05-22_sprint69_pyeon_detection_heading_style_extraction_review.md`
 
 ---
 
