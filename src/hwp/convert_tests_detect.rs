@@ -194,8 +194,9 @@ fn detect_heading_level_bold_small_font_returns_h3() {
 }
 
 #[test]
-fn detect_heading_level_not_bold_large_font_returns_h1() {
-    // Bold is no longer required — large font size alone triggers heading detection.
+fn detect_heading_level_not_bold_returns_none() {
+    // Bold is required for tier-3 (font-size) heading detection.
+    // 14pt non-bold is standard article text in Korean government docs.
     let mut doc_info = DocInfo::default();
     doc_info.para_shapes.push(ParaShape::default());
     let cs = CharShape {
@@ -206,7 +207,7 @@ fn detect_heading_level_not_bold_large_font_returns_h1() {
     doc_info.char_shapes.push(cs);
 
     let para = make_para_with_cs("Large not bold", 0);
-    assert_eq!(detect_heading_level(&para, &doc_info), Some(1));
+    assert_eq!(detect_heading_level(&para, &doc_info), None);
 }
 
 #[test]

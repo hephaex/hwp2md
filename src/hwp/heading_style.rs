@@ -19,11 +19,14 @@ pub(crate) fn parse_heading_style(style_name: &str) -> Option<u8> {
 
     for prefix in PREFIXES {
         if let Some(rest) = lower.strip_prefix(prefix) {
-            // Allow an optional single space between the keyword and the digit.
-            let rest = rest.strip_prefix(' ').unwrap_or(rest);
-            if let Ok(n) = rest.parse::<u8>() {
-                if (1..=6).contains(&n) {
-                    return Some(n);
+            // Allow optional whitespace (spaces, tabs, etc.) between the keyword and the digit.
+            let rest = rest.trim();
+            // Ensure the remainder contains only ASCII digits to reject inputs like "+1".
+            if !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit()) {
+                if let Ok(n) = rest.parse::<u8>() {
+                    if (1..=6).contains(&n) {
+                        return Some(n);
+                    }
                 }
             }
         }
@@ -79,5 +82,23 @@ mod tests {
         assert_eq!(parse_heading_style("Normal"), None);
         assert_eq!(parse_heading_style("Body Text"), None);
         assert_eq!(parse_heading_style(""), None);
+    }
+
+    #[test]
+    fn outline_double_space_returns_level() {
+        // After trim(), double spaces are handled correctly
+        assert_eq!(parse_heading_style("Outline  1"), Some(1));
+    }
+
+    #[test]
+    fn outline_plus_sign_is_none() {
+        // Non-ASCII-digit characters are rejected
+        assert_eq!(parse_heading_style("Outline +1"), None);
+    }
+
+    #[test]
+    fn heading_tab_separator_returns_level() {
+        // Tab characters are handled by trim()
+        assert_eq!(parse_heading_style("Heading\t2"), Some(2));
     }
 }

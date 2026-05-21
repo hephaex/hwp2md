@@ -543,7 +543,7 @@ fn is_page_break_ctrl(id: &str) -> bool {
 ///
 /// Returns `Some(level)` if recognized as a heading level in 1–6, `None`
 /// otherwise.
-fn parse_hwpx_style_ref(style_ref: &str) -> Option<u8> {
+pub(super) fn parse_hwpx_style_ref(style_ref: &str) -> Option<u8> {
     // Try the shared style-name parser first.
     if let Some(level) = parse_heading_style(style_ref) {
         return Some(level);
@@ -555,4 +555,35 @@ fn parse_hwpx_style_ref(style_ref: &str) -> Option<u8> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod style_ref_tests {
+    use super::*;
+
+    #[test]
+    fn numeric_in_range_maps_to_level() {
+        assert_eq!(parse_hwpx_style_ref("2"), Some(2));
+        assert_eq!(parse_hwpx_style_ref("6"), Some(6));
+    }
+
+    #[test]
+    fn numeric_out_of_range_is_none() {
+        assert_eq!(parse_hwpx_style_ref("0"), None);
+        assert_eq!(parse_hwpx_style_ref("7"), None);
+        assert_eq!(parse_hwpx_style_ref("10"), None);
+    }
+
+    #[test]
+    fn name_takes_precedence_over_numeric() {
+        assert_eq!(parse_hwpx_style_ref("Outline 3"), Some(3));
+        assert_eq!(parse_hwpx_style_ref("heading 2"), Some(2));
+    }
+
+    #[test]
+    fn empty_and_garbage_is_none() {
+        assert_eq!(parse_hwpx_style_ref(""), None);
+        assert_eq!(parse_hwpx_style_ref("body"), None);
+        assert_eq!(parse_hwpx_style_ref("abc123"), None);
+    }
 }

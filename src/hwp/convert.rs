@@ -525,13 +525,13 @@ pub(crate) fn detect_heading_level(para: &HwpParagraph, doc_info: &DocInfo) -> O
             let cs_id = first_cs.1 as usize;
             if cs_id < doc_info.char_shapes.len() {
                 let cs = &doc_info.char_shapes[cs_id];
-                if cs.height >= HEADING1_MIN_HEIGHT {
+                if cs.height >= HEADING1_MIN_HEIGHT && cs.bold {
                     return Some(1);
                 }
-                if cs.height >= HEADING2_MIN_HEIGHT {
+                if cs.height >= HEADING2_MIN_HEIGHT && cs.bold {
                     return Some(2);
                 }
-                if cs.height >= HEADING3_MIN_HEIGHT {
+                if cs.height >= HEADING3_MIN_HEIGHT && cs.bold {
                     return Some(3);
                 }
             }
