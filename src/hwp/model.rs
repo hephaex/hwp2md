@@ -160,7 +160,7 @@ pub struct HwpParagraph {
     pub char_shape_ids: Vec<(u32, u16)>,
     pub para_shape_id: u16,
     /// Style index into `DocInfo::styles`, parsed from `PARA_HEADER` byte[6] (UINT8 nStyleID).
-    pub style_id: u16,
+    pub style_id: u8,
     pub controls: Vec<HwpControl>,
     /// Raw UTF-16LE bytes from the `PARA_TEXT` record, used during Ruby base-text
     /// fixup and cleared (set to `None`) once fixup is complete.

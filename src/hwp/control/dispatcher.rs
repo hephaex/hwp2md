@@ -44,7 +44,7 @@ pub(crate) fn extract_paragraphs_from_range(
                 // nStyleID is UINT8 at byte[6]; reading two bytes would corrupt the
                 // value with the flags byte when any flag bit is set.
                 let style_id = if rec.data.len() >= 7 {
-                    u16::from(rec.data[6])
+                    rec.data[6]
                 } else {
                     0
                 };

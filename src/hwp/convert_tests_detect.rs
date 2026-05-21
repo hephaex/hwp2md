@@ -418,6 +418,45 @@ fn detect_korean_regulation_heading_tier4_integration() {
 }
 
 // -----------------------------------------------------------------------
+// S57-P3: is_heading_terminator policy test
+// -----------------------------------------------------------------------
+
+#[test]
+fn is_heading_terminator_canonical_allowed_set() {
+    // Whitespace variants
+    assert!(is_heading_terminator(' '), "space");
+    assert!(is_heading_terminator('\t'), "tab");
+    // ASCII parens (both directions)
+    assert!(is_heading_terminator('('), "open paren");
+    assert!(is_heading_terminator(')'), "close paren");
+    // CJK quotes
+    assert!(is_heading_terminator('「'), "CJK open");
+    assert!(is_heading_terminator('」'), "CJK close");
+    // Fullwidth parens (common in OCR'd Korean docs)
+    assert!(is_heading_terminator('（'), "fullwidth open");
+    assert!(is_heading_terminator('）'), "fullwidth close");
+    // Punctuation
+    assert!(is_heading_terminator('.'), "period");
+    assert!(is_heading_terminator(':'), "colon");
+    assert!(is_heading_terminator('·'), "middle dot");
+    assert!(is_heading_terminator('ㆍ'), "Korean middle dot");
+    assert!(is_heading_terminator('…'), "ellipsis");
+}
+
+#[test]
+fn is_heading_terminator_blocked_set() {
+    // Korean grammatical particles — must NOT terminate
+    assert!(!is_heading_terminator('은'), "subject particle 은");
+    assert!(!is_heading_terminator('에'), "location particle 에");
+    assert!(!is_heading_terminator('이'), "subject particle 이");
+    assert!(!is_heading_terminator('가'), "subject particle 가");
+    assert!(!is_heading_terminator('의'), "possessive particle 의");
+    // ASCII letters and digits — must NOT terminate
+    assert!(!is_heading_terminator('a'), "ASCII letter");
+    assert!(!is_heading_terminator('1'), "ASCII digit");
+}
+
+// -----------------------------------------------------------------------
 // S54-03: Tier-1 heading_type works even when bold=false (Sprint 52 carryover)
 // -----------------------------------------------------------------------
 
