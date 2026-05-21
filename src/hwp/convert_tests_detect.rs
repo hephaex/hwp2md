@@ -545,6 +545,58 @@ fn detect_korean_regulation_heading_cjk_single_guillemet_close_treated_as_headin
 }
 
 #[test]
+fn detect_korean_regulation_heading_cjk_single_angle_open_treated_as_heading() {
+    // "제3조〈참조〉": 〈 (U+3008) is in the terminator allowlist → Some(2).
+    // Symmetric with 〉 close test below.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조〈참조〉"),
+        Some(2),
+        "'제3조〈참조〉' CJK single-angle open after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_cjk_single_angle_close_treated_as_heading() {
+    // Closer symmetry: 〉 (U+3009) is also in the allowlist.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조〉참조"),
+        Some(2),
+        "'제3조〉참조' CJK single-angle close after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_cjk_double_angle_close_treated_as_heading() {
+    // "제3조》참조": 》 (U+300B) close-side of the 《》 pair is in the allowlist.
+    // The opener 《 behavioral test exists since Sprint 60 ("제5장《한국》").
+    assert_eq!(
+        detect_korean_regulation_heading("제3조》참조"),
+        Some(2),
+        "'제3조》참조' CJK double-angle close after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_ascii_angle_open_treated_as_heading() {
+    // "제3조<참조>": ASCII '<' is in the terminator allowlist → Some(2).
+    assert_eq!(
+        detect_korean_regulation_heading("제3조<참조>"),
+        Some(2),
+        "'제3조<참조>' ASCII angle-open after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_ascii_angle_close_treated_as_heading() {
+    // Closer symmetry: ASCII '>' is also in the allowlist.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조>참조"),
+        Some(2),
+        "'제3조>참조' ASCII angle-close after 조 should yield Some(2)"
+    );
+}
+
+#[test]
 fn detect_korean_regulation_heading_dash_then_particle_still_classifies_as_heading() {
     // Known limitation: the function checks only the first char after 장/절/조.
     // "제3조-제5조는 적용 제외" starts with dash (a terminator), so the trailing
