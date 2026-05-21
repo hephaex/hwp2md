@@ -538,7 +538,38 @@ pub(crate) fn detect_heading_level(para: &HwpParagraph, doc_info: &DocInfo) -> O
         }
     }
 
+    // Tier-4: Korean regulation text patterns (제N장/절/조).
+    if let Some(level) = detect_korean_regulation_heading(&para.text) {
+        return Some(level);
+    }
+
     None
+}
+
+/// Tier-4: Korean regulation document text patterns.
+/// Applies when all format-based signals (tier 1–3) are absent.
+/// Recognises the standard Korean legislative numbering conventions:
+/// - 제N장 (chapter) → H1
+/// - 제N절 (section) → H2
+/// - 제N조 (article) → H3
+fn detect_korean_regulation_heading(text: &str) -> Option<u8> {
+    let trimmed = text.trim_start();
+    let rest = trimmed.strip_prefix('제')?;
+    // Must be followed by one or more ASCII digits
+    let digit_end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
+    if digit_end == 0 {
+        return None;
+    }
+    let suffix = &rest[digit_end..];
+    if suffix.starts_with('장') {
+        Some(1)
+    } else if suffix.starts_with('절') {
+        Some(2)
+    } else if suffix.starts_with('조') {
+        Some(3)
+    } else {
+        None
+    }
 }
 
 pub(crate) fn build_inlines(para: &HwpParagraph, doc_info: &DocInfo) -> Vec<ir::Inline> {

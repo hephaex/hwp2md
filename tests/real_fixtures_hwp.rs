@@ -7,10 +7,10 @@
 //!
 //! # Status
 //!
-//! Golden files regenerated in Sprint 52 (post-Sprint-49 encoding fix +
-//! post-Sprint-50 heading detection regression fix).  All five structural
-//! comparison tests are now active (non-ignored).  The exact-equality tests
-//! remain `#[ignore]` as safety margin for future format changes.
+//! Golden files regenerated in Sprint 54 (post-tier-4 Korean regulation
+//! heading detection).  All eleven tests are active: five structural
+//! comparisons (garbled-char + heading fidelity) and five exact-equality
+//! comparisons against the current golden files.
 //!
 //! The `real_fixtures_no_garbled_chars` test is a live regression guard:
 //! asserts none of the converted outputs contain the garbled byte sequences
@@ -116,14 +116,9 @@ fn real_fixtures_no_garbled_chars() {
 // ---------------------------------------------------------------------------
 
 /// Full exact-equality comparison between the converted Markdown and the
-/// golden file.  Exact equality is the strongest possible assertion; it will
-/// be activated once the golden files are regenerated to reflect the
-/// post-Sprint-49 output.
-///
-/// If exact equality proves too fragile (whitespace differences, trailing
-/// newlines, etc.) this can be replaced by the structural comparison below.
+/// golden file.  Golden files regenerated in Sprint 54 (post-tier-4 heading
+/// detection).
 #[test]
-#[ignore = "activate after golden file regeneration in Sprint 52"]
 fn real_fixture_moel_01_goyang_center_exact() {
     let stem = "moel_01_goyang_center";
     let actual = convert_hwp_to_md(stem);
@@ -135,7 +130,6 @@ fn real_fixture_moel_01_goyang_center_exact() {
 }
 
 #[test]
-#[ignore = "activate after golden file regeneration in Sprint 52"]
 fn real_fixture_moel_02_vocational_training_exact() {
     let stem = "moel_02_vocational_training";
     let actual = convert_hwp_to_md(stem);
@@ -147,7 +141,6 @@ fn real_fixture_moel_02_vocational_training_exact() {
 }
 
 #[test]
-#[ignore = "activate after golden file regeneration in Sprint 52"]
 fn real_fixture_moel_03_livelihood_loan_exact() {
     let stem = "moel_03_livelihood_loan";
     let actual = convert_hwp_to_md(stem);
@@ -159,7 +152,6 @@ fn real_fixture_moel_03_livelihood_loan_exact() {
 }
 
 #[test]
-#[ignore = "activate after golden file regeneration in Sprint 52"]
 fn real_fixture_moel_04_instructor_education_exact() {
     let stem = "moel_04_instructor_education";
     let actual = convert_hwp_to_md(stem);
@@ -171,7 +163,6 @@ fn real_fixture_moel_04_instructor_education_exact() {
 }
 
 #[test]
-#[ignore = "activate after golden file regeneration in Sprint 52"]
 fn real_fixture_moel_05_quality_management_exact() {
     let stem = "moel_05_quality_management";
     let actual = convert_hwp_to_md(stem);

@@ -307,3 +307,65 @@ fn detect_heading_level_style_id_out_of_bounds_no_panic() {
     };
     assert_eq!(detect_heading_level(&para, &doc_info), None);
 }
+
+// -----------------------------------------------------------------------
+// Tier-4: Korean regulation text patterns (제N장/절/조)
+// -----------------------------------------------------------------------
+
+#[test]
+fn detect_korean_regulation_heading_jang_returns_h1() {
+    assert_eq!(detect_korean_regulation_heading("제1장 총칙"), Some(1));
+}
+
+#[test]
+fn detect_korean_regulation_heading_jeol_returns_h2() {
+    assert_eq!(detect_korean_regulation_heading("제2절 운영"), Some(2));
+}
+
+#[test]
+fn detect_korean_regulation_heading_jo_returns_h3() {
+    assert_eq!(detect_korean_regulation_heading("제12조"), Some(3));
+}
+
+#[test]
+fn detect_korean_regulation_heading_no_digits_returns_none() {
+    assert_eq!(detect_korean_regulation_heading("제장"), None);
+}
+
+#[test]
+fn detect_korean_regulation_heading_wrong_suffix_returns_none() {
+    assert_eq!(detect_korean_regulation_heading("제3과"), None);
+}
+
+#[test]
+fn detect_korean_regulation_heading_tier4_integration() {
+    // All tier-1/2/3 signals absent: empty para_shapes, empty styles, no char_shapes.
+    let doc_info = DocInfo::default();
+    let para = make_para("제5장 시행규칙", 0);
+    assert_eq!(detect_heading_level(&para, &doc_info), Some(1));
+}
+
+// -----------------------------------------------------------------------
+// S54-03: Tier-1 heading_type works even when bold=false (Sprint 52 carryover)
+// -----------------------------------------------------------------------
+
+#[test]
+fn detect_heading_level_para_shape_tier1_ignores_bold() {
+    // Tier-1 (heading_type) must fire regardless of CharShape.bold.
+    let mut doc_info = DocInfo::default();
+    let ps = ParaShape {
+        heading_type: Some(0),
+        ..Default::default()
+    };
+    doc_info.para_shapes.push(ps);
+    // Add a CharShape that is NOT bold and below tier-3 thresholds.
+    let cs = CharShape {
+        height: 800,
+        bold: false,
+        ..Default::default()
+    };
+    doc_info.char_shapes.push(cs);
+
+    let para = make_para_with_cs("제1조 목적", 0);
+    assert_eq!(detect_heading_level(&para, &doc_info), Some(1));
+}
