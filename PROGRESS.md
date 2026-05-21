@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 50 완료 (HWPTAG 상수 수정 + 단락 스타일 헤딩 감지)
+## 현재 상태: v0.5.0 Sprint 51 완료 (STYLE BSTR 수정 + 헤딩 스타일 헬퍼 추출 + 픽스처 하네스)
 
 ### 완료
 
@@ -233,6 +233,33 @@
 - 아키텍처 분할 (reader.rs 4분할, hwpx/reader.rs 분할, ParseContext 5 sub-structs)
 
 ## 변경 이력
+
+### 2026-05-21 — v0.5.0 Sprint 51: STYLE BSTR 수정 + 헤딩 스타일 헬퍼 추출 + 픽스처 하네스
+
+**S51-01: HWPTAG_STYLE BSTR 파서 수정** (`src/hwp/reader.rs`, `src/hwp/reader_tests.rs`):
+
+근본 원인: STYLE 레코드의 첫 필드는 `localName` BSTR(내부 ID), 두 번째가 `name` BSTR(사용자 표시명). 고정 오프셋 8은 `localName`이 정확히 3 UTF-16 chars일 때만 우연히 일치. `read_utf16le_str`가 반환하는 다음 오프셋을 체이닝하여 수정.
+
+회귀 테스트 4건 추가: 한국어 이름/영문 이름/긴 localName/절단 데이터 무패닉.
+
+**S51-02: `parse_heading_style` 공유 헬퍼 추출** (`src/hwp/heading_style.rs` 신규, `src/hwp/convert.rs`, `src/hwpx/handlers.rs`):
+
+`src/hwp/heading_style.rs` 신규 생성 — `parse_heading_style(str) -> Option<u8>` (대소문자 무관, "outline"/"heading"/"개요"/"제목" + 공백 선택 + 숫자 1–6). `convert.rs`의 좁은 prefix 루프와 `handlers.rs`의 로컬 정의를 모두 교체. HWPX 전용 `parse_hwpx_style_ref` 래퍼로 numeric styleIDRef 폴백 보존.
+
+테스트 4건 추가 (convert_tests_detect.rs): 영문 "Outline 2"/"개요 3"/소문자 "heading 1"/style_id 범위 초과 무패닉.
+
+**S51-03: 실 픽스처 하네스** (`tests/real_fixtures_hwp.rs` 신규):
+
+`real_fixtures_no_garbled_chars` (라이브, ignore 없음) — moel_01~05 5개 파일 변환 후 湰灧/桤灧 등 깨진 문자 부재 단언. 황금 비교 5건 + 구조적 비교 5건 (#[ignore], Sprint 52 재생성 후 활성화 예정).
+
+**Commits**: `b39476b`
+
+**검증**: 1177 tests (1167 active + 10 ignored), 0 failures. Clippy 0 warnings.
+
+**리뷰 (code-reviewer opus)**: 승인. H1 parse_hwpx_style_ref 단위 테스트 미작성, H2 numeric styleIDRef 폴백이 외부 HWPX 생성자와 충돌 가능 (Sprint 52 검토). M1 "Heading" 단독 동작 변경 CHANGELOG 미반영, M2 공백 처리 단일 ASCII 공백만, M3 "+1" 오파스 파싱, M5 래퍼 가시성.
+리뷰 전문: `~/.claude/references/2026-05-21_sprint51_style_bstr_heading_helper_review.md`
+
+---
 
 ### 2026-05-21 — v0.5.0 Sprint 50: HWPTAG 상수 수정 + 단락 스타일 헤딩 감지
 
