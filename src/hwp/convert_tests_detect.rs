@@ -444,12 +444,26 @@ fn detect_korean_regulation_heading_ideographic_space_treated_as_heading() {
         Some(2),
         "narrow NBSP (U+202F) after 조 should yield Some(2)"
     );
+    // U+205F (MEDIUM MATHEMATICAL SPACE) — is_whitespace() = true per Unicode White_Space.
+    // Rare in statute text but covered by the same is_whitespace() branch.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조\u{205F}참조"),
+        Some(2),
+        "medium math space (U+205F) after 조 should yield Some(2)"
+    );
     // U+200B (ZERO WIDTH SPACE) is NOT Unicode White_Space → not a heading terminator.
     // Regression pin: if a future change makes ZWSP a terminator, this test trips.
     assert_eq!(
         detect_korean_regulation_heading("제3조\u{200B}참조"),
         None,
         "ZWSP (U+200B) after 조 is not is_whitespace() — should yield None"
+    );
+    // U+FEFF (BOM/ZWNBSP) is NOT Unicode White_Space → not a heading terminator.
+    // Regression pin: completes the negative-pin pair with U+200B.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조\u{FEFF}참조"),
+        None,
+        "BOM/ZWNBSP (U+FEFF) after 조 is not is_whitespace() — should yield None"
     );
 }
 
@@ -483,6 +497,7 @@ fn is_heading_terminator_canonical_allowed_set() {
     assert!(is_heading_terminator('\u{3000}'), "U+3000 ideographic space");
     assert!(is_heading_terminator('\u{00A0}'), "U+00A0 non-breaking space");
     assert!(is_heading_terminator('\u{202F}'), "U+202F narrow non-breaking space");
+    assert!(is_heading_terminator('\u{205F}'), "U+205F medium mathematical space");
     // ASCII parens and brackets (both directions)
     assert!(is_heading_terminator('('), "open paren");
     assert!(is_heading_terminator(')'), "close paren");
@@ -539,6 +554,8 @@ fn is_heading_terminator_blocked_set() {
     // ASCII semicolon ';' is NOT in the allowlist — only the fullwidth variant '；' is.
     // This guards against accidentally promoting ASCII ';' to terminator status.
     assert!(!is_heading_terminator(';'), "ASCII semicolon (fullwidth ； is allowed, ASCII ';' is not)");
+    // U+FEFF (BOM / ZERO WIDTH NO-BREAK SPACE) is NOT Unicode White_Space → not a terminator.
+    assert!(!is_heading_terminator('\u{FEFF}'), "U+FEFF BOM/ZWNBSP is not is_whitespace() — must NOT terminate");
 }
 
 #[test]
