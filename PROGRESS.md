@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 63 완료 (〈〉/《》/⟨⟩ terminator-pair behavioral gap fill)
+## 현재 상태: v0.5.0 Sprint 64 완료 (bracket matrix complete + punctuation behavioral coverage)
 
 ### 완료
 
@@ -473,6 +473,33 @@ Sprint 62 리뷰 gap matrix 해결. 구현 변경 없음.
 - LOW: 커밋 제목에 `⟨⟩` (U+27E8/U+27E9) 오타 — 실제 추가된 것은 `〈〉` (U+3008/U+3009)
 Sprint 64 제안: `[]` + `（）` behavioral 쌍 (bracket matrix 완성), `cjk_title_bracket` 이름 변경, `<`/`>` 단위 허용 집합 테스트 추가.
 리뷰 전문: `~/.claude/references/2026-05-22_sprint63_terminator_pair_behavioral_gap_fill_review.md`
+
+### 2026-05-22 — v0.5.0 Sprint 64: bracket matrix complete + punctuation behavioral coverage
+
+**S64-P2: 괄호 matrix 완성 + 이름 변경** (`src/hwp/convert_tests_detect.rs`):
+
+Sprint 63 리뷰 nit 해결. 구현 변경 없음.
+
+- `cjk_title_bracket_treated_as_heading` → `cjk_double_angle_open_treated_as_heading` (이름 대칭 복원, U+300A 코드포인트 주석 추가, 닫힘 쌍 함수명 cross-reference)
+- `"제3조[참조]"` → `Some(2)` (ASCII 대괄호 열림)
+- `"제3조]참조"` → `Some(2)` (ASCII 대괄호 닫힘 고아)
+- `"제3조（참조）"` → `Some(2)` (전각 괄호 열림)
+- `"제3조）참조"` → `Some(2)` (전각 괄호 닫힘 고아)
+
+**S64-P3: 구두점 behavioral 커버리지** (`src/hwp/convert_tests_detect.rs`):
+
+- `<`/`>` 를 `is_heading_terminator_canonical_allowed_set` 단위 테스트에 추가
+- `~` `·` `ㆍ` `…` `：` `．` `；` `，` — 8개 behavioral 테스트 추가
+
+**Commit**: `1a8560b`
+
+**검증**: 1230 tests (0 ignored), 0 failures. Clippy 0 warnings.
+
+**리뷰 (code-reviewer opus)**: APPROVE. CRITICAL/HIGH/MEDIUM 없음. LOW 2건:
+- LOW-1: ASCII `,` (전각 `，` 는 Sprint 64에서 추가됐으나 ASCII 짝 누락)
+- LOW-2: ASCII `)` 고아 닫힘 괄호 behavioral 테스트 없음 (쌍으로만 사용됨)
+Sprint 65 제안: ASCII `,` + `)` orphan-close 2건 추가로 matrix 완성.
+리뷰 전문: `~/.claude/references/2026-05-22_sprint64_bracket_matrix_complete_punctuation_behavioral_review.md`
 
 ---
 
