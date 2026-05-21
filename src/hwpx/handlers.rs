@@ -1,3 +1,4 @@
+use crate::hwp::heading_style::parse_heading_style;
 use crate::ir::{self, InlineFormat};
 
 use super::context::{
@@ -27,7 +28,7 @@ pub(super) fn handle_start_element(
                 let val = attr.unescape_value().unwrap_or_default().to_string();
                 match key {
                     "styleIDRef" | "hp:styleIDRef" => {
-                        if let Some(level) = parse_heading_style(&val) {
+                        if let Some(level) = parse_hwpx_style_ref(&val) {
                             ctx.heading_level = Some(level);
                         }
                     }
@@ -532,30 +533,26 @@ fn is_page_break_ctrl(id: &str) -> bool {
     matches!(id, "newPage" | "pageBreak" | "cnpb")
 }
 
-/// Parse a HWP style ID reference and return the heading level (1–6).
-pub(crate) fn parse_heading_style(style_ref: &str) -> Option<u8> {
+/// Parse an HWPX `styleIDRef` attribute value as a heading level (1–6).
+///
+/// HWPX `styleIDRef` values can be either:
+/// - A style name string (e.g. `"Heading1"`, `"개요 2"`) — delegated to the
+///   shared [`parse_heading_style`] function.
+/// - A bare numeric style-ID string (e.g. `"2"`) where the value directly
+///   encodes the heading level.
+///
+/// Returns `Some(level)` if recognized as a heading level in 1–6, `None`
+/// otherwise.
+fn parse_hwpx_style_ref(style_ref: &str) -> Option<u8> {
+    // Try the shared style-name parser first.
+    if let Some(level) = parse_heading_style(style_ref) {
+        return Some(level);
+    }
+    // Fall back to bare numeric level for documents that use integer IDs.
     if let Ok(n) = style_ref.parse::<u8>() {
         if (1..=6).contains(&n) {
             return Some(n);
         }
-    }
-
-    let lower = style_ref.to_lowercase();
-    if lower.contains("heading") || lower.contains("제목") || lower.contains("개요") {
-        let num_str: String = style_ref
-            .chars()
-            .rev()
-            .take_while(char::is_ascii_digit)
-            .collect::<String>()
-            .chars()
-            .rev()
-            .collect();
-        if let Ok(n) = num_str.parse::<u8>() {
-            if (1..=6).contains(&n) {
-                return Some(n);
-            }
-        }
-        return Some(1);
     }
     None
 }

@@ -1,4 +1,5 @@
 use crate::hwp::eqedit::eqedit_to_latex;
+use crate::hwp::heading_style::parse_heading_style;
 use crate::hwp::model::{DocInfo, HwpControl, HwpDocument, HwpParagraph, HwpTableCell};
 use crate::ir::{self, InlineFormat};
 use crate::url_util::is_safe_url_scheme;
@@ -507,18 +508,14 @@ pub(crate) fn detect_heading_level(para: &HwpParagraph, doc_info: &DocInfo) -> O
     }
 
     // Style-based detection using style names from DocInfo.
-    // Korean outline styles: "개요 1"–"개요 7", English: "Outline 1"–"Outline 7".
+    // Delegates to the shared `parse_heading_style` which accepts all known
+    // English ("Outline", "Heading") and Korean ("개요", "제목") prefixes,
+    // case-insensitively.
     let style_id = para.style_id as usize;
     if style_id < doc_info.styles.len() {
         let style_name = &doc_info.styles[style_id];
-        for prefix in &["Outline ", "개요 "] {
-            if let Some(rest) = style_name.strip_prefix(prefix) {
-                if let Ok(n) = rest.trim().parse::<u8>() {
-                    if (1..=6).contains(&n) {
-                        return Some(n);
-                    }
-                }
-            }
+        if let Some(level) = parse_heading_style(style_name) {
+            return Some(level);
         }
     }
 

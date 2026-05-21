@@ -14,7 +14,7 @@ use context::{flush_paragraph_staged, group_list_paragraphs, StagedBlock};
 #[path = "handlers.rs"]
 mod handlers;
 #[cfg(test)]
-pub(crate) use handlers::parse_heading_style;
+pub(crate) use crate::hwp::heading_style::parse_heading_style;
 use handlers::{handle_empty_element, handle_end_element, handle_start_element, handle_text};
 
 /// Read an HWPX (OWPML ZIP+XML) file and return an IR [`ir::Document`].

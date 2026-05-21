@@ -5,6 +5,7 @@ mod control;
 mod convert;
 pub(crate) mod crypto;
 pub(crate) mod eqedit;
+pub(crate) mod heading_style;
 mod lenient;
 mod model;
 mod reader;

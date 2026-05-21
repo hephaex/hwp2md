@@ -269,6 +269,25 @@ fn make_para_shape_with_heading(head_type: u8, para_level: u8) -> Vec<u8> {
     data
 }
 
+// Helper: Build a BSTR (2-byte count + UTF-16LE string) at a given offset.
+fn make_bstr(s: &str) -> Vec<u8> {
+    let utf16: Vec<u16> = s.encode_utf16().collect();
+    let count = utf16.len() as u16;
+    let mut data = Vec::new();
+    data.extend_from_slice(&count.to_le_bytes());
+    for &u in &utf16 {
+        data.extend_from_slice(&u.to_le_bytes());
+    }
+    data
+}
+
+// Helper: Concatenate two BSTRs into a single byte vec.
+fn make_style_record_data(local_name: &str, name: &str) -> Vec<u8> {
+    let mut data = make_bstr(local_name);
+    data.extend(make_bstr(name));
+    data
+}
+
 #[test]
 fn parse_para_shape_heading_type_outline() {
     let ps = parse_para_shape(&make_para_shape_with_heading(1, 0));
@@ -405,5 +424,39 @@ fn read_file_header_drm_bit_sets_has_drm() {
     buf[36] = 0x10;
     let props = u32::from_le_bytes([buf[36], buf[37], buf[38], buf[39]]);
     assert!((props & 0x10) != 0, "has_drm bit should be set");
+}
+
+// --- parse_style_record ---
+
+#[test]
+fn parse_style_record_normal_korean() {
+    let data = make_style_record_data("Normal", "개요 1");
+    let (_local_name, off) = read_utf16le_str(&data, 0);
+    let (name, _) = read_utf16le_str(&data, off);
+    assert_eq!(name, "개요 1");
+}
+
+#[test]
+fn parse_style_record_empty_local_name() {
+    let data = make_style_record_data("", "Outline 1");
+    let (_local_name, off) = read_utf16le_str(&data, 0);
+    let (name, _) = read_utf16le_str(&data, off);
+    assert_eq!(name, "Outline 1");
+}
+
+#[test]
+fn parse_style_record_long_local_name() {
+    let data = make_style_record_data("0123456789", "Body Text");
+    let (_local_name, off) = read_utf16le_str(&data, 0);
+    let (name, _) = read_utf16le_str(&data, off);
+    assert_eq!(name, "Body Text");
+}
+
+#[test]
+fn parse_style_record_truncated_no_panic() {
+    let data = vec![0x01u8];
+    let (_local_name, off) = read_utf16le_str(&data, 0);
+    let (name, _) = read_utf16le_str(&data, off);
+    assert_eq!(name, "");
 }
 

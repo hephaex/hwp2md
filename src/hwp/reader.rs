@@ -263,7 +263,8 @@ fn read_doc_info(
                 doc_info.para_shapes.push(parse_para_shape(&rec.data));
             }
             HWPTAG_STYLE => {
-                let name = read_utf16le_str(&rec.data, 8).0;
+                let (_local_name, off) = read_utf16le_str(&rec.data, 0);
+                let (name, _) = read_utf16le_str(&rec.data, off);
                 doc_info.styles.push(name);
             }
             HWPTAG_BIN_DATA => {

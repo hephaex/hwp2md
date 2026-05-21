@@ -225,3 +225,84 @@ fn detect_heading_level_long_text_skips_heuristic() {
     let para = make_para_with_cs(&long_text, 0);
     assert_eq!(detect_heading_level(&para, &doc_info), None);
 }
+
+// -----------------------------------------------------------------------
+// Style-name based detection (shared parse_heading_style)
+// -----------------------------------------------------------------------
+
+#[test]
+fn detect_heading_level_outline_english_returns_level() {
+    // style_id 1 → "Outline 2" → Some(2)
+    let mut doc_info = DocInfo::default();
+    doc_info.para_shapes.push(ParaShape::default()); // index 0, style_id 0 unused
+    doc_info.styles.push("Normal".to_string()); // index 0
+    doc_info.styles.push("Outline 2".to_string()); // index 1
+
+    let para = HwpParagraph {
+        text: "Section heading".to_string(),
+        char_shape_ids: Vec::new(),
+        para_shape_id: 0,
+        style_id: 1,
+        controls: Vec::new(),
+        raw_para_text: None,
+    };
+    assert_eq!(detect_heading_level(&para, &doc_info), Some(2));
+}
+
+#[test]
+fn detect_heading_level_outline_korean_returns_level() {
+    // style_id 1 → "개요 3" → Some(3)
+    let mut doc_info = DocInfo::default();
+    doc_info.para_shapes.push(ParaShape::default());
+    doc_info.styles.push("바탕글".to_string()); // index 0 (normal body)
+    doc_info.styles.push("개요 3".to_string()); // index 1
+
+    let para = HwpParagraph {
+        text: "Korean outline".to_string(),
+        char_shape_ids: Vec::new(),
+        para_shape_id: 0,
+        style_id: 1,
+        controls: Vec::new(),
+        raw_para_text: None,
+    };
+    assert_eq!(detect_heading_level(&para, &doc_info), Some(3));
+}
+
+#[test]
+fn detect_heading_level_lenient_lowercase_heading() {
+    // style_id 1 → "heading 1" (lowercase) → Some(1)
+    let mut doc_info = DocInfo::default();
+    doc_info.para_shapes.push(ParaShape::default());
+    doc_info.styles.push("Normal".to_string()); // index 0
+    doc_info.styles.push("heading 1".to_string()); // index 1
+
+    let para = HwpParagraph {
+        text: "Lowercase heading".to_string(),
+        char_shape_ids: Vec::new(),
+        para_shape_id: 0,
+        style_id: 1,
+        controls: Vec::new(),
+        raw_para_text: None,
+    };
+    assert_eq!(detect_heading_level(&para, &doc_info), Some(1));
+}
+
+#[test]
+fn detect_heading_level_style_id_out_of_bounds_no_panic() {
+    // style_id 99 but styles only has 3 entries → must return None without panic
+    let mut doc_info = DocInfo::default();
+    doc_info.para_shapes.push(ParaShape::default());
+    doc_info.styles.push("Normal".to_string()); // index 0
+    doc_info.styles.push("Outline 1".to_string()); // index 1
+    doc_info.styles.push("Outline 2".to_string()); // index 2
+
+    let para = HwpParagraph {
+        text: "Body text".to_string(),
+        char_shape_ids: Vec::new(),
+        para_shape_id: 0,
+        style_id: 99,
+        controls: Vec::new(),
+        raw_para_text: None,
+    };
+    assert_eq!(detect_heading_level(&para, &doc_info), None);
+}
