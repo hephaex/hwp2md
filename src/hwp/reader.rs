@@ -378,7 +378,7 @@ pub(crate) fn extract_paragraph_text(data: &[u8]) -> String {
             // Codes 0x000E–0x001F are extended HWP 5.0 inline controls (e.g. auto-numbering
             // 0x0015) that follow the same 14-byte structure as 0x0001–0x000C.  Failing to
             // skip their inline data causes garbled characters (湰灧) in the output.
-            _ if is_inline_ctrl_code(ch) => {
+            ch if is_inline_ctrl_code(ch) => {
                 if i + CTRL_INLINE_PARAM_BYTES > len {
                     break;
                 }

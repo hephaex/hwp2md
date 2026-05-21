@@ -12,7 +12,7 @@ pub(crate) const CTRL_INLINE_PARAM_BYTES: usize = 14;
 /// carries a 14-byte inline parameter block.
 ///
 /// Excludes:
-/// - 0x0000: null / paragraph end
+/// - 0x0000: stream terminator / padding (no params)
 /// - 0x0009: tab (emitted as `\t`, no params)
 /// - 0x000A: line break (emitted as `\n`, no params)
 /// - 0x000D: section/column break (no params — verified from real records)
@@ -181,6 +181,18 @@ mod inline_ctrl_tests {
         assert!(!is_inline_ctrl_code(0x000D)); // para end / section break
         assert!(!is_inline_ctrl_code(0x0020)); // space (plain text)
         assert!(!is_inline_ctrl_code(0xAC00)); // Korean char
+    }
+
+    #[test]
+    fn inline_ctrl_code_exhaustive_range() {
+        for ch in 0x0000u16..=0x0021 {
+            let expected = matches!(ch, 0x0001..=0x0008 | 0x000B..=0x000C | 0x000E..=0x001F);
+            assert_eq!(
+                is_inline_ctrl_code(ch),
+                expected,
+                "ch=0x{ch:04X}: expected {expected}"
+            );
+        }
     }
 }
 

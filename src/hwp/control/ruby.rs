@@ -1,11 +1,5 @@
 use crate::hwp::model::{HwpControl, HwpParagraph};
-use crate::hwp::record::{read_utf16le_str, Record, CTRL_INLINE_PARAM_BYTES};
-
-/// Control characters in HWP `PARA_TEXT` that occupy a 2-byte code unit plus a
-/// 14-byte inline parameter block.  The range 0x0001..=0x001F covers all such
-/// extended control code units.
-const CTRL_CHAR_LOW: u16 = 0x0001;
-const CTRL_CHAR_HIGH: u16 = 0x001F;
+use crate::hwp::record::{is_inline_ctrl_code, read_utf16le_str, Record, CTRL_INLINE_PARAM_BYTES};
 
 /// The specific code unit that marks an extended control (Ruby, Table, ...) in
 /// the paragraph text stream.
@@ -51,7 +45,7 @@ pub(crate) fn fixup_ruby_base_text(para: &mut HwpParagraph) {
             i += 2 + CTRL_INLINE_PARAM_BYTES;
             // The next run starts after the parameter block.
             run_start = i;
-        } else if (CTRL_CHAR_LOW..=CTRL_CHAR_HIGH).contains(&ch) {
+        } else if is_inline_ctrl_code(ch) {
             // Other extended control characters: skip 2-byte code unit + 14-byte block.
             i += 2 + CTRL_INLINE_PARAM_BYTES;
             // These characters are not text, so they break the run.  Start a
