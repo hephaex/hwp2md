@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 66 완료 (U+3000 behavioral + is_heading_terminator doc comment)
+## 현재 상태: v0.5.0 Sprint 67 완료 (tab terminator + U+202F narrow NBSP behavioral)
 
 ### 완료
 
@@ -550,6 +550,33 @@ Sprint 65 리뷰 제안 해결.
 - MEDIUM: whitespace "모든 Unicode" 표현 과장 → ZWSP/BOM 제외 명시
 - LOW: U+00A0 behavioral 미커버, ZWSP 부정 회귀 고정 누락
 리뷰 전문: `~/.claude/references/2026-05-22_sprint66_ideographic_space_doc_comment_review.md`
+
+### 2026-05-22 — v0.5.0 Sprint 67: tab terminator path + U+202F narrow NBSP behavioral
+
+**S67-P2/P3: 공백 behavioral 커버리지 완성** (`src/hwp/convert_tests_detect.rs`):
+
+Sprint 66 리뷰 제안 해결. 구현 변경 없음 — 테스트만 추가.
+
+- `detect_korean_regulation_heading_tab_between_marker_and_title` 신규 테스트:
+  - `"제3조\t참조"` → `Some(2)`, `"제1장\t총칙"` → `Some(1)`
+  - tab-as-terminator 경로 격리 (tab_indented_matched는 trim_start + 공백 terminator를 함께 커버)
+- U+202F (NARROW NBSP) behavioral 단언 + `ideographic_space_treated_as_heading`에 추가:
+  - `"제3조\u{202F}참조"` → `Some(2)` 행동 검증
+  - U+202F를 `is_heading_terminator_canonical_allowed_set` 단위 테스트에 추가
+- U+200B (ZWSP) 부정 회귀 고정: `"제3조\u{200B}참조"` → `None` (is_whitespace()=false 확인)
+
+**리뷰 follow-up** (`79c7935`):
+- LOW-1: U+202F 주석 수정 — "괄호 앞 narrow NBSP" → "some HWP authoring tools emit it as a no-break separator" (픽스처와 불일치 해소)
+- LOW-2: tab between marker+title 주석 명확화 — "Isolates the tab-as-terminator path. tab_indented_matched exercises trim_start() on the leading tab and then hits a space terminator; here we exercise the tab terminator alone."
+
+**Commits**: `7204362` (feat) + `79c7935` (follow-up)
+
+**검증**: 1234 tests (0 ignored), 0 failures. Clippy 0 warnings.
+
+**리뷰 (code-reviewer opus)**: APPROVE. CRITICAL/HIGH/MEDIUM 없음. LOW 2건 (follow-up에서 해결):
+- LOW-1: U+202F 주석이 픽스처와 불일치
+- LOW-2: tab terminator 격리 의도 불명확
+리뷰 전문: `~/.claude/references/2026-05-22_sprint67_tab_narrownbsp_whitespace_coverage_review.md`
 
 ---
 
