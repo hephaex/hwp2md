@@ -436,6 +436,9 @@ fn is_heading_terminator_canonical_allowed_set() {
     assert!(is_heading_terminator('」'), "CJK close guillemet");
     assert!(is_heading_terminator('『'), "CJK double open guillemet");
     assert!(is_heading_terminator('』'), "CJK double close guillemet");
+    // ASCII angle brackets (< >)
+    assert!(is_heading_terminator('<'), "ASCII angle open");
+    assert!(is_heading_terminator('>'), "ASCII angle close");
     // CJK title brackets — canonical Korean title delimiters
     assert!(is_heading_terminator('《'), "CJK double open angle");
     assert!(is_heading_terminator('》'), "CJK double close angle");
@@ -493,12 +496,13 @@ fn detect_korean_regulation_heading_range_expression_treated_as_heading() {
 }
 
 #[test]
-fn detect_korean_regulation_heading_cjk_title_bracket_treated_as_heading() {
-    // "제5장《한국》": CJK double-angle bracket is a heading terminator.
+fn detect_korean_regulation_heading_cjk_double_angle_open_treated_as_heading() {
+    // "제5장《한국》": 《 (U+300A) opens the CJK double-angle pair — heading terminator.
+    // Symmetric with detect_korean_regulation_heading_cjk_double_angle_close_treated_as_heading.
     assert_eq!(
         detect_korean_regulation_heading("제5장《한국》"),
         Some(1),
-        "'제5장《한국》' CJK title bracket should yield chapter heading level Some(1)"
+        "'제5장《한국》' CJK double-angle open after 장 should yield chapter heading level Some(1)"
     );
 }
 
@@ -568,7 +572,7 @@ fn detect_korean_regulation_heading_cjk_single_angle_close_treated_as_heading() 
 #[test]
 fn detect_korean_regulation_heading_cjk_double_angle_close_treated_as_heading() {
     // "제3조》참조": 》 (U+300B) close-side of the 《》 pair is in the allowlist.
-    // The opener 《 behavioral test exists since Sprint 60 ("제5장《한국》").
+    // The opener 《 behavioral test: detect_korean_regulation_heading_cjk_double_angle_open_treated_as_heading.
     assert_eq!(
         detect_korean_regulation_heading("제3조》참조"),
         Some(2),
@@ -593,6 +597,126 @@ fn detect_korean_regulation_heading_ascii_angle_close_treated_as_heading() {
         detect_korean_regulation_heading("제3조>참조"),
         Some(2),
         "'제3조>참조' ASCII angle-close after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_ascii_bracket_open_treated_as_heading() {
+    // "제3조[참조]": '[' is in the terminator allowlist → Some(2). Closes bracket matrix.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조[참조]"),
+        Some(2),
+        "'제3조[참조]' ASCII bracket-open after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_ascii_bracket_close_treated_as_heading() {
+    // Closer symmetry: ']' is also in the allowlist. Orphaned close-bracket at boundary.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조]참조"),
+        Some(2),
+        "'제3조]참조' ASCII bracket-close after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_fullwidth_paren_open_treated_as_heading() {
+    // "제3조（참조）": '（' (U+FF08) fullwidth open paren is in the allowlist → Some(2).
+    assert_eq!(
+        detect_korean_regulation_heading("제3조（참조）"),
+        Some(2),
+        "'제3조（참조）' fullwidth paren-open after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_fullwidth_paren_close_treated_as_heading() {
+    // Closer symmetry: '）' (U+FF09) is also in the allowlist. Orphaned close.
+    assert_eq!(
+        detect_korean_regulation_heading("제3조）참조"),
+        Some(2),
+        "'제3조）참조' fullwidth paren-close after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_tilde_treated_as_heading() {
+    // "제3조~제5조": '~' is in the terminator allowlist (range notation) → Some(2).
+    assert_eq!(
+        detect_korean_regulation_heading("제3조~제5조"),
+        Some(2),
+        "'제3조~제5조' tilde range after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_middle_dot_treated_as_heading() {
+    // "제3조·제5조": '·' (U+00B7 middle dot) is in the allowlist → Some(2).
+    assert_eq!(
+        detect_korean_regulation_heading("제3조·제5조"),
+        Some(2),
+        "'제3조·제5조' middle-dot separator after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_korean_middle_dot_treated_as_heading() {
+    // "제3조ㆍ제5조": 'ㆍ' (U+318D Korean middle dot) is in the allowlist → Some(2).
+    assert_eq!(
+        detect_korean_regulation_heading("제3조ㆍ제5조"),
+        Some(2),
+        "'제3조ㆍ제5조' Korean middle-dot separator after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_ellipsis_treated_as_heading() {
+    // "제3조…": '…' (U+2026) is in the allowlist → Some(2).
+    assert_eq!(
+        detect_korean_regulation_heading("제3조…"),
+        Some(2),
+        "'제3조…' ellipsis after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_fullwidth_colon_treated_as_heading() {
+    // "제3조：참조": '：' (U+FF1A fullwidth colon) is in the allowlist → Some(2).
+    assert_eq!(
+        detect_korean_regulation_heading("제3조：참조"),
+        Some(2),
+        "'제3조：참조' fullwidth colon after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_fullwidth_period_treated_as_heading() {
+    // "제3조．": '．' (U+FF0E fullwidth period) is in the allowlist → Some(2).
+    assert_eq!(
+        detect_korean_regulation_heading("제3조．"),
+        Some(2),
+        "'제3조．' fullwidth period after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_fullwidth_semicolon_treated_as_heading() {
+    // "제3조；참조": '；' (U+FF1B fullwidth semicolon) is in the allowlist → Some(2).
+    assert_eq!(
+        detect_korean_regulation_heading("제3조；참조"),
+        Some(2),
+        "'제3조；참조' fullwidth semicolon after 조 should yield Some(2)"
+    );
+}
+
+#[test]
+fn detect_korean_regulation_heading_fullwidth_comma_treated_as_heading() {
+    // "제3조，제5조": '，' (U+FF0C fullwidth comma) is in the allowlist → Some(2).
+    assert_eq!(
+        detect_korean_regulation_heading("제3조，제5조"),
+        Some(2),
+        "'제3조，제5조' fullwidth comma after 조 should yield Some(2)"
     );
 }
 
