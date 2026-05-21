@@ -481,7 +481,7 @@ fn is_heading_terminator_blocked_set() {
     assert!(!is_heading_terminator('"'), "double quote");
     // ASCII semicolon ';' is NOT in the allowlist — only the fullwidth variant '；' is.
     // This guards against accidentally promoting ASCII ';' to terminator status.
-    assert!(!is_heading_terminator(';'), "ASCII semicolon (fullwidth ；ↄis allowed, ASCII ';' is not)");
+    assert!(!is_heading_terminator(';'), "ASCII semicolon (fullwidth ； is allowed, ASCII ';' is not)");
 }
 
 #[test]
@@ -737,7 +737,7 @@ fn detect_korean_regulation_heading_ascii_comma_treated_as_heading() {
 #[test]
 fn detect_korean_regulation_heading_ascii_paren_close_treated_as_heading() {
     // "제3조)참조": ')' is in the allowlist. Orphaned close-paren at the suffix boundary.
-    // Complements the implicit open-paren coverage in tier4_integration ("제1장(총칙)").
+    // Complements the open-paren coverage in terminator_chars_still_match ("제1장(총칙)").
     assert_eq!(
         detect_korean_regulation_heading("제3조)참조"),
         Some(2),
