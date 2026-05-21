@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 56 완료 (suffix 경계 검사 + PARA_HEADER style_id 수정)
+## 현재 상태: v0.5.0 Sprint 57 완료 (style_id u8 축소 + is_heading_terminator 테스트)
 
 ### 완료
 
@@ -329,6 +329,30 @@ model.rs doc comment 수정: bytes[6-7] → byte[6] (UINT8).
 **Commits**: `298df1f` (feat), `3122eca` (follow-up)
 
 **검증**: 1204 tests (0 ignored), 0 failures. Clippy 0 warnings.
+
+### 2026-05-21 — v0.5.0 Sprint 57: style_id u8 축소 + is_heading_terminator 정책 테스트
+
+**P2: `style_id` 필드 타입 `u16` → `u8`** (`src/hwp/model.rs`, `src/hwp/control/dispatcher.rs`):
+
+HWP 5.0 스펙 §3.2.1: nStyleID는 UINT8(0-255 범위). Sprint 56 리뷰 M1 권고.
+- `HwpParagraph.style_id`: `u16` → `u8` (doc comment도 `byte[6] (UINT8 nStyleID)`로 수정)
+- `dispatcher.rs`: `u16::from(rec.data[6])` → `rec.data[6]` (직접 u8 읽기)
+- 모든 호출 지점은 즉시 `usize`로 캐스팅 — breaking change 없음
+
+**P3: `is_heading_terminator` 정책 테스트** (`src/hwp/convert_tests_detect.rs`):
+
+Sprint 56 리뷰 L2 권고: 함수의 허용/차단 정책을 명시적으로 고정.
+- `is_heading_terminator_canonical_allowed_set`: 공백/탭/괄호 ASCII+fullwidth/CJK/구두점 (`·` `ㆍ` `…`) 등 대표값 검증
+- `is_heading_terminator_blocked_set`: 한국어 조사(은/에/이/가/의) + ASCII 알파벳/숫자 차단 확인
+
+**Commit**: `224d2d4`
+
+**검증**: 1206 tests (0 ignored), 0 failures. Clippy 0 warnings.
+
+**리뷰 (code-reviewer opus)**: APPROVE. CRITICAL/HIGH/MEDIUM 없음. LOW 2건:
+- LOW-1: `is_heading_terminator` 차단 집합에 `%`, `&`, `/`, `"` 미포함 (비한국어 구두점)
+- LOW-2: 허용 집합에 `[`, `]`, `：`, `．`, `；` 대표값 누락
+리뷰 전문: `~/.claude/references/2026-05-21_sprint57_style_id_narrowing_terminator_tests_review.md`
 
 ---
 
