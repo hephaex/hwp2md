@@ -201,13 +201,13 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 63 로드맵
+## Sprint 64 로드맵
 
-Sprint 62 완료 (2026-05-22). 다음 스프린트 우선순위:
+Sprint 63 완료 (2026-05-22). 다음 스프린트 우선순위:
 
-- **P1**: 편(part, 장보다 상위) 감지 — 대형 법전(민법, 형법)에 필요. 필요 픽스처: `tests/fixtures/real/` 아래 편-포함 HWP 파일 (민법/형법/상법 등). 편 추가 시 장→H2, 절/조→H3 shift 필요 (황금 파일 모두 재생성 필요). **BLOCKER: 픽스처 없음.**
-- **P2**: `〈〉` behavioral 테스트 — open/close 모두 (Sprint 62 리뷰 gap matrix). 단일 각괄호.
-- **P3**: `《》` closer + `<>` behavioral 테스트 — `《》` opener(Sprint 60)는 테스트 있으나 closer 없음; `<>` 양쪽 모두 behavioral 미테스트 (Sprint 62 리뷰 gap matrix).
+- **P1**: 편(part, 장보다 상위) 감지 — 대형 법전(민법, 형법)에 필요. **BLOCKER: 픽스처 없음.** (편 추가 시 장→H2, 절/조→H3 shift + 황금 파일 전체 재생성 필요)
+- **P2**: `[]` + `（）` behavioral 쌍 추가 (bracket matrix 완성) — `cjk_title_bracket_treated_as_heading` → `cjk_double_angle_open_treated_as_heading` 이름 변경 포함
+- **P3**: `<`/`>` 를 `is_heading_terminator_canonical_allowed_set` 단위 테스트에 추가; 구두점 behavioral 커버리지 (`~` `·` `ㆍ` `；` `…` `．` `，` `：`) 보강
 - **P4**: 기사 제목 vs 기사 본문 분리 — 현재 100자 상한은 합리적 근사치; 실제 반례 발생 시 재검토.
 
 ## 라이선스

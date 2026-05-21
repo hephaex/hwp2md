@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 62 완료 (「」 behavioral + assertion 메시지 nit 수정)
+## 현재 상태: v0.5.0 Sprint 63 완료 (〈〉/《》/⟨⟩ terminator-pair behavioral gap fill)
 
 ### 완료
 
@@ -452,6 +452,27 @@ Sprint 61 리뷰 제안 해결. 구현 변경 없음.
 - 메시지 경미한 형식 불일치 (491/501 "heading level" 표현 vs 511+ 생략)
 - Sprint 63 P3: 잔여 terminator-pair gap — `《》` closer + `〈〉` open/close + `<>` open/close
 리뷰 전문: `~/.claude/references/2026-05-22_sprint62_single_guillemet_behavioral_tests_review.md`
+
+### 2026-05-22 — v0.5.0 Sprint 63: 〈〉/《》/<> terminator-pair behavioral gap fill
+
+**S63-P2/P3: 〈〉/《》/<> 행동 테스트 추가** (`src/hwp/convert_tests_detect.rs`):
+
+Sprint 62 리뷰 gap matrix 해결. 구현 변경 없음.
+
+- `"제3조〈참조〉"` → `Some(2)` (CJK 단일 각괄호 열림)
+- `"제3조〉참조"` → `Some(2)` (CJK 단일 각괄호 닫힘)
+- `"제3조》참조"` → `Some(2)` (CJK 이중 각괄호 닫힘; 열림은 Sprint 60에서 완료)
+- `"제3조<참조>"` → `Some(2)` (ASCII 각괄호 열림)
+- `"제3조>참조"` → `Some(2)` (ASCII 각괄호 닫힘)
+
+**Commit**: `ad36ee4`
+
+**검증**: 1218 tests (0 ignored), 0 failures. Clippy 0 warnings.
+
+**리뷰 (code-reviewer opus)**: APPROVE. CRITICAL/HIGH/MEDIUM 없음. LOW 1건:
+- LOW: 커밋 제목에 `⟨⟩` (U+27E8/U+27E9) 오타 — 실제 추가된 것은 `〈〉` (U+3008/U+3009)
+Sprint 64 제안: `[]` + `（）` behavioral 쌍 (bracket matrix 완성), `cjk_title_bracket` 이름 변경, `<`/`>` 단위 허용 집합 테스트 추가.
+리뷰 전문: `~/.claude/references/2026-05-22_sprint63_terminator_pair_behavioral_gap_fill_review.md`
 
 ---
 
