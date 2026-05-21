@@ -323,8 +323,9 @@ fn detect_korean_regulation_heading_jeol_returns_h2() {
 }
 
 #[test]
-fn detect_korean_regulation_heading_jo_returns_h3() {
-    assert_eq!(detect_korean_regulation_heading("제12조"), Some(3));
+fn detect_korean_regulation_heading_jo_returns_h2() {
+    // 조 maps to H2 (same as 절) to avoid orphan H3 in documents without 절.
+    assert_eq!(detect_korean_regulation_heading("제12조"), Some(2));
 }
 
 #[test]
@@ -335,6 +336,19 @@ fn detect_korean_regulation_heading_no_digits_returns_none() {
 #[test]
 fn detect_korean_regulation_heading_wrong_suffix_returns_none() {
     assert_eq!(detect_korean_regulation_heading("제3과"), None);
+}
+
+#[test]
+fn detect_korean_regulation_heading_leading_whitespace_not_matched() {
+    // A paragraph with leading whitespace is NOT a chapter marker.
+    // trim_start is intentionally absent to prevent mis-promoting indented citations.
+    assert_eq!(detect_korean_regulation_heading(" 제1장 총칙"), None);
+}
+
+#[test]
+fn detect_korean_regulation_heading_amendment_notation_jo_ui_n() {
+    // "제N조의M" (amendment sub-articles) should match 조 → H2.
+    assert_eq!(detect_korean_regulation_heading("제5조의2 특례"), Some(2));
 }
 
 #[test]
