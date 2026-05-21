@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 55 완료 (trim_start 복원 + 100자 상한 + 황금 파일 재생성)
+## 현재 상태: v0.5.0 Sprint 56 완료 (suffix 경계 검사 + PARA_HEADER style_id 수정)
 
 ### 완료
 
@@ -304,6 +304,31 @@ code-reviewer(opus) 리뷰 주요 지적:
 **Commits**: `24cc39b` (feat), `2daa7a7` (follow-up)
 
 **검증**: 1199 tests (0 ignored), 0 failures. Clippy 0 warnings.
+
+### 2026-05-21 — v0.5.0 Sprint 56: suffix 경계 검사 + PARA_HEADER style_id 수정
+
+**S56-01: suffix 경계 검사** (`src/hwp/convert.rs`):
+
+`detect_korean_regulation_heading`에 suffix 뒤 문자 검사 추가.
+- `is_heading_terminator(c)` 헬퍼: 공백/괄호/구두점 → true
+- 장/절/조 직후 문자가 한국어 조사(은/에서/의+비숫자)이면 → None
+- 개정 표기 예외: `제5조의2` (의 + ASCII 숫자) → Some(2)
+- fullwidth 괄호 `（/）` + CJK 닫힘 괄호 추가 (review H1)
+- amendment 엣지케이스 테스트 추가 (EOL/공백/한국어 숫자/다자리)
+- 황금 파일 변화 없음 — 기존 moel 문서에 단락 시작 조사 없음
+
+**S56-02: PARA_HEADER nStyleID 파싱 수정** (`src/hwp/control/dispatcher.rs`):
+
+HWP 5.0 스펙: nStyleID는 byte[6]의 UINT8; byte[7]은 플래그.
+기존 코드: `u16::from_le_bytes([data[6], data[7]])` → 플래그 비트가 style_id를 오염.
+예: style_id=0, flags=0x80 → 구코드 0x80_00=32768 → styles[] OOB → tier-2 누락.
+수정: `u16::from(data[6])` (1 바이트만 읽음), 가드 `>= 8` → `>= 7`.
+회귀 테스트 3건: flags=0xFF/flags=0x80/short-data 경계.
+model.rs doc comment 수정: bytes[6-7] → byte[6] (UINT8).
+
+**Commits**: `298df1f` (feat), `3122eca` (follow-up)
+
+**검증**: 1204 tests (0 ignored), 0 failures. Clippy 0 warnings.
 
 ---
 
