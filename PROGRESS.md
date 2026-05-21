@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 61 완료 (『』 behavioral + dash-then-particle regression pin)
+## 현재 상태: v0.5.0 Sprint 62 완료 (「」 behavioral + assertion 메시지 nit 수정)
 
 ### 완료
 
@@ -433,6 +433,25 @@ Sprint 60 리뷰 S2/S3 해결. 구현 변경 없음 — 테스트만 추가.
 - nit: assertion 메시지에 입력 문자열 포함 권고
 - Sprint 62 P2: `「」` behavioral test (「=」 쌍과 대칭; 『』와 함께 가장 흔한 한국어 인용 부호)
 리뷰 전문: `~/.claude/references/2026-05-22_sprint61_guillemet_behavioral_regression_tests_review.md`
+
+### 2026-05-22 — v0.5.0 Sprint 62: 「」 behavioral + assertion 메시지 nit 수정
+
+**S62-P2/P3: 「」 행동 테스트 + assertion 메시지 개선** (`src/hwp/convert_tests_detect.rs`):
+
+Sprint 61 리뷰 제안 해결. 구현 변경 없음.
+
+- `"제3조「참조」"` → `Some(2)` (open guillemet 대칭)
+- `"제3조」참조"` → `Some(2)` (close guillemet 대칭)
+- 기존 5개 behavioral 테스트 assertion 메시지에 입력 문자열 포함 (CI 자기 문서화)
+
+**Commit**: `e8d0aff`
+
+**검증**: 1213 tests (0 ignored), 0 failures. Clippy 0 warnings.
+
+**리뷰 (code-reviewer opus)**: APPROVE. CRITICAL/HIGH/MEDIUM 없음. 제안 2건:
+- 메시지 경미한 형식 불일치 (491/501 "heading level" 표현 vs 511+ 생략)
+- Sprint 63 P3: 잔여 terminator-pair gap — `《》` closer + `〈〉` open/close + `<>` open/close
+리뷰 전문: `~/.claude/references/2026-05-22_sprint62_single_guillemet_behavioral_tests_review.md`
 
 ---
 
