@@ -350,6 +350,14 @@ fn detect_korean_regulation_heading_leading_whitespace_matched() {
 fn detect_korean_regulation_heading_amendment_notation_jo_ui_n() {
     // "제N조의M" (amendment sub-articles) should match 조 → H2.
     assert_eq!(detect_korean_regulation_heading("제5조의2 특례"), Some(2));
+    // Multi-digit amendment number.
+    assert_eq!(detect_korean_regulation_heading("제5조의10 특례"), Some(2));
+    // "의" with no following character (EOL) — not a valid amendment form → None.
+    assert_eq!(detect_korean_regulation_heading("제5조의"), None);
+    // "의" + space + digit (non-canonical form) → None.
+    assert_eq!(detect_korean_regulation_heading("제5조의 2"), None);
+    // "의" + Korean digit character (not ASCII) → None.
+    assert_eq!(detect_korean_regulation_heading("제5조의일"), None);
 }
 
 #[test]

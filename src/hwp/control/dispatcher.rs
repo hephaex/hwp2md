@@ -405,4 +405,28 @@ mod tests {
         assert_eq!(paras[0].para_shape_id, 1);
         assert_eq!(paras[0].style_id, 3, "flags byte must not contaminate style_id");
     }
+
+    #[test]
+    fn para_header_style_id_zero_with_heading_flag_set() {
+        // Motivating bug: nStyleID=0 (Normal), heading flag = 0x80.
+        // Old code: u16 read → 0x80_00 = 32768 → styles[32768] OOB → tier-2 skipped.
+        // New code: 0 → styles[0] = "Normal" → correct.
+        let mut ph_data = vec![0u8; 8];
+        ph_data[6] = 0; // Normal style
+        ph_data[7] = 0x80; // heading/numbering flag bit
+
+        let records = vec![make_record_with_data_plain(HWPTAG_PARA_HEADER, 2, ph_data)];
+        let paras = extract_paragraphs_from_range(&records, 0, records.len());
+        assert_eq!(paras[0].style_id, 0, "heading flag must not corrupt style_id");
+    }
+
+    #[test]
+    fn para_header_short_data_does_not_panic() {
+        // rec.data.len() == 6: para_shape_id present, no style byte → style_id = 0.
+        let ph_data = vec![0u8; 6];
+        let records = vec![make_record_with_data_plain(HWPTAG_PARA_HEADER, 2, ph_data)];
+        let paras = extract_paragraphs_from_range(&records, 0, records.len());
+        assert_eq!(paras.len(), 1);
+        assert_eq!(paras[0].style_id, 0);
+    }
 }

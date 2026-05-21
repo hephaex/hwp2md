@@ -575,7 +575,16 @@ fn is_heading_terminator(c: char) -> bool {
     c.is_whitespace()
         || matches!(
             c,
-            '(' | '[' | '「' | '『' | '<' | '《' | ':' | '.' | ',' | '-' | '~' | '·' | 'ㆍ'
+            // ASCII openers / closers
+            '(' | ')' | '[' | ']'
+            // CJK openers
+            | '「' | '『' | '<' | '《' | '〈'
+            // CJK closers (symmetric — "제3조」" in citations is not a heading-start)
+            | '」' | '』' | '>' | '》' | '〉'
+            // Fullwidth parens (common in older Korean OCR documents)
+            | '（' | '）'
+            // Punctuation
+            | ':' | '：' | '.' | '．' | ',' | '，' | '-' | '~' | '·' | 'ㆍ' | '；' | '…'
         )
 }
 
