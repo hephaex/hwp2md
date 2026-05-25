@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 69 완료 (편(Part) detection + heading_style 모듈 추출)
+## 현재 상태: v0.5.0 Sprint 70 완료 (effective_heading_level 헬퍼 추출 + 통합 테스트 정확도 강화)
 
 ### 완료
 
@@ -635,6 +635,50 @@ Sprint 67 리뷰 선택적 항목 구현. 구현 변경 없음 — 테스트만 
 - M1: 설계 근거 독스트링 소실 → 복원
 - M2: is_heading 의미론 변경 미문서화 → 주석 추가
 리뷰 전문: `~/.claude/references/2026-05-22_sprint69_pyeon_detection_heading_style_extraction_review.md`
+
+### 2026-05-26 — v0.5.0 Sprint 70: effective_heading_level 헬퍼 추출 + 통합 테스트 정확도 강화
+
+**S70-01: `effective_heading_level` 헬퍼 추출** (`src/hwpx/context/flush.rs`):
+
+Sprint 69 리뷰 L4 권고 해결. `flush_paragraph`(#[cfg(test)]) 와 `flush_paragraph_staged` 두 HWPX 경로에 인라인 중복된 tier-4 level 결정 로직을 단일 헬퍼로 추출:
+
+```rust
+fn effective_heading_level(style_level: Option<u8>, inlines: &[Inline]) -> Option<u8> {
+    style_level.or_else(|| {
+        let combined: String = inlines.iter().map(|i| i.text.as_str()).collect();
+        detect_korean_regulation_heading(&combined)
+    })
+}
+```
+
+- 서명 `(Option<u8>, &[Inline]) -> Option<u8>` — ParseContext 미참조, 독립 테스트 가능
+- `or_else` lazy semantics 보존 (style_level이 Some이면 String 미생성)
+- 두 경로가 동일 헬퍼를 호출하므로 tier-4 로직 변경 시 한 쪽만 업데이트되는 리스크 제거
+- `Inline` 타입 import 추가
+
+**S70-02: `pyeon_heading_text_preserved` 통합 테스트 정확도 강화** (`tests/integration.rs`):
+
+Sprint 69 L2 권고 해결. `.any()` 기반 느슨한 검사 → `.find()` + `assert_eq!` 정확한 텍스트 단언:
+
+```rust
+let heading = doc.sections.iter().flat_map(|s| &s.blocks)
+    .find(|b| matches!(b, ir::Block::Heading { level: 1, .. }));
+assert!(heading.is_some(), "expected an H1 heading block; none found");
+let ir::Block::Heading { inlines, .. } = heading.unwrap() else { unreachable!() };
+let text: String = inlines.iter().map(|i| i.text.as_str()).collect();
+assert_eq!(text, "제3편 채권", "heading text mismatch: got {:?}", text);
+```
+
+텍스트 오염(공백 누출, 추가 문자), inline 분리 회귀까지 탐지 가능.
+
+**Commit**: `7dc621e`
+
+**검증**: 1240 lib tests + 31 integration tests (0 ignored), 0 failures. Clippy -D warnings 0 경고.
+
+**리뷰 (code-reviewer opus)**: APPROVE. CRITICAL/HIGH/MEDIUM 없음. LOW 2건:
+- LOW-1: Docstring "lockstep" 범위가 list-staging 분기를 포함하는 것처럼 과잉 표현 — level 결정만 공유됨을 명시 권고
+- LOW-2: String 할당이 헬퍼 내부로 숨어 `or(...)` vs `or_else(...)` 함정 가능 — 기존 lazy semantics 유지됨
+리뷰 전문: `~/.claude/references/2026-05-26_sprint70_effective_heading_level_helper_review.md`
 
 ---
 
