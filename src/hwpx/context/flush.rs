@@ -1,5 +1,5 @@
 use crate::hwp::heading_style::detect_korean_regulation_heading;
-use crate::ir::{self, InlineFormat};
+use crate::ir::{self, Inline, InlineFormat};
 
 use super::state::FormattingState;
 use super::ParseContext;
@@ -12,6 +12,19 @@ fn parse_bool_preserve(val: &str, current: bool) -> bool {
         "false" | "0" => false,
         _ => current,
     }
+}
+
+/// Resolves the effective heading level for a paragraph's inline content.
+///
+/// Returns `style_level` when a tier-1/2/3 signal was already resolved, or
+/// falls back to tier-4 text-pattern detection via
+/// `detect_korean_regulation_heading`.  Both `flush_paragraph` and
+/// `flush_paragraph_staged` use this helper so the two paths stay in lockstep.
+fn effective_heading_level(style_level: Option<u8>, inlines: &[Inline]) -> Option<u8> {
+    style_level.or_else(|| {
+        let combined: String = inlines.iter().map(|i| i.text.as_str()).collect();
+        detect_korean_regulation_heading(&combined)
+    })
 }
 
 /// Parse `bold`, `italic`, `underline`, `strikeout`, and font-face attributes
@@ -114,10 +127,7 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
         return;
     }
 
-    let effective_level = ctx.heading_level.or_else(|| {
-        let combined: String = inlines.iter().map(|i| i.text.as_str()).collect();
-        detect_korean_regulation_heading(&combined)
-    });
+    let effective_level = effective_heading_level(ctx.heading_level, &inlines);
 
     let block = if let Some(level) = effective_level {
         ir::Block::Heading { level, inlines }
@@ -150,14 +160,7 @@ pub(crate) fn flush_paragraph_staged(ctx: &mut ParseContext) -> Option<StagedBlo
         return Some(StagedBlock::Plain(ir::Block::CodeBlock { language, code }));
     }
 
-    // Tier-1/2/3: style-based heading level from styleIDRef attribute.
-    // Tier-4: text-pattern detection (제N편/장/절/조) fires when all
-    // format-based signals are absent, matching the HWP binary reader's
-    // behaviour for regulation documents.
-    let effective_level = ctx.heading_level.or_else(|| {
-        let combined: String = inlines.iter().map(|i| i.text.as_str()).collect();
-        detect_korean_regulation_heading(&combined)
-    });
+    let effective_level = effective_heading_level(ctx.heading_level, &inlines);
 
     let block = if let Some(level) = effective_level {
         ir::Block::Heading { level, inlines }

@@ -605,12 +605,21 @@ fn pyeon_heading_text_preserved() {
     };
     let doc = hwpx::read_hwpx(&path).expect("read_hwpx failed");
 
-    let found = doc.sections.iter().flat_map(|s| &s.blocks).any(|b| {
-        matches!(b, ir::Block::Heading { level: 1, inlines }
-            if inlines.iter().any(|i| i.text.contains("제3편 채권")))
-    });
+    let heading = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::Heading { level: 1, .. }));
 
-    assert!(found, "제3편 채권 heading with text not found in IR");
+    assert!(
+        heading.is_some(),
+        "expected an H1 heading block; none found"
+    );
+    let ir::Block::Heading { inlines, .. } = heading.unwrap() else {
+        unreachable!()
+    };
+    let text: String = inlines.iter().map(|i| i.text.as_str()).collect();
+    assert_eq!(text, "제3편 채권", "heading text mismatch: got {:?}", text);
 }
 
 /// 편 → H1 renders as `# 제N편 …` in Markdown output.
