@@ -115,6 +115,35 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
     inlines.into_iter().map(|i| i.text).collect()
 }
 
+/// Build a paragraph-level [`ir::Block`] from its components.
+///
+/// `code_lang` mirrors [`ParseContext::pending_code_lang`]: the outer `Option` signals
+/// "this paragraph is a code block", the inner `Option<String>` is the language hint
+/// (matching `ir::Block::CodeBlock::language`).  When present the inlines are concatenated
+/// into a [`ir::Block::CodeBlock`].  Otherwise [`effective_heading_level`] decides between
+/// [`ir::Block::Heading`] and [`ir::Block::Paragraph`].
+///
+/// Both `flush_paragraph` and `flush_paragraph_staged` delegate here so CodeBlock / Heading /
+/// Paragraph construction stays in one place.
+fn build_block(
+    inlines: Vec<ir::Inline>,
+    code_lang: Option<Option<String>>,
+    heading_level: Option<u8>,
+) -> ir::Block {
+    if let Some(language) = code_lang {
+        return ir::Block::CodeBlock {
+            language,
+            code: collect_inline_text(inlines),
+        };
+    }
+    let effective_level = effective_heading_level(heading_level, &inlines);
+    if let Some(level) = effective_level {
+        ir::Block::Heading { level, inlines }
+    } else {
+        ir::Block::Paragraph { inlines }
+    }
+}
+
 /// Flush any pending paragraph inlines to `section.blocks` (test-only).
 #[cfg(test)]
 pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section) {
@@ -130,21 +159,7 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
     }
 
     let inlines = std::mem::take(&mut ctx.current_inlines);
-
-    if let Some(language) = code_lang {
-        let code = collect_inline_text(inlines);
-        section.blocks.push(ir::Block::CodeBlock { language, code });
-        return;
-    }
-
-    let effective_level = effective_heading_level(ctx.heading_level, &inlines);
-
-    let block = if let Some(level) = effective_level {
-        ir::Block::Heading { level, inlines }
-    } else {
-        ir::Block::Paragraph { inlines }
-    };
-    section.blocks.push(block);
+    section.blocks.push(build_block(inlines, code_lang, ctx.heading_level));
 }
 
 /// Variant of `flush_paragraph` used during OWPML flat-paragraph list
@@ -164,32 +179,20 @@ pub(crate) fn flush_paragraph_staged(ctx: &mut ParseContext) -> Option<StagedBlo
     }
 
     let inlines = std::mem::take(&mut ctx.current_inlines);
+    let block = build_block(inlines, code_lang, ctx.heading_level);
 
-    if let Some(language) = code_lang {
-        let code = collect_inline_text(inlines);
-        return Some(StagedBlock::Plain(ir::Block::CodeBlock { language, code }));
-    }
-
-    let effective_level = effective_heading_level(ctx.heading_level, &inlines);
-
-    let block = if let Some(level) = effective_level {
-        ir::Block::Heading { level, inlines }
-    } else {
-        ir::Block::Paragraph { inlines }
-    };
-
-    // Heading wins over list-indent: a tier-4 regulation heading (e.g. "제1편 총칙")
-    // must not be re-staged as a ListPara even if paraPrIDRef looks list-like.
-    let is_heading = effective_level.is_some();
-    let list_depth: Option<u32> = if is_heading {
-        None
-    } else {
+    // Only Paragraph blocks are list-stageable: Heading and CodeBlock are always Plain.
+    // A tier-4 regulation heading (e.g. "제1편 총칙") must not be re-staged as a ListPara
+    // even if paraPrIDRef looks list-like; likewise a CodeBlock is never a list item.
+    let list_depth: Option<u32> = if matches!(block, ir::Block::Paragraph { .. }) {
         match para_pr_id.as_deref() {
             Some("2") => Some(0),
             Some("3") => Some(1),
             Some(s) if s.parse::<u32>().ok().is_some_and(|n| n >= 4) => Some(1),
             _ => None,
         }
+    } else {
+        None
     };
 
     Some(if let Some(depth) = list_depth {
