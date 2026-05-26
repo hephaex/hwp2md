@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 71 완료 (flush.rs docstring 정확화 + collect_inline_text 헬퍼)
+## 현재 상태: v0.5.0 Sprint 72 완료 (build_block 헬퍼 추출 + list-staging 정밀화)
 
 ### 완료
 
@@ -709,6 +709,43 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+### 2026-05-26 — v0.5.0 Sprint 72: build_block 헬퍼 추출 + list-staging 정밀화
+
+**S72-01: `build_block` 헬퍼 추출** (`src/hwpx/context/flush.rs`):
+
+Sprint 71 로드맵 P2 해결. `flush_paragraph`와 `flush_paragraph_staged`의 CodeBlock/Heading/Paragraph 생성 로직 통합:
+
+```rust
+fn build_block(
+    inlines: Vec<ir::Inline>,
+    code_lang: Option<Option<String>>,  // 외부: is-code-block, 내부: language hint
+    heading_level: Option<u8>,
+) -> ir::Block
+```
+
+- `code_lang: Option<Option<String>>` — `pending_code_lang` 타입과 일치; 내부 Option<String>이 `ir::Block::CodeBlock::language`로 직접 전달
+- `collect_inline_text` 재사용 (Sprint 71 헬퍼)
+- `flush_paragraph` 14줄 → 2줄 간소화
+
+**list-staging 조건 정밀화** (`flush_paragraph_staged`):
+- `is_heading = effective_level.is_some()` → `matches!(block, ir::Block::Paragraph { .. })`
+- 더 정밀: CodeBlock도 명시적으로 list-staging 제외
+- 이전 early-return에 의존하던 암묵적 보호 → 명시적 조건
+
+**S72 follow-up: CodeBlock list-staging regression guard** (`src/hwpx/reader_tests_charpr.rs`):
+
+Sprint 72 리뷰 LOW 권고 즉시 해결.
+- `flush_paragraph_staged_code_block_with_list_para_pr_id_is_plain`: `pending_code_lang=Some(None)` + `para_pr_id="2"` → `StagedBlock::Plain(CodeBlock)` 단언
+- `matches!` 조건이 미래 변형 추가 시 침묵 실패하지 않도록 고정
+
+**Commits**: `d696a4b` (refactor) + `ab81446` (follow-up)
+
+**검증**: 1241 lib tests + 31 integration tests (0 ignored), 0 failures. Clippy -D warnings 0 경고.
+
+**리뷰 (code-reviewer opus)**: APPROVE. CRITICAL/HIGH/MEDIUM 없음. LOW 1건 (follow-up에서 해결):
+- LOW: `matches!` 조건 미래 변형 대비 regression guard 테스트 추가 권고 → 즉시 구현
+리뷰 전문: `~/.claude/references/2026-05-26_sprint72_build_block_helper_list_staging_precision_review.md`
 
 ---
 
