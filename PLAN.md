@@ -201,13 +201,13 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 71 로드맵
+## Sprint 72 로드맵
 
-Sprint 70 완료 (2026-05-26). effective_heading_level 헬퍼 추출 + 통합 테스트 정확도 강화. 다음 스프린트 우선순위:
+Sprint 71 완료 (2026-05-26). flush.rs docstring 정확화 + collect_inline_text 헬퍼 추출. 다음 스프린트 우선순위:
 
 - **P1**: 관(subsection, 절과 조 사이) 감지 — 실제 픽스처 없음; 일반 명사 '관'과 충돌 위험. **대형 법령 픽스처 확보 시 검토.** (계속 BLOCKER)
-- **P2**: `flush.rs` docstring LOW-1 수정 — "lockstep" 범위 명확화 (level-resolution만 공유, list-staging 분기 제외 명시); `or_else` lazy 의미론 note 추가. (optional, 다음 touch 시)
-- **P3**: `inlines_to_string(&[Inline]) -> String` 헬퍼 추출 — flush.rs 내 3곳 반복 패턴 통합. (optional, 미래 sprint)
+- **P2**: `flush_paragraph` / `flush_paragraph_staged` 추가 통합 — 두 경로의 CodeBlock/Heading/Paragraph 처리가 여전히 중복. `flush_active_paragraph_scope`로 더 통합 가능하나 설계 논의 필요.
+- **P3**: HWP binary reader의 `collect_inline_text` 동등 패턴 확인 — HWPX와 유사한 inlines-to-string 패턴이 HWP 경로에도 있는지 조사.
 - **P4**: 기사 제목 vs 기사 본문 분리 — 현재 100자 상한은 합리적 근사치; 실제 반례 발생 시 재검토.
 
 ## 라이선스

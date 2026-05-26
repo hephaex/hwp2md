@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 70 완료 (effective_heading_level 헬퍼 추출 + 통합 테스트 정확도 강화)
+## 현재 상태: v0.5.0 Sprint 71 완료 (flush.rs docstring 정확화 + collect_inline_text 헬퍼)
 
 ### 완료
 
@@ -679,6 +679,36 @@ assert_eq!(text, "제3편 채권", "heading text mismatch: got {:?}", text);
 - LOW-1: Docstring "lockstep" 범위가 list-staging 분기를 포함하는 것처럼 과잉 표현 — level 결정만 공유됨을 명시 권고
 - LOW-2: String 할당이 헬퍼 내부로 숨어 `or(...)` vs `or_else(...)` 함정 가능 — 기존 lazy semantics 유지됨
 리뷰 전문: `~/.claude/references/2026-05-26_sprint70_effective_heading_level_helper_review.md`
+
+### 2026-05-26 — v0.5.0 Sprint 71: flush.rs docstring 정확화 + collect_inline_text 헬퍼
+
+**S71-01: `effective_heading_level` docstring 수정** (`src/hwpx/context/flush.rs`):
+
+Sprint 70 리뷰 LOW-1/LOW-2 해결.
+
+- "stay in lockstep" → "**level-resolution rule** stays in lockstep" — list-staging 가드는 `flush_paragraph_staged`에만 존재함을 명시
+- `or_else` lazy semantics note 추가 — `style_level`이 `Some`이면 String 미생성
+
+**S71-02: `collect_inline_text` 헬퍼 추출** (`src/hwpx/context/flush.rs`):
+
+Sprint 70 리뷰 P3(inlines_to_string) 해결.
+
+```rust
+fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
+    inlines.into_iter().map(|i| i.text).collect()
+}
+```
+
+`flush_paragraph`(line 130)과 `flush_paragraph_staged`(line 164)의 동일한 CodeBlock 텍스트 추출 패턴 대체. by-value 소비, turbofish 제거 (반환 타입 추론), clone 없음.
+
+**Commit**: `da8fb2e`
+
+**검증**: 1240 lib tests + 31 integration tests (0 ignored), 0 failures. Clippy -D warnings 0 경고.
+
+**리뷰 (code-reviewer opus)**: APPROVE. CRITICAL/HIGH/MEDIUM 없음. 제안 2건 (비차단):
+- S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
+- S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
+리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
 
 ---
 
