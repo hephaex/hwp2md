@@ -531,3 +531,35 @@ fn apply_charpr_attrs_bold_numeric_one_sets_true() {
         "bold=\"1\" must set bold to true"
     );
 }
+
+// -----------------------------------------------------------------------
+// flush_paragraph_staged — list-staging gate
+// -----------------------------------------------------------------------
+
+#[test]
+fn flush_paragraph_staged_code_block_with_list_para_pr_id_is_plain() {
+    // Regression guard for build_block extraction (Sprint 72): a CodeBlock must never be
+    // wrapped in StagedBlock::ListPara even when paraPrIDRef="2" would normally trigger
+    // list-staging for a Paragraph.
+    let mut ctx = super::context::ParseContext {
+        in_paragraph: true,
+        current_text: "fn main() {}".to_string(),
+        pending_code_lang: Some(None), // outer Some = code block; inner None = no language
+        current_para_pr_id: Some("2".to_string()), // would trigger depth-0 list for a Paragraph
+        ..Default::default()
+    };
+
+    let result = super::context::flush_paragraph_staged(&mut ctx);
+
+    assert!(result.is_some(), "flush_paragraph_staged must return Some for non-empty inlines");
+    match result.unwrap() {
+        super::context::StagedBlock::Plain(crate::ir::Block::CodeBlock { code, .. }) => {
+            assert_eq!(code, "fn main() {}", "code block text mismatch: {:?}", code);
+        }
+        other => panic!(
+            "expected StagedBlock::Plain(CodeBlock), got {:?}; \
+             CodeBlock must never be list-staged regardless of paraPrIDRef",
+            other
+        ),
+    }
+}
