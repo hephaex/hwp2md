@@ -19,7 +19,12 @@ fn parse_bool_preserve(val: &str, current: bool) -> bool {
 /// Returns `style_level` when a tier-1/2/3 signal was already resolved, or
 /// falls back to tier-4 text-pattern detection via
 /// `detect_korean_regulation_heading`.  Both `flush_paragraph` and
-/// `flush_paragraph_staged` use this helper so the two paths stay in lockstep.
+/// `flush_paragraph_staged` call this helper so the **level-resolution rule**
+/// stays in lockstep.  List-staging precedence (`if is_heading { … }`) is a
+/// separate concern that only `flush_paragraph_staged` handles.
+///
+/// Uses `or_else` (not `or`) so the `String` allocation is skipped when
+/// `style_level` is already `Some`.
 fn effective_heading_level(style_level: Option<u8>, inlines: &[Inline]) -> Option<u8> {
     style_level.or_else(|| {
         let combined: String = inlines.iter().map(|i| i.text.as_str()).collect();
@@ -105,6 +110,11 @@ fn make_inline(text: String, fmt: &FormattingState) -> ir::Inline {
         .with_font_name(fmt.font_name.clone())
 }
 
+/// Consume a `Vec<ir::Inline>` and concatenate all inline text runs into one `String`.
+fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
+    inlines.into_iter().map(|i| i.text).collect()
+}
+
 /// Flush any pending paragraph inlines to `section.blocks` (test-only).
 #[cfg(test)]
 pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section) {
@@ -122,7 +132,7 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
     let inlines = std::mem::take(&mut ctx.current_inlines);
 
     if let Some(language) = code_lang {
-        let code = inlines.into_iter().map(|i| i.text).collect::<String>();
+        let code = collect_inline_text(inlines);
         section.blocks.push(ir::Block::CodeBlock { language, code });
         return;
     }
@@ -156,7 +166,7 @@ pub(crate) fn flush_paragraph_staged(ctx: &mut ParseContext) -> Option<StagedBlo
     let inlines = std::mem::take(&mut ctx.current_inlines);
 
     if let Some(language) = code_lang {
-        let code = inlines.into_iter().map(|i| i.text).collect::<String>();
+        let code = collect_inline_text(inlines);
         return Some(StagedBlock::Plain(ir::Block::CodeBlock { language, code }));
     }
 
