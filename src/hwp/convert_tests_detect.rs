@@ -1073,12 +1073,18 @@ fn detect_list_kind_no_numbering_id_uses_text_heuristic_only() {
     // Tier-2 pure text detection — no numbering_id at all.
     let mut doc_info = DocInfo::default();
     doc_info.para_shapes.push(ParaShape::default()); // numbering_id = None
-    // Ordered text.
+                                                     // Ordered text.
     let para_ord = make_list_para("2. 두번째", 0);
-    assert_eq!(detect_list_kind(&para_ord, &doc_info), Some(ListKind::Ordered));
+    assert_eq!(
+        detect_list_kind(&para_ord, &doc_info),
+        Some(ListKind::Ordered)
+    );
     // Bullet text.
     let para_bul = make_list_para("• 항목", 0);
-    assert_eq!(detect_list_kind(&para_bul, &doc_info), Some(ListKind::Unordered));
+    assert_eq!(
+        detect_list_kind(&para_bul, &doc_info),
+        Some(ListKind::Unordered)
+    );
     // Plain text → None.
     let para_plain = make_list_para("일반 텍스트", 0);
     assert_eq!(detect_list_kind(&para_plain, &doc_info), None);

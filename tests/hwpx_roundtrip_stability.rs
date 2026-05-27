@@ -21,7 +21,7 @@ use hwp2md::md::{parse_markdown, write_markdown};
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 
-use fixtures::{heading_xml, para_xml, table_2x2_xml, HwpxFixture};
+use fixtures::{heading_xml, lang_hint_comment, para_xml, table_2x2_xml, HwpxFixture};
 
 // ---------------------------------------------------------------------------
 // Helper: HWPX path → md1, md2
@@ -141,12 +141,12 @@ fn hwpx_md_hwpx_md_code_block_stable() {
     // before the paragraph inside <hs:sec>.  Both the comment and the
     // paragraph are injected via `.section()` as raw XML.
     let code_text = "fn add(a: i32, b: i32) -> i32 { a + b }";
-    let lang_comment = "<!-- hwp2md:lang:rust -->";
+    let lang_comment = lang_hint_comment("rust");
     let p = para_xml(code_text);
 
     let (_guard, path) = HwpxFixture::new()
         .title("CodeBlock Stability")
-        .section(lang_comment)
+        .section(&lang_comment)
         .section(&p)
         .write_to_tempfile();
 

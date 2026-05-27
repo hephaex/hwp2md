@@ -212,8 +212,8 @@ fn flush_inlines_to_blocks(
     }
     if !inlines.is_empty() {
         let i = std::mem::take(inlines);
-        let block = try_code_block(code_lang, i)
-            .unwrap_or_else(|i| ir::Block::Paragraph { inlines: i });
+        let block =
+            try_code_block(code_lang, i).unwrap_or_else(|i| ir::Block::Paragraph { inlines: i });
         blocks.push(block);
     }
 }

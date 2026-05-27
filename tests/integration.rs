@@ -11,7 +11,9 @@
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 
-use fixtures::{heading_xml, para_xml, styled_run_xml, table_2x2_xml, HwpxFixture};
+use fixtures::{
+    heading_xml, lang_hint_comment, para_xml, styled_run_xml, table_2x2_xml, HwpxFixture,
+};
 use hwp2md::{hwpx, ir, md};
 
 // ---------------------------------------------------------------------------
@@ -767,9 +769,8 @@ fn fixture_lang_hint_comment_produces_codeblock_ir() {
     // The section XML embeds the lang-hint comment directly before the paragraph
     // that carries the code text. This mirrors what the HWPX writer emits when
     // serialising a `Block::CodeBlock { language: Some("python") }`.
-    let (_dir, doc) = read_fixture(
-        HwpxFixture::new().with_lang_hint_paragraph("python", "print(\"hello\")")
-    );
+    let (_dir, doc) =
+        read_fixture(HwpxFixture::new().with_lang_hint_paragraph("python", "print(\"hello\")"));
 
     let code_block = doc
         .sections
@@ -810,9 +811,8 @@ fn fixture_lang_hint_comment_produces_codeblock_ir() {
 /// code block opened with ` ```python `.
 #[test]
 fn fixture_lang_hint_comment_renders_python_fence_in_markdown() {
-    let (_dir, doc) = read_fixture(
-        HwpxFixture::new().with_lang_hint_paragraph("python", "print(\"hello\")")
-    );
+    let (_dir, doc) =
+        read_fixture(HwpxFixture::new().with_lang_hint_paragraph("python", "print(\"hello\")"));
     let markdown = md::write_markdown(&doc, false);
 
     assert!(
@@ -872,19 +872,22 @@ fn fixture_newpage_ctrl_produces_pagebreak_ir() {
 fn fixture_lang_hint_inside_cell_does_not_leak_to_next_toplevel_paragraph() {
     // 1×1 table whose single cell contains the lang-hint comment before its
     // inner paragraph.  A top-level paragraph follows the table.
-    let body = r#"<hp:p id="10" paraPrIDRef="0"><hp:run charPrIDRef="0">
+    let lh = lang_hint_comment("python");
+    let body = format!(
+        r#"<hp:p id="10" paraPrIDRef="0"><hp:run charPrIDRef="0">
   <hp:tbl rowCnt="1" colCnt="1">
     <hp:tr>
       <hp:tc>
-        <!-- hwp2md:lang:python -->
+        {lh}
         <hp:p id="11" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>cell text</hp:t></hp:run></hp:p>
       </hp:tc>
     </hp:tr>
   </hp:tbl>
 </hp:run></hp:p>
-<hp:p id="12" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>after table</hp:t></hp:run></hp:p>"#;
+<hp:p id="12" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>after table</hp:t></hp:run></hp:p>"#
+    );
 
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
 
     // Sprint 75: the cell itself must contain a CodeBlock (not a Paragraph).
     let cell_code_block = doc
@@ -968,18 +971,21 @@ fn fixture_newpage_ctrl_renders_pagebreak_marker_in_markdown() {
 /// list (not a plain `Paragraph`).
 #[test]
 fn fixture_lang_hint_in_cell_produces_codeblock_ir() {
-    let body = r#"<hp:p id="20" paraPrIDRef="0"><hp:run charPrIDRef="0">
+    let lh = lang_hint_comment("python");
+    let body = format!(
+        r#"<hp:p id="20" paraPrIDRef="0"><hp:run charPrIDRef="0">
   <hp:tbl rowCnt="1" colCnt="1">
     <hp:tr>
       <hp:tc>
-        <!-- hwp2md:lang:python -->
+        {lh}
         <hp:p id="21" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>x = 1</hp:t></hp:run></hp:p>
       </hp:tc>
     </hp:tr>
   </hp:tbl>
-</hp:run></hp:p>"#;
+</hp:run></hp:p>"#
+    );
 
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
 
     let cell_block = doc.sections.iter().flat_map(|s| &s.blocks).find_map(|b| {
         if let ir::Block::Table { rows, .. } = b {
@@ -1034,18 +1040,21 @@ fn fixture_lang_hint_in_cell_produces_codeblock_ir() {
 ///   proving the block was serialised as `CodeBlock`, not `Paragraph`.
 #[test]
 fn fixture_lang_hint_in_cell_renders_as_codeblock_in_table_markdown() {
-    let body = r#"<hp:p id="30" paraPrIDRef="0"><hp:run charPrIDRef="0">
+    let lh = lang_hint_comment("rust");
+    let body = format!(
+        r#"<hp:p id="30" paraPrIDRef="0"><hp:run charPrIDRef="0">
   <hp:tbl rowCnt="1" colCnt="1">
     <hp:tr>
       <hp:tc>
-        <!-- hwp2md:lang:rust -->
-        <hp:p id="31" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>fn main() {}</hp:t></hp:run></hp:p>
+        {lh}
+        <hp:p id="31" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>fn main() {{}}</hp:t></hp:run></hp:p>
       </hp:tc>
     </hp:tr>
   </hp:tbl>
-</hp:run></hp:p>"#;
+</hp:run></hp:p>"#
+    );
 
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
     let markdown = md::write_markdown(&doc, false);
 
     // The code content must appear in the markdown output.
@@ -1080,14 +1089,17 @@ fn fixture_lang_hint_in_cell_renders_as_codeblock_in_table_markdown() {
 #[test]
 fn fixture_lang_hint_in_list_item_produces_codeblock_ir() {
     // Build a section with an explicit list item containing a lang-hint comment.
-    let body = r#"<ul>
+    let lh = lang_hint_comment("rust");
+    let body = format!(
+        r#"<ul>
   <li>
-    <!-- hwp2md:lang:rust -->
+    {lh}
     <hp:p id="40" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>let x = 42;</hp:t></hp:run></hp:p>
   </li>
-</ul>"#;
+</ul>"#
+    );
 
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
 
     // Walk all list items looking for a CodeBlock with the expected code.
     let found_code_block = doc.sections.iter().flat_map(|s| &s.blocks).any(|b| {
@@ -1118,17 +1130,20 @@ fn fixture_lang_hint_in_list_item_produces_codeblock_ir() {
 /// containing nested `<hp:p>` paragraphs.
 #[test]
 fn fixture_lang_hint_in_footnote_produces_codeblock_ir() {
-    let body = r#"<hp:p id="50" paraPrIDRef="0">
+    let lh = lang_hint_comment("python");
+    let body = format!(
+        r#"<hp:p id="50" paraPrIDRef="0">
   <hp:run charPrIDRef="0">
     <hp:t>main text</hp:t>
     <hp:fn id="fn1">
-      <!-- hwp2md:lang:python -->
+      {lh}
       <hp:p id="51" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>note code</hp:t></hp:run></hp:p>
     </hp:fn>
   </hp:run>
-</hp:p>"#;
+</hp:p>"#
+    );
 
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
 
     // Walk all Footnote blocks looking for a CodeBlock in the content.
     let found_code_block = doc.sections.iter().flat_map(|s| &s.blocks).any(|b| {
@@ -1156,19 +1171,22 @@ fn fixture_lang_hint_in_footnote_produces_codeblock_ir() {
 /// table must remain a plain `Paragraph`.
 #[test]
 fn fixture_lang_hint_inside_cell_does_not_leak_to_next_toplevel_paragraph_cell_is_codeblock() {
-    let body = r#"<hp:p id="60" paraPrIDRef="0"><hp:run charPrIDRef="0">
+    let lh = lang_hint_comment("python");
+    let body = format!(
+        r#"<hp:p id="60" paraPrIDRef="0"><hp:run charPrIDRef="0">
   <hp:tbl rowCnt="1" colCnt="1">
     <hp:tr>
       <hp:tc>
-        <!-- hwp2md:lang:python -->
+        {lh}
         <hp:p id="61" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>import os</hp:t></hp:run></hp:p>
       </hp:tc>
     </hp:tr>
   </hp:tbl>
 </hp:run></hp:p>
-<hp:p id="62" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>plain paragraph</hp:t></hp:run></hp:p>"#;
+<hp:p id="62" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>plain paragraph</hp:t></hp:run></hp:p>"#
+    );
 
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
     let all_blocks: Vec<&ir::Block> = doc.sections.iter().flat_map(|s| &s.blocks).collect();
 
     // The cell must be a CodeBlock.
@@ -1223,13 +1241,13 @@ fn fixture_lang_hint_inside_cell_does_not_leak_to_next_toplevel_paragraph_cell_i
 #[test]
 fn fixture_lang_hint_in_header_produces_codeblock_ir() {
     // The header XML contains a lang-hint comment followed by an <hp:p>.
-    let header_body = r#"<!-- hwp2md:lang:python -->
-<hp:p id="70" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>header_code()</hp:t></hp:run></hp:p>"#;
+    let lh = lang_hint_comment("python");
+    let header_body = format!("{lh}\n<hp:p id=\"70\" paraPrIDRef=\"0\"><hp:run charPrIDRef=\"0\"><hp:t>header_code()</hp:t></hp:run></hp:p>");
 
     let (_dir, doc) = read_fixture(
         HwpxFixture::new()
             .section(&para_xml("body paragraph"))
-            .with_header_xml(header_body),
+            .with_header_xml(&header_body),
     );
 
     // The section header must be present and contain a CodeBlock.
@@ -1272,13 +1290,13 @@ fn fixture_lang_hint_in_header_produces_codeblock_ir() {
 #[test]
 fn fixture_lang_hint_in_footer_produces_codeblock_ir() {
     // The footer XML contains a lang-hint comment followed by an <hp:p>.
-    let footer_body = r#"<!-- hwp2md:lang:python -->
-<hp:p id="80" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>footer_code()</hp:t></hp:run></hp:p>"#;
+    let lh = lang_hint_comment("python");
+    let footer_body = format!("{lh}\n<hp:p id=\"80\" paraPrIDRef=\"0\"><hp:run charPrIDRef=\"0\"><hp:t>footer_code()</hp:t></hp:run></hp:p>");
 
     let (_dir, doc) = read_fixture(
         HwpxFixture::new()
             .section(&para_xml("body paragraph"))
-            .with_footer_xml(footer_body),
+            .with_footer_xml(&footer_body),
     );
 
     // The section footer must be present and contain a CodeBlock.
