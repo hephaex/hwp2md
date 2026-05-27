@@ -710,6 +710,34 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
 
+## Sprint 76 — 2026-05-27
+**주제**: CodeBlock 중복 제거 + HeaderFooterState 헬퍼 추출 + HWPX 왕복 안정성 테스트
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/hwpx/context/flush.rs` | `try_code_block()` 헬퍼 추출; `flush_inlines_to_blocks` + `build_block` CodeBlock 생성 경로 통합 |
+| `src/hwpx/context/state.rs` | `HeaderFooterState` impl 블록 추가 (`in_header_active`, `in_footer_active`, `in_either_active`) |
+| `src/hwpx/context/mod.rs` | active_text_buf, push_inline, push_block_scoped — `in_either_active()` 헬퍼 사용 |
+| `src/hwpx/context/flush.rs` | flush_nested_scope — `in_header_active()`, `in_footer_active()` 헬퍼 사용 |
+| `src/hwpx/handlers.rs` | 6번째 `active&&in_*` 패턴 → `in_either_active()` |
+| `src/hwpx/reader_tests_charpr.rs` | `nested_scope_korean_regulation_text_stays_paragraph_not_heading` 단위 테스트 |
+| `tests/fixtures/mod.rs` | dead_code allow 추가 |
+| `tests/hwpx_roundtrip_stability.rs` | 신규: HWPX→MD→HWPX→MD 안정성 테스트 3건 |
+
+### 검증
+- **1453 tests, 0 failures** (커밋 `7e01b1f`)
+- Clippy: 0 경고
+
+### 리뷰 요약 (opus)
+APPROVE. LOW(handlers.rs) + MEDIUM(roundtrip fixture/assertion) follow-up 완료.
+
+### 관련 커밋
+- `bc488e6` refactor(hwpx): Sprint 76 — CodeBlock dedup, header/footer helpers, HWPX roundtrip tests
+- `7e01b1f` fix(hwpx): Sprint 76 follow-up — LOW/MEDIUM review items
+
+---
+
 ## Sprint 75 — 2026-05-27
 **주제**: CodeLangHint enum + nested scope CodeBlock 지원
 
