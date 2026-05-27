@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 73 완료 (HWPX tier-3 heading 감지 + nested scope dedup)
+## 현재 상태: v0.5.0 Sprint 74 완료 (pending_code_lang 누수 수정 + CodeBlock/PageBreak 픽스처 테스트)
 
 ### 완료
 
@@ -709,6 +709,50 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+### 2026-05-27 — v0.5.0 Sprint 74: pending_code_lang 누수 수정 + CodeBlock/PageBreak 픽스처 테스트
+
+**S74-01 (P3): `pending_code_lang` 누수 수정** (`src/hwpx/context/flush.rs`):
+
+`flush_nested_scope`가 cell/list/header/footer/footnote 분기를 처리한 후 `pending_code_lang`을 초기화하지 않아 XML comment 코드 힌트가 다음 최상위 단락으로 누수되는 버그 수정.
+
+구조 변경:
+```rust
+pub(crate) fn flush_nested_scope(ctx: &mut ParseContext) -> bool {
+    if ctx.header_footer.in_header { flush_header_paragraph(ctx); }
+    else if ... { ... }
+    else { return false; }  // top-level: return early, preserve pending_code_lang
+    ctx.pending_code_lang = None;  // nested path only: discard code-fence hint
+    true
+}
+```
+
+**S74-02: 단위 테스트 2건** (`src/hwpx/reader_tests_charpr.rs`):
+- `pending_code_lang_cleared_after_nested_scope_flush` — 5개 중첩 분기(in_header/in_footer/footnote.active/table.in_cell/list.in_item) 각각 cleared 검증
+- `pending_code_lang_preserved_at_top_level_no_nested_scope` — top-level 경로에서 intact 보존 확인
+
+**S74-03 (P2): HwpxFixture 통합 테스트 4+1건** (`tests/integration.rs`):
+- `fixture_lang_hint_comment_produces_codeblock_ir` — `<!-- hwp2md:lang:python -->` → `ir::Block::CodeBlock`
+- `fixture_lang_hint_comment_renders_python_fence_in_markdown` — MD에 ` ```python ` 펜스
+- `fixture_newpage_ctrl_produces_pagebreak_ir` — `<hp:ctrl id="newPage"/>` → `ir::Block::PageBreak`
+- `fixture_newpage_ctrl_renders_pagebreak_marker_in_markdown` — MD에 `<!-- pagebreak -->`
+- Follow-up L3: `fixture_lang_hint_inside_cell_does_not_leak_to_next_toplevel_paragraph` — 셀 내부 힌트가 다음 최상위 단락을 CodeBlock으로 만들지 않음을 확인 (원래 버그 시나리오 end-to-end 검증)
+
+**S74-P4**: flush.rs=456L, handlers.rs=583L — 800행 제한 준수 확인, 추출 불필요.
+
+**Follow-up (L1/L2/L3)**:
+- L1: `check_scope!` 매크로에 scope 레이블 추가
+- L2: `if let` → `let-else panic!` 교체 (묵시적 통과 방지)
+- L3: 셀 누수 end-to-end 회귀 테스트 추가
+
+**Commits**: `901fbc8` (feat:sprint74) + `826ba6b` (docs:follow-up)
+
+**검증**: 1442 tests (0 failures). Clippy -D warnings 0 경고.
+
+**리뷰 (code-reviewer opus)**: APPROVE. CRITICAL/HIGH 없음. M1 (중첩 스코프 CodeBlock 언어 힌트 손실 — pre-existing, 향후 Sprint 75 후보) + LOW 3건 (L1/L2/L3 모두 follow-up에서 해결).
+리뷰 전문: `~/.claude/references/2026-05-27_hwp2md_sprint74_pending_code_lang_leak_fix_review.md`
+
+---
 
 ### 2026-05-27 — v0.5.0 Sprint 73: HWPX tier-3 heading 감지 + nested scope dedup
 

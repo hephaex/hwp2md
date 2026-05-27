@@ -201,14 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 74 로드맵
+## Sprint 75 로드맵
 
-Sprint 73 완료 (2026-05-27). HWPX tier-3 heading 감지 + nested scope dedup. HWPX/HWP 헤딩 감지 파이프라인 대칭화 완료.
+Sprint 74 완료 (2026-05-27). `pending_code_lang` 누수 수정 + CodeBlock/PageBreak HwpxFixture 통합 테스트.
 
 - **P1**: 관(subsection, 절과 조 사이) 감지 — 실제 픽스처 없음; 일반 명사 '관'과 충돌 위험. **대형 법령 픽스처 확보 시 검토.** (계속 BLOCKER)
-- **P2**: HWPX 실제 문서 픽스처 기반 통합 테스트 — `HwpxFixture`(Sprint 8) 활용 확장, 실제 한글 문서 변환 정확도 검증
-- **P3**: `pending_code_lang` 처리 감사 — `build_block` 이후 CodeBlock/Paragraph 경로에서 `code_lang` 상태가 항상 리셋되는지 확인
-- **P4**: HWPX reader 파일 크기 감사 — flush.rs/handlers.rs 800행 가이드라인 준수 여부 확인 (Sprint 73 이후 handlers.rs 단순화 효과 검증)
+- **P2**: 중첩 스코프 CodeBlock 언어 힌트 보존 (Sprint 74 M1) — `flush_inlines_to_blocks`에 `pending_code_lang` 파라미터 추가, 셀/리스트/각주 내부 CodeBlock 지원
+- **P3**: `Option<Option<String>>` → 전용 enum 리팩토링 — `pending_code_lang` 타입을 `CodeLangHint { None, NoLang, Lang(String) }`로 교체하여 의미 명확화
+- **P4**: roundtrip 커버리지 확장 — 실제 hwp2md 출력을 다시 읽는 HWPX→MD→HWPX→MD 왕복 테스트
 
 ## 라이선스
 
