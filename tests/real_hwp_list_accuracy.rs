@@ -25,6 +25,11 @@ fn list_stats(stem: &str) -> (usize, usize) {
 
 /// Recursively count `Block::List` entries, descending into `BlockQuote` and
 /// `ListItem` children so nested lists are not missed.
+///
+/// **Scope limitation**: does not descend into `Block::Table` cells,
+/// `Block::Footnote` content, or section header/footer block lists.
+/// Those contexts may contain lists in complex documents; this walker
+/// covers the common top-level + blockquote + list-item cases.
 fn count_lists_in_blocks(blocks: &[ir::Block]) -> (usize, usize) {
     let mut total = 0usize;
     let mut ordered = 0usize;
@@ -161,11 +166,14 @@ fn moel_02_ordered_lists_dominate() {
     // Must have at least some lists (sanity — document is non-trivial).
     assert!(total > 0, "moel_02: expected at least one list block, got 0");
 
-    // Ordered lists must be the majority.
-    let pct_ordered = ordered * 100 / total;
+    // Ordered lists must dominate (50–85 % band).
+    // Lower bound: a drop below 50 % signals ordered detection regressed.
+    // Upper bound: a rise above 85 % signals unordered bullets are being
+    // misclassified as ordered.  Baseline (Sprint 78): 42/67 ≈ 62.7 %.
+    let pct_ordered = (ordered as f64) * 100.0 / (total as f64);
     assert!(
-        pct_ordered >= 50,
-        "moel_02: ordered lists fell below 50 % — possible detect_list_kind regression; \
-         total={total}, ordered={ordered} ({pct_ordered} %)"
+        (50.0..=85.0).contains(&pct_ordered),
+        "moel_02: ordered ratio {pct_ordered:.1} % outside expected band 50–85 %; \
+         total={total}, ordered={ordered}"
     );
 }

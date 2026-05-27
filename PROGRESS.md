@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 77 완료 (HWPTAG_NUMBERING 파싱 + Tier-4 정책 doc-comment + lang-hint 헬퍼)
+## 현재 상태: v0.5.0 Sprint 78 완료 (하이퍼링크 URL 강건성 + lang-hint 마이그레이션 완료 + 실 파일 리스트 정확도 테스트)
 
 ### 완료
 
@@ -709,6 +709,30 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 78 — 2026-05-27
+**주제**: 하이퍼링크 URL 강건성 + lang-hint 마이그레이션 완료 + 실 파일 리스트 정확도 테스트
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/hwp/control/hyperlink.rs` | parse_hyperlink_url: null-terminated URL truncate + control char strip; 테스트 +4건 |
+| `tests/integration.rs` | raw <!-- hwp2md:lang:* --> → lang_hint_comment() 마이그레이션 8건 |
+| `tests/hwpx_roundtrip_stability.rs` | lang_hint_comment() 마이그레이션 1건 |
+| `tests/real_hwp_list_accuracy.rs` | moel_01/02/03/04/05 ordered list 회귀 테스트 5건 (신규) |
+
+### 검증
+- **1472 tests, 0 failures** (커밋 `6557a60`)
+- Clippy: 0 경고
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. M2/M3/M4 follow-up 즉시 처리 (f64 퍼센트 + 밴드 검사 + scope doc-comment).
+리뷰 전문: `~/.claude/references/2026-05-27_hwp2md_sprint78_hyperlink_langmigration_review.md`
+
+### 관련 커밋
+- `6557a60` feat(hwp): Sprint 78 — hyperlink URL sanitization + lang-hint migration + real list accuracy tests
+
+---
 
 ## Sprint 77 — 2026-05-27
 **주제**: HWPTAG_NUMBERING 파싱 + Tier-4 정책 명시화 + lang-hint 헬퍼

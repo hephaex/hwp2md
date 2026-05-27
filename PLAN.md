@@ -201,14 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 78 로드맵
+## Sprint 79 로드맵
 
-Sprint 77 완료 (2026-05-27). HWPTAG_NUMBERING 파싱 + Tier-4 정책 doc-comment + lang-hint 헬퍼.
+Sprint 78 완료 (2026-05-27). 하이퍼링크 URL null-truncate + control strip; lang-hint 마이그레이션 완료; moel 실 파일 회귀 테스트.
 
 - **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지)
-- **P2**: HWPTAG_NUMBERING byte 오프셋 실제 HWP 파일 검증 — 단위 테스트는 합성 데이터 기반; 실 파일로 ordered/unordered 결정 정확도 측정
-- **P3**: HWP 5.0 reader Phase 2 — 하이퍼링크(CTRL_HYPERLINK) 파싱 개선 또는 이미지(BinData) 추출
-- **P4**: HwpxFixture lang-hint 마이그레이션 나머지 완료 (현재 2건 마이그레이션, 6+건 잔여)
+- **P2**: parse_hyperlink_url 강건성 추가 개선 — is_control() 사용 (DEL + C1 커버) + scheme 최소 유효성 검사 (Sprint 78 M1)
+- **P3**: hyperlink 테스트 helper 추출 + 변수명 개선 (Sprint 78 L1/L2/L5)
+- **P4**: HWP 5.0 reader Phase 2 — 이미지(BinData) 추출 또는 CTRL_RUBY 강건성
 
 ## 라이선스
 
