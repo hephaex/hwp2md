@@ -207,9 +207,7 @@ pub(super) fn handle_end_element(
             // Drain from the correct buffer.  Header/footer paragraphs route
             // text into `header_footer.text`; every other context uses
             // `current_text`.
-            let text = if ctx.header_footer.active
-                && (ctx.header_footer.in_header || ctx.header_footer.in_footer)
-            {
+            let text = if ctx.header_footer.in_either_active() {
                 std::mem::take(&mut ctx.header_footer.text)
             } else {
                 std::mem::take(&mut ctx.current_text)

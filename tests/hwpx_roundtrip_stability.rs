@@ -129,31 +129,34 @@ fn hwpx_md_hwpx_md_heading_and_table_stable() {
 // Test 3: code block fixture
 // ---------------------------------------------------------------------------
 
-/// A fixture containing a code-block paragraph.  The HWPX format stores code
-/// in a plain paragraph; after two roundtrips the text content must be
-/// identical between md1 and md2.
-///
-/// Note: HWPX does not carry a fenced-code marker, so the reader reconstructs
-/// a code block only when the paragraph style carries language metadata.  The
-/// stability assertion is therefore on text content equality rather than exact
-/// block structure, tolerating the case where both passes produce either a
-/// paragraph or a code block with the same text.
+/// A fixture containing a code-block paragraph preceded by a
+/// `<!-- hwp2md:lang:rust -->` XML comment.  The comment causes the reader to
+/// surface the paragraph as a `CodeBlock` with `language = Some("rust")` in
+/// the first pass; the writer then emits another lang-hint comment, so the
+/// second pass reproduces an identical `CodeBlock`.  This exercises the
+/// `CodeLangHint::Code(lang)` path end-to-end.
 #[test]
 fn hwpx_md_hwpx_md_code_block_stable() {
-    // Store the code as a plain paragraph (HWPX has no native code block).
-    // After HWPX roundtrip the reader will surface it as a Paragraph; the MD
-    // writer will then emit plain text, which stays stable across the second
-    // trip.
+    // The lang-hint comment must appear as a sibling XML node immediately
+    // before the paragraph inside <hs:sec>.  Both the comment and the
+    // paragraph are injected via `.section()` as raw XML.
     let code_text = "fn add(a: i32, b: i32) -> i32 { a + b }";
+    let lang_comment = "<!-- hwp2md:lang:rust -->";
     let p = para_xml(code_text);
 
     let (_guard, path) = HwpxFixture::new()
         .title("CodeBlock Stability")
+        .section(lang_comment)
         .section(&p)
         .write_to_tempfile();
 
     let (md1, md2) = hwpx_to_md_to_hwpx_to_md(&path);
 
+    // First pass must produce a fenced code block with language annotation.
+    assert!(
+        md1.contains("```rust"),
+        "fenced rust code block missing from md1; md1: {md1:?}"
+    );
     // The code text must survive both passes.
     assert!(
         md1.contains("fn add"),
