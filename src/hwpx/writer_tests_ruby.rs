@@ -234,7 +234,10 @@ fn inline_with_formatting_chained_with_link() {
 fn inline_with_formatting_chained_with_ruby() {
     let i = Inline::with_formatting(
         "base".into(),
-        &InlineFormat { bold: true, ..InlineFormat::default() },
+        &InlineFormat {
+            bold: true,
+            ..InlineFormat::default()
+        },
     )
     .with_ruby(Some("annotation".into()));
 

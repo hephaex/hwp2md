@@ -43,11 +43,7 @@ pub(crate) fn extract_paragraphs_from_range(
                 };
                 // nStyleID is UINT8 at byte[6]; reading two bytes would corrupt the
                 // value with the flags byte when any flag bit is set.
-                let style_id = if rec.data.len() >= 7 {
-                    rec.data[6]
-                } else {
-                    0
-                };
+                let style_id = if rec.data.len() >= 7 { rec.data[6] } else { 0 };
                 current = Some(HwpParagraph {
                     text: String::new(),
                     char_shape_ids: Vec::new(),
@@ -403,7 +399,10 @@ mod tests {
         let paras = extract_paragraphs_from_range(&records, 0, records.len());
         assert_eq!(paras.len(), 1);
         assert_eq!(paras[0].para_shape_id, 1);
-        assert_eq!(paras[0].style_id, 3, "flags byte must not contaminate style_id");
+        assert_eq!(
+            paras[0].style_id, 3,
+            "flags byte must not contaminate style_id"
+        );
     }
 
     #[test]
@@ -417,7 +416,10 @@ mod tests {
 
         let records = vec![make_record_with_data_plain(HWPTAG_PARA_HEADER, 2, ph_data)];
         let paras = extract_paragraphs_from_range(&records, 0, records.len());
-        assert_eq!(paras[0].style_id, 0, "heading flag must not corrupt style_id");
+        assert_eq!(
+            paras[0].style_id, 0,
+            "heading flag must not corrupt style_id"
+        );
     }
 
     #[test]

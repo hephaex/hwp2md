@@ -252,7 +252,11 @@ fn node_to_block<'a>(node: &'a AstNode<'a>) -> Option<ir::Block> {
                 });
             }
 
-            Some(ir::Block::Table { rows, col_count, inner_margin: None })
+            Some(ir::Block::Table {
+                rows,
+                col_count,
+                inner_margin: None,
+            })
         }
         NodeValue::ThematicBreak => Some(ir::Block::HorizontalRule),
         NodeValue::HtmlBlock(html) => {

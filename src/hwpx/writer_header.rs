@@ -407,7 +407,11 @@ fn write_para_properties<W: Write>(
     write_single_para_pr(w, &ParaPrConfig::standard("0", "0"), break_setting)?;
 
     // ── paraPr id=1: block-quote (left indent) ──
-    write_single_para_pr(w, &ParaPrConfig::standard("1", QUOTE_MARGIN_LEFT), break_setting)?;
+    write_single_para_pr(
+        w,
+        &ParaPrConfig::standard("1", QUOTE_MARGIN_LEFT),
+        break_setting,
+    )?;
 
     // ── paraPr id=2: top-level list item ──
     write_single_para_pr(

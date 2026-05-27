@@ -253,7 +253,11 @@ fn write_markdown_simple_gfm_table() {
             is_header: false,
         },
     ];
-    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2, inner_margin: None }]);
+    let doc = make_doc_with_blocks(vec![ir::Block::Table {
+        rows,
+        col_count: 2,
+        inner_margin: None,
+    }]);
     let md = write_markdown(&doc, false);
     assert!(md.contains("| Name | Age |"), "got: {md}");
     assert!(md.contains("| --- |"), "got: {md}");
@@ -273,7 +277,11 @@ fn write_markdown_complex_table_html_fallback() {
         }],
         is_header: true,
     }];
-    let doc = make_doc_with_blocks(vec![ir::Block::Table { rows, col_count: 2, inner_margin: None }]);
+    let doc = make_doc_with_blocks(vec![ir::Block::Table {
+        rows,
+        col_count: 2,
+        inner_margin: None,
+    }]);
     let md = write_markdown(&doc, false);
     assert!(md.contains("<table>"), "got: {md}");
     assert!(md.contains("colspan=\"2\""), "got: {md}");

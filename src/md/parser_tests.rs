@@ -140,7 +140,10 @@ fn parse_markdown_table() {
     let md = "| A | B |\n| --- | --- |\n| 1 | 2 |\n";
     let doc = parse_markdown(md);
     let blocks = first_section_blocks(&doc);
-    if let ir::Block::Table { rows, col_count, .. } = &blocks[0] {
+    if let ir::Block::Table {
+        rows, col_count, ..
+    } = &blocks[0]
+    {
         assert_eq!(*col_count, 2, "col_count: {col_count}");
         assert!(!rows.is_empty());
     } else {

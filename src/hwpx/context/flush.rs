@@ -4,6 +4,21 @@ use crate::ir::{self, Inline, InlineFormat};
 use super::state::FormattingState;
 use super::ParseContext;
 
+/// Code-fence hint for the next paragraph flush.
+///
+/// Replaces `Option<Option<String>>` on [`ParseContext::pending_code_lang`].
+/// `Default` is `Plain`.
+#[derive(Debug, Default, PartialEq, Clone)]
+pub(crate) enum CodeLangHint {
+    /// Normal paragraph (no code-fence annotation).
+    #[default]
+    Plain,
+    /// Code block, no language (`<!-- hwp2md:lang: -->`).
+    CodeNoLang,
+    /// Code block with language string (`<!-- hwp2md:lang:python -->`).
+    Code(String),
+}
+
 // ── Tier-3 heading thresholds (HWPX charPr `height`, 1/100 pt units) ──────
 //
 // These constants mirror the HWP binary reader's tier-3 logic.  Tier-3 fires
@@ -142,12 +157,13 @@ pub(crate) fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut Pa
     }
 }
 
-/// Drain accumulated `text` + `inlines` into `blocks` as a `Paragraph`.
+/// Drain accumulated `text` + `inlines` into `blocks` as a `Paragraph` or `CodeBlock`.
 fn flush_inlines_to_blocks(
     text: &mut String,
     inlines: &mut Vec<ir::Inline>,
     blocks: &mut Vec<ir::Block>,
     fmt: &FormattingState,
+    code_lang: CodeLangHint,
 ) {
     if !text.is_empty() {
         let t = std::mem::take(text);
@@ -158,7 +174,18 @@ fn flush_inlines_to_blocks(
     }
     if !inlines.is_empty() {
         let i = std::mem::take(inlines);
-        blocks.push(ir::Block::Paragraph { inlines: i });
+        let block = match code_lang {
+            CodeLangHint::Plain => ir::Block::Paragraph { inlines: i },
+            CodeLangHint::CodeNoLang => ir::Block::CodeBlock {
+                language: None,
+                code: collect_inline_text(i),
+            },
+            CodeLangHint::Code(lang) => ir::Block::CodeBlock {
+                language: Some(lang),
+                code: collect_inline_text(i),
+            },
+        };
+        blocks.push(block);
     }
 }
 
@@ -175,10 +202,10 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 
 /// Build a paragraph-level [`ir::Block`] from its components.
 ///
-/// `code_lang` mirrors [`ParseContext::pending_code_lang`]: the outer `Option` signals
-/// "this paragraph is a code block", the inner `Option<String>` is the language hint
-/// (matching `ir::Block::CodeBlock::language`).  When present the inlines are concatenated
-/// into a [`ir::Block::CodeBlock`].  Otherwise [`effective_heading_level`] decides between
+/// `code_lang` is a [`CodeLangHint`] that signals whether the paragraph should
+/// become a [`ir::Block::CodeBlock`] and which language to annotate.  When
+/// `CodeNoLang` or `Code(_)` the inlines are concatenated into a `CodeBlock`.
+/// When `Plain`, [`effective_heading_level`] decides between
 /// [`ir::Block::Heading`] and [`ir::Block::Paragraph`].
 ///
 /// `height_hint` is `Some((max_height, was_bold))` carrying the per-paragraph
@@ -189,21 +216,27 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 /// Paragraph construction stays in one place.
 fn build_block(
     inlines: Vec<ir::Inline>,
-    code_lang: Option<Option<String>>,
+    code_lang: CodeLangHint,
     heading_level: Option<u8>,
     height_hint: Option<(u32, bool)>,
 ) -> ir::Block {
-    if let Some(language) = code_lang {
-        return ir::Block::CodeBlock {
-            language,
+    match code_lang {
+        CodeLangHint::CodeNoLang => ir::Block::CodeBlock {
+            language: None,
             code: collect_inline_text(inlines),
-        };
-    }
-    let effective_level = effective_heading_level(heading_level, &inlines, height_hint);
-    if let Some(level) = effective_level {
-        ir::Block::Heading { level, inlines }
-    } else {
-        ir::Block::Paragraph { inlines }
+        },
+        CodeLangHint::Code(lang) => ir::Block::CodeBlock {
+            language: Some(lang),
+            code: collect_inline_text(inlines),
+        },
+        CodeLangHint::Plain => {
+            let effective_level = effective_heading_level(heading_level, &inlines, height_hint);
+            if let Some(level) = effective_level {
+                ir::Block::Heading { level, inlines }
+            } else {
+                ir::Block::Paragraph { inlines }
+            }
+        }
     }
 }
 
@@ -215,7 +248,7 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
         ctx.current_inlines.push(make_inline(t, &ctx.fmt));
     }
 
-    let code_lang = ctx.pending_code_lang.take();
+    let code_lang = std::mem::take(&mut ctx.pending_code_lang);
 
     if ctx.current_inlines.is_empty() {
         return;
@@ -223,7 +256,12 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
 
     let height_hint = Some((ctx.para_max_font_height, ctx.para_max_font_height_bold));
     let inlines = std::mem::take(&mut ctx.current_inlines);
-    section.blocks.push(build_block(inlines, code_lang, ctx.heading_level, height_hint));
+    section.blocks.push(build_block(
+        inlines,
+        code_lang,
+        ctx.heading_level,
+        height_hint,
+    ));
 }
 
 /// Variant of `flush_paragraph` used during OWPML flat-paragraph list
@@ -236,7 +274,7 @@ pub(crate) fn flush_paragraph_staged(ctx: &mut ParseContext) -> Option<StagedBlo
 
     let para_pr_id = ctx.current_para_pr_id.take();
     let num_pr_id = ctx.current_num_pr_id.take();
-    let code_lang = ctx.pending_code_lang.take();
+    let code_lang = std::mem::take(&mut ctx.pending_code_lang);
 
     if ctx.current_inlines.is_empty() {
         return None;
@@ -354,51 +392,56 @@ fn build_list(entries: Vec<(u32, bool, ir::Block)>) -> ir::Block {
     }
 }
 
-pub(crate) fn flush_cell_paragraph(ctx: &mut ParseContext) {
+pub(crate) fn flush_cell_paragraph(ctx: &mut ParseContext, code_lang: CodeLangHint) {
     flush_inlines_to_blocks(
         &mut ctx.table.cell_text,
         &mut ctx.table.cell_inlines,
         &mut ctx.table.cell_blocks,
         &ctx.fmt,
+        code_lang,
     );
 }
 
-pub(crate) fn flush_list_item_paragraph(ctx: &mut ParseContext) {
+pub(crate) fn flush_list_item_paragraph(ctx: &mut ParseContext, code_lang: CodeLangHint) {
     flush_inlines_to_blocks(
         &mut ctx.list.item_text,
         &mut ctx.list.item_inlines,
         &mut ctx.list.item_blocks,
         &ctx.fmt,
+        code_lang,
     );
 }
 
 /// Flush pending footnote/endnote paragraph into `footnote.blocks`.
-pub(crate) fn flush_footnote_paragraph(ctx: &mut ParseContext) {
+pub(crate) fn flush_footnote_paragraph(ctx: &mut ParseContext, code_lang: CodeLangHint) {
     flush_inlines_to_blocks(
         &mut ctx.footnote.text,
         &mut ctx.footnote.inlines,
         &mut ctx.footnote.blocks,
         &ctx.fmt,
+        code_lang,
     );
 }
 
 /// Flush pending header paragraph into `header_footer.header_blocks`.
-pub(crate) fn flush_header_paragraph(ctx: &mut ParseContext) {
+pub(crate) fn flush_header_paragraph(ctx: &mut ParseContext, code_lang: CodeLangHint) {
     flush_inlines_to_blocks(
         &mut ctx.header_footer.text,
         &mut ctx.header_footer.inlines,
         &mut ctx.header_footer.header_blocks,
         &ctx.fmt,
+        code_lang,
     );
 }
 
 /// Flush pending footer paragraph into `header_footer.footer_blocks`.
-pub(crate) fn flush_footer_paragraph(ctx: &mut ParseContext) {
+pub(crate) fn flush_footer_paragraph(ctx: &mut ParseContext, code_lang: CodeLangHint) {
     flush_inlines_to_blocks(
         &mut ctx.header_footer.text,
         &mut ctx.header_footer.inlines,
         &mut ctx.header_footer.footer_blocks,
         &ctx.fmt,
+        code_lang,
     );
 }
 
@@ -408,30 +451,29 @@ pub(crate) fn flush_footer_paragraph(ctx: &mut ParseContext) {
 /// Callers that return `false` are responsible for the top-level flush.
 ///
 /// Branch order: header → footer → footnote → **cell → list** (cell-first).
-/// The previous `flush_active_paragraph_scope` top-level handler used list-first;
-/// this function unifies to cell-first throughout, matching `handlers.rs` table logic.
 ///
-/// `pending_code_lang` is cleared on the nested path: code-fence annotations
-/// (`<!-- hwp2md:lang:LANG -->`) apply only to top-level paragraphs and must not
-/// leak to the next top-level [`flush_paragraph_staged`] call.
+/// `pending_code_lang` is consumed and forwarded to the nested-scope flush so
+/// that code-fence annotations (`<!-- hwp2md:lang:LANG -->`) take effect inside
+/// cells, list items, footnotes, headers, and footers.
 pub(crate) fn flush_nested_scope(ctx: &mut ParseContext) -> bool {
     if ctx.header_footer.in_header {
-        flush_header_paragraph(ctx);
+        let code_lang = std::mem::take(&mut ctx.pending_code_lang);
+        flush_header_paragraph(ctx, code_lang);
     } else if ctx.header_footer.in_footer {
-        flush_footer_paragraph(ctx);
+        let code_lang = std::mem::take(&mut ctx.pending_code_lang);
+        flush_footer_paragraph(ctx, code_lang);
     } else if ctx.footnote.active {
-        flush_footnote_paragraph(ctx);
+        let code_lang = std::mem::take(&mut ctx.pending_code_lang);
+        flush_footnote_paragraph(ctx, code_lang);
     } else if ctx.table.in_cell {
-        flush_cell_paragraph(ctx);
+        let code_lang = std::mem::take(&mut ctx.pending_code_lang);
+        flush_cell_paragraph(ctx, code_lang);
     } else if ctx.list.in_item {
-        flush_list_item_paragraph(ctx);
+        let code_lang = std::mem::take(&mut ctx.pending_code_lang);
+        flush_list_item_paragraph(ctx, code_lang);
     } else {
         return false;
     }
-    // Code-fence annotations (<!-- hwp2md:lang:LANG -->) apply only to top-level
-    // paragraphs; discard any pending hint so it cannot leak to the next
-    // top-level paragraph flush.
-    ctx.pending_code_lang = None;
     true
 }
 
@@ -449,12 +491,14 @@ pub(crate) fn flush_active_paragraph_scope(ctx: &mut ParseContext) -> Option<Sta
     if flush_nested_scope(ctx) {
         return None;
     }
+    let code_lang = std::mem::take(&mut ctx.pending_code_lang);
     let mut top: Vec<ir::Block> = Vec::new();
     flush_inlines_to_blocks(
         &mut ctx.current_text,
         &mut ctx.current_inlines,
         &mut top,
         &ctx.fmt,
+        code_lang,
     );
     top.pop().map(StagedBlock::Plain)
 }

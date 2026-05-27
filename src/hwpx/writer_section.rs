@@ -162,7 +162,11 @@ fn write_block<W: Write>(
             write_inlines(writer, inlines, tables)?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
         }
-        ir::Block::Table { rows, col_count, inner_margin } => {
+        ir::Block::Table {
+            rows,
+            col_count,
+            inner_margin,
+        } => {
             let id_str = para_id.to_string();
             *para_id += 1;
             let mut p = BytesStart::new("hp:p");
@@ -174,7 +178,16 @@ fn write_block<W: Write>(
             run.push_attribute(("charPrIDRef", "0"));
             writer.write_event(Event::Start(run))?;
 
-            write_table(writer, rows, *col_count, inner_margin.as_ref(), tables, para_id, quote_depth, asset_map)?;
+            write_table(
+                writer,
+                rows,
+                *col_count,
+                inner_margin.as_ref(),
+                tables,
+                para_id,
+                quote_depth,
+                asset_map,
+            )?;
 
             writer.write_event(Event::End(BytesEnd::new("hp:run")))?;
             writer.write_event(Event::End(BytesEnd::new("hp:p")))?;
@@ -407,18 +420,28 @@ fn write_table<W: Write>(
     let margin_top;
     let margin_bottom;
     let (ml, mr, mt, mb) = if let Some(m) = inner_margin {
-        margin_left   = m.left.to_string();
-        margin_right  = m.right.to_string();
-        margin_top    = m.top.to_string();
+        margin_left = m.left.to_string();
+        margin_right = m.right.to_string();
+        margin_top = m.top.to_string();
         margin_bottom = m.bottom.to_string();
-        (margin_left.as_str(), margin_right.as_str(), margin_top.as_str(), margin_bottom.as_str())
+        (
+            margin_left.as_str(),
+            margin_right.as_str(),
+            margin_top.as_str(),
+            margin_bottom.as_str(),
+        )
     } else {
-        (TABLE_INNER_MARGIN, TABLE_INNER_MARGIN, TABLE_INNER_MARGIN, TABLE_INNER_MARGIN)
+        (
+            TABLE_INNER_MARGIN,
+            TABLE_INNER_MARGIN,
+            TABLE_INNER_MARGIN,
+            TABLE_INNER_MARGIN,
+        )
     };
     let mut in_margin = BytesStart::new("hp:inMargin");
-    in_margin.push_attribute(("left",   ml));
-    in_margin.push_attribute(("right",  mr));
-    in_margin.push_attribute(("top",    mt));
+    in_margin.push_attribute(("left", ml));
+    in_margin.push_attribute(("right", mr));
+    in_margin.push_attribute(("top", mt));
     in_margin.push_attribute(("bottom", mb));
     writer.write_event(Event::Empty(in_margin))?;
     writer.write_event(Event::End(BytesEnd::new("hp:tblPr")))?;

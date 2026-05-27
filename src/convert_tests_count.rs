@@ -150,7 +150,11 @@ fn count_chars_table_sums_all_cells() {
             is_header: false,
         },
     ];
-    let block = Block::Table { rows, col_count: 2, inner_margin: None };
+    let block = Block::Table {
+        rows,
+        col_count: 2,
+        inner_margin: None,
+    };
     // "Col1"=4, "Col2"=4, "val"=3, "x"=1 → 12
     assert_eq!(count_chars(&block), 12);
 }
@@ -268,7 +272,11 @@ fn count_chars_table_inside_blockquote() {
         }],
         is_header: false,
     }];
-    let table = Block::Table { rows, col_count: 1, inner_margin: None };
+    let table = Block::Table {
+        rows,
+        col_count: 1,
+        inner_margin: None,
+    };
     let block = Block::BlockQuote {
         blocks: vec![table],
     };

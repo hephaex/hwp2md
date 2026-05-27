@@ -52,10 +52,7 @@ fn block_heading() -> BoxedStrategy<Block> {
 /// body restricted to printable ASCII + newlines.  Backtick sequences inside
 /// the body would break fenced-code parsing, so they are excluded.
 fn block_code() -> BoxedStrategy<Block> {
-    (
-        proptest::option::of("[a-z]{2,10}"),
-        "[a-zA-Z0-9 \n]{1,200}",
-    )
+    (proptest::option::of("[a-z]{2,10}"), "[a-zA-Z0-9 \n]{1,200}")
         .prop_map(|(language, code)| Block::CodeBlock { language, code })
         .boxed()
 }
@@ -70,11 +67,7 @@ fn block_horizontal_rule() -> BoxedStrategy<Block> {
 /// strict about complex nested block structure and does not reliably round-trip
 /// them.
 fn block_quote() -> BoxedStrategy<Block> {
-    let inner = prop_oneof![
-        block_paragraph(),
-        block_heading(),
-        block_horizontal_rule(),
-    ];
+    let inner = prop_oneof![block_paragraph(), block_heading(), block_horizontal_rule(),];
     prop::collection::vec(inner, 1..4)
         .prop_map(|blocks| Block::BlockQuote { blocks })
         .boxed()
@@ -87,7 +80,10 @@ fn block_quote() -> BoxedStrategy<Block> {
 /// always 1 for ordered lists because comrak may renumber items when parsing,
 /// which would break idempotence for any other start value.
 fn block_list() -> BoxedStrategy<Block> {
-    (any::<bool>(), prop::collection::vec(block_paragraph(), 1..4))
+    (
+        any::<bool>(),
+        prop::collection::vec(block_paragraph(), 1..4),
+    )
         .prop_map(|(ordered, paragraphs)| {
             let items = paragraphs
                 .into_iter()
@@ -112,10 +108,8 @@ fn block_table() -> BoxedStrategy<Block> {
     (1usize..4usize)
         .prop_flat_map(|cols| {
             let header_cells = prop::collection::vec(inlines(), cols..=cols);
-            let data_rows = prop::collection::vec(
-                prop::collection::vec(inlines(), cols..=cols),
-                0..4usize,
-            );
+            let data_rows =
+                prop::collection::vec(prop::collection::vec(inlines(), cols..=cols), 0..4usize);
             (Just(cols), header_cells, data_rows)
         })
         .prop_map(|(cols, header_cells, data_rows)| {
@@ -210,8 +204,8 @@ fn simple_document() -> impl Strategy<Value = Document> {
 /// - **Variant B**: 2-column table, single header row with one cell spanning
 ///   both columns (`colspan=2`) — exercises non-trivial span encoding.
 fn table_with_spans() -> impl Strategy<Value = Block> {
-    let variant_a = (safe_text(), safe_text(), safe_text(), safe_text()).prop_map(
-        |(a, b, c, d)| {
+    let variant_a =
+        (safe_text(), safe_text(), safe_text(), safe_text()).prop_map(|(a, b, c, d)| {
             let make_cell = |text: String| TableCell {
                 blocks: vec![Block::Paragraph {
                     inlines: vec![Inline::plain(&text)],
@@ -233,8 +227,7 @@ fn table_with_spans() -> impl Strategy<Value = Block> {
                 col_count: 2,
                 inner_margin: None,
             }
-        },
-    );
+        });
 
     let variant_b = safe_text().prop_map(|text| Block::Table {
         rows: vec![TableRow {

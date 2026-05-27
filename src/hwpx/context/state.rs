@@ -88,17 +88,22 @@ impl TableState {
     /// Axes with non-numeric values are silently skipped (default preserved).
     pub(crate) fn parse_in_margin(&mut self, e: &quick_xml::events::BytesStart) {
         let d = ir::DEFAULT_TABLE_INNER_MARGIN;
-        let mut m = ir::TableInnerMargin { left: d, right: d, top: d, bottom: d };
+        let mut m = ir::TableInnerMargin {
+            left: d,
+            right: d,
+            top: d,
+            bottom: d,
+        };
         for attr in e.attributes().flatten() {
             let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
             let Ok(val) = attr.unescape_value().unwrap_or_default().parse::<u32>() else {
                 continue;
             };
             match key {
-                "left"   | "hp:left"   => m.left   = val,
-                "right"  | "hp:right"  => m.right  = val,
-                "top"    | "hp:top"    => m.top     = val,
-                "bottom" | "hp:bottom" => m.bottom  = val,
+                "left" | "hp:left" => m.left = val,
+                "right" | "hp:right" => m.right = val,
+                "top" | "hp:top" => m.top = val,
+                "bottom" | "hp:bottom" => m.bottom = val,
                 _ => {}
             }
         }
@@ -244,7 +249,7 @@ impl PageLayoutState {
                 // Unknown values preserve prior state, consistent with
                 // parse_page_size / parse_margin skip-on-parse-failure semantics.
                 match val.as_ref() {
-                    "true" | "1"  => self.landscape = true,
+                    "true" | "1" => self.landscape = true,
                     "false" | "0" => self.landscape = false,
                     _ => {}
                 }
@@ -280,7 +285,9 @@ mod tests {
     #[test]
     fn parse_in_margin_all_axes_explicit() {
         let mut state = TableState::default();
-        state.parse_in_margin(&make_in_margin(r#"left="11" right="22" top="33" bottom="44""#));
+        state.parse_in_margin(&make_in_margin(
+            r#"left="11" right="22" top="33" bottom="44""#,
+        ));
         let m = state.inner_margin.unwrap();
         assert_eq!(m.left, 11);
         assert_eq!(m.right, 22);
@@ -350,7 +357,10 @@ mod tests {
     #[test]
     fn parse_page_size_both_dims() {
         let mut s = PageLayoutState::default();
-        s.parse_page_size(&make_empty("hp:pageSize", r#"width="59528" height="84188""#));
+        s.parse_page_size(&make_empty(
+            "hp:pageSize",
+            r#"width="59528" height="84188""#,
+        ));
         assert_eq!(s.width, Some(59528));
         assert_eq!(s.height, Some(84188));
     }
@@ -358,7 +368,10 @@ mod tests {
     #[test]
     fn parse_page_size_hp_prefixed_attrs() {
         let mut s = PageLayoutState::default();
-        s.parse_page_size(&make_empty("hp:pageSize", r#"hp:width="42000" hp:height="59528""#));
+        s.parse_page_size(&make_empty(
+            "hp:pageSize",
+            r#"hp:width="42000" hp:height="59528""#,
+        ));
         assert_eq!(s.width, Some(42000));
         assert_eq!(s.height, Some(59528));
     }
@@ -384,10 +397,13 @@ mod tests {
     #[test]
     fn parse_margin_all_axes() {
         let mut s = PageLayoutState::default();
-        s.parse_margin(&make_empty("hp:margin", r#"left="1701" right="1701" top="2000" bottom="1500""#));
-        assert_eq!(s.margin_left,   Some(1701));
-        assert_eq!(s.margin_right,  Some(1701));
-        assert_eq!(s.margin_top,    Some(2000));
+        s.parse_margin(&make_empty(
+            "hp:margin",
+            r#"left="1701" right="1701" top="2000" bottom="1500""#,
+        ));
+        assert_eq!(s.margin_left, Some(1701));
+        assert_eq!(s.margin_right, Some(1701));
+        assert_eq!(s.margin_top, Some(2000));
         assert_eq!(s.margin_bottom, Some(1500));
     }
 
@@ -395,9 +411,9 @@ mod tests {
     fn parse_margin_hp_prefixed_attrs() {
         let mut s = PageLayoutState::default();
         s.parse_margin(&make_empty("hp:margin", r#"hp:left="800" hp:right="900""#));
-        assert_eq!(s.margin_left,  Some(800));
+        assert_eq!(s.margin_left, Some(800));
         assert_eq!(s.margin_right, Some(900));
-        assert_eq!(s.margin_top,   None);
+        assert_eq!(s.margin_top, None);
         assert_eq!(s.margin_bottom, None);
     }
 
@@ -405,9 +421,9 @@ mod tests {
     fn parse_margin_partial_leaves_rest_none() {
         let mut s = PageLayoutState::default();
         s.parse_margin(&make_empty("hp:margin", r#"top="2000""#));
-        assert_eq!(s.margin_left,   None);
-        assert_eq!(s.margin_right,  None);
-        assert_eq!(s.margin_top,    Some(2000));
+        assert_eq!(s.margin_left, None);
+        assert_eq!(s.margin_right, None);
+        assert_eq!(s.margin_top, Some(2000));
         assert_eq!(s.margin_bottom, None);
     }
 
@@ -415,7 +431,7 @@ mod tests {
     fn parse_margin_invalid_value_keeps_none() {
         let mut s = PageLayoutState::default();
         s.parse_margin(&make_empty("hp:margin", r#"left="inherit" right="1000""#));
-        assert_eq!(s.margin_left,  None, "invalid value must stay None");
+        assert_eq!(s.margin_left, None, "invalid value must stay None");
         assert_eq!(s.margin_right, Some(1000));
     }
 
@@ -437,14 +453,20 @@ mod tests {
 
     #[test]
     fn parse_page_pr_landscape_false() {
-        let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
+        let mut s = PageLayoutState {
+            landscape: true,
+            ..PageLayoutState::default()
+        };
         s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="false""#));
         assert!(!s.landscape);
     }
 
     #[test]
     fn parse_page_pr_landscape_zero_resets() {
-        let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
+        let mut s = PageLayoutState {
+            landscape: true,
+            ..PageLayoutState::default()
+        };
         s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="0""#));
         assert!(!s.landscape, "landscape=\"0\" must reset to false");
     }
@@ -458,7 +480,10 @@ mod tests {
 
     #[test]
     fn parse_page_pr_no_attrs_preserves_existing_landscape() {
-        let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
+        let mut s = PageLayoutState {
+            landscape: true,
+            ..PageLayoutState::default()
+        };
         s.parse_page_pr(&make_empty("hp:pagePr", ""));
         assert!(s.landscape, "absent attr must not touch existing landscape");
     }
@@ -467,62 +492,112 @@ mod tests {
 
     #[test]
     fn parse_page_size_invalid_value_preserves_existing_some() {
-        let mut s = PageLayoutState { width: Some(59528), height: Some(84188), ..PageLayoutState::default() };
+        let mut s = PageLayoutState {
+            width: Some(59528),
+            height: Some(84188),
+            ..PageLayoutState::default()
+        };
         s.parse_page_size(&make_empty("hp:pageSize", r#"width="bogus""#));
-        assert_eq!(s.width, Some(59528), "invalid parse must not reset existing Some");
+        assert_eq!(
+            s.width,
+            Some(59528),
+            "invalid parse must not reset existing Some"
+        );
         assert_eq!(s.height, Some(84188), "unmentioned field unchanged");
     }
 
     #[test]
     fn parse_page_size_negative_value_preserves_existing_some() {
-        let mut s = PageLayoutState { width: Some(42000), ..PageLayoutState::default() };
+        let mut s = PageLayoutState {
+            width: Some(42000),
+            ..PageLayoutState::default()
+        };
         s.parse_page_size(&make_empty("hp:pageSize", r#"width="-1""#));
-        assert_eq!(s.width, Some(42000), "negative fails u32 parse; existing Some preserved");
+        assert_eq!(
+            s.width,
+            Some(42000),
+            "negative fails u32 parse; existing Some preserved"
+        );
     }
 
     #[test]
     fn parse_page_size_overflow_value_preserves_existing_some() {
-        let mut s = PageLayoutState { width: Some(42000), ..PageLayoutState::default() };
+        let mut s = PageLayoutState {
+            width: Some(42000),
+            ..PageLayoutState::default()
+        };
         s.parse_page_size(&make_empty("hp:pageSize", r#"width="4294967296""#));
-        assert_eq!(s.width, Some(42000), "u32::MAX+1 overflow; existing Some preserved");
+        assert_eq!(
+            s.width,
+            Some(42000),
+            "u32::MAX+1 overflow; existing Some preserved"
+        );
     }
 
     // ── Group B: parse_margin edge cases ─────────────────────────────────
 
     #[test]
     fn parse_margin_invalid_value_preserves_existing_some() {
-        let mut s = PageLayoutState { margin_left: Some(1701), margin_right: Some(1701), ..PageLayoutState::default() };
+        let mut s = PageLayoutState {
+            margin_left: Some(1701),
+            margin_right: Some(1701),
+            ..PageLayoutState::default()
+        };
         s.parse_margin(&make_empty("hp:margin", r#"left="oops" right="2000""#));
-        assert_eq!(s.margin_left, Some(1701), "invalid left: existing Some preserved");
+        assert_eq!(
+            s.margin_left,
+            Some(1701),
+            "invalid left: existing Some preserved"
+        );
         assert_eq!(s.margin_right, Some(2000), "valid right: updated");
     }
 
     #[test]
     fn parse_margin_negative_value_preserves_existing_some() {
-        let mut s = PageLayoutState { margin_top: Some(2000), ..PageLayoutState::default() };
+        let mut s = PageLayoutState {
+            margin_top: Some(2000),
+            ..PageLayoutState::default()
+        };
         s.parse_margin(&make_empty("hp:margin", r#"top="-50""#));
-        assert_eq!(s.margin_top, Some(2000), "negative top fails u32 parse; existing Some preserved");
+        assert_eq!(
+            s.margin_top,
+            Some(2000),
+            "negative top fails u32 parse; existing Some preserved"
+        );
     }
 
     #[test]
     fn parse_margin_overflow_value_preserves_existing_some() {
-        let mut s = PageLayoutState { margin_bottom: Some(1500), ..PageLayoutState::default() };
+        let mut s = PageLayoutState {
+            margin_bottom: Some(1500),
+            ..PageLayoutState::default()
+        };
         s.parse_margin(&make_empty("hp:margin", r#"bottom="4294967296""#));
-        assert_eq!(s.margin_bottom, Some(1500), "overflow bottom; existing Some preserved");
+        assert_eq!(
+            s.margin_bottom,
+            Some(1500),
+            "overflow bottom; existing Some preserved"
+        );
     }
 
     // ── Group C: parse_page_pr edge cases ──────────────────────────────────
 
     #[test]
     fn parse_page_pr_unknown_value_preserves_existing() {
-        let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
+        let mut s = PageLayoutState {
+            landscape: true,
+            ..PageLayoutState::default()
+        };
         s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="yes""#));
         assert!(s.landscape, "unrecognised value preserves prior true state");
     }
 
     #[test]
     fn parse_page_pr_empty_value_preserves_existing() {
-        let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
+        let mut s = PageLayoutState {
+            landscape: true,
+            ..PageLayoutState::default()
+        };
         s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="""#));
         assert!(s.landscape, "empty string value preserves prior true state");
     }
@@ -531,21 +606,33 @@ mod tests {
     fn parse_page_pr_uppercase_true_preserves_false() {
         let mut s = PageLayoutState::default();
         s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="TRUE""#));
-        assert!(!s.landscape, "case-sensitive: TRUE preserves prior false state");
+        assert!(
+            !s.landscape,
+            "case-sensitive: TRUE preserves prior false state"
+        );
     }
 
     #[test]
     fn parse_page_pr_unknown_value_preserves_false() {
         let mut s = PageLayoutState::default(); // landscape: false
         s.parse_page_pr(&make_empty("hp:pagePr", r#"landscape="yes""#));
-        assert!(!s.landscape, "unrecognised value preserves prior false state");
+        assert!(
+            !s.landscape,
+            "unrecognised value preserves prior false state"
+        );
     }
 
     #[test]
     fn parse_page_pr_unknown_attribute_ignored_preserves_landscape() {
-        let mut s = PageLayoutState { landscape: true, ..PageLayoutState::default() };
+        let mut s = PageLayoutState {
+            landscape: true,
+            ..PageLayoutState::default()
+        };
         s.parse_page_pr(&make_empty("hp:pagePr", r#"numbering="continuous""#));
-        assert!(s.landscape, "unknown attribute is silently ignored; existing state preserved");
+        assert!(
+            s.landscape,
+            "unknown attribute is silently ignored; existing state preserved"
+        );
     }
 
     #[test]
@@ -555,6 +642,9 @@ mod tests {
             "hp:pagePr",
             r#"numbering="continuous" landscape="true" footnote="endOfPage""#,
         ));
-        assert!(s.landscape, "landscape parsed correctly among unknown attrs");
+        assert!(
+            s.landscape,
+            "landscape parsed correctly among unknown attrs"
+        );
     }
 }

@@ -526,10 +526,7 @@ fn apply_charpr_attrs_italic_garbage_value_preserves_existing() {
 fn apply_charpr_attrs_bold_numeric_one_sets_true() {
     // bold starts false; "1" must flip it to true.
     let ctx = apply_attrs_via_xml("charPr", &[("bold", "1")]);
-    assert!(
-        ctx.fmt.bold,
-        "bold=\"1\" must set bold to true"
-    );
+    assert!(ctx.fmt.bold, "bold=\"1\" must set bold to true");
 }
 
 // -----------------------------------------------------------------------
@@ -544,14 +541,17 @@ fn flush_paragraph_staged_code_block_with_list_para_pr_id_is_plain() {
     let mut ctx = super::context::ParseContext {
         in_paragraph: true,
         current_text: "fn main() {}".to_string(),
-        pending_code_lang: Some(None), // outer Some = code block; inner None = no language
+        pending_code_lang: super::context::CodeLangHint::CodeNoLang, // CodeNoLang = code block with no language annotation
         current_para_pr_id: Some("2".to_string()), // would trigger depth-0 list for a Paragraph
         ..Default::default()
     };
 
     let result = super::context::flush_paragraph_staged(&mut ctx);
 
-    assert!(result.is_some(), "flush_paragraph_staged must return Some for non-empty inlines");
+    assert!(
+        result.is_some(),
+        "flush_paragraph_staged must return Some for non-empty inlines"
+    );
     match result.unwrap() {
         super::context::StagedBlock::Plain(crate::ir::Block::CodeBlock { code, .. }) => {
             assert_eq!(code, "fn main() {}", "code block text mismatch: {:?}", code);
@@ -620,8 +620,14 @@ fn apply_charpr_attrs_height_updates_para_max_when_greater() {
     };
     super::context::apply_charpr_attrs(&e, &mut ctx);
 
-    assert_eq!(ctx.para_max_font_height, 1600, "tracker must update to the larger height");
-    assert!(ctx.para_max_font_height_bold, "bold flag must reflect the run that set the max");
+    assert_eq!(
+        ctx.para_max_font_height, 1600,
+        "tracker must update to the larger height"
+    );
+    assert!(
+        ctx.para_max_font_height_bold,
+        "bold flag must reflect the run that set the max"
+    );
 }
 
 #[test]
@@ -647,7 +653,10 @@ fn apply_charpr_attrs_height_does_not_decrease_para_max() {
     };
     super::context::apply_charpr_attrs(&e, &mut ctx);
 
-    assert_eq!(ctx.para_max_font_height, 2000, "tracker must not decrease for a smaller height");
+    assert_eq!(
+        ctx.para_max_font_height, 2000,
+        "tracker must not decrease for a smaller height"
+    );
 }
 
 // -----------------------------------------------------------------------
@@ -801,12 +810,17 @@ fn pending_code_lang_cleared_after_nested_scope_flush() {
     // The $label parameter appears in failure messages so the failing branch is identifiable.
     macro_rules! check_scope {
         ($ctx:ident, $label:expr) => {{
-            $ctx.pending_code_lang = Some(Some("python".to_string()));
+            $ctx.pending_code_lang = super::context::CodeLangHint::Code("python".to_string());
             let result = flush_nested_scope(&mut $ctx);
-            assert!(result, "[{}] flush_nested_scope must return true in nested scope", $label);
             assert!(
-                $ctx.pending_code_lang.is_none(),
-                "[{}] pending_code_lang must be cleared after nested scope flush", $label
+                result,
+                "[{}] flush_nested_scope must return true in nested scope",
+                $label
+            );
+            assert!(
+                matches!($ctx.pending_code_lang, super::context::CodeLangHint::Plain),
+                "[{}] pending_code_lang must be Plain after nested scope flush",
+                $label
             );
         }};
     }
@@ -852,20 +866,17 @@ fn pending_code_lang_preserved_at_top_level_no_nested_scope() {
     use super::context::flush_nested_scope;
 
     let mut ctx = super::context::ParseContext {
-        pending_code_lang: Some(Some("rust".to_string())),
+        pending_code_lang: super::context::CodeLangHint::Code("rust".to_string()),
         ..Default::default()
     };
 
     // No nested scope active (all false by default).
     let result = flush_nested_scope(&mut ctx);
 
+    assert!(!result, "flush_nested_scope must return false at top level");
     assert!(
-        !result,
-        "flush_nested_scope must return false at top level"
-    );
-    assert_eq!(
-        ctx.pending_code_lang,
-        Some(Some("rust".to_string())),
-        "pending_code_lang must remain intact when no nested scope is active"
+        matches!(ctx.pending_code_lang, super::context::CodeLangHint::Code(ref s) if s == "rust"),
+        "pending_code_lang must remain intact when no nested scope is active; got: {:?}",
+        ctx.pending_code_lang
     );
 }

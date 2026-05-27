@@ -33,8 +33,8 @@ const FIXTURES_DIR: &str = "tests/fixtures/real";
 /// output clearly identifies which fixture broke and why.
 fn convert_hwp_to_md(stem: &str) -> String {
     let hwp_path = Path::new(FIXTURES_DIR).join(format!("{stem}.hwp"));
-    let doc = hwp::read_hwp(&hwp_path)
-        .unwrap_or_else(|e| panic!("read_hwp failed for {stem}.hwp: {e}"));
+    let doc =
+        hwp::read_hwp(&hwp_path).unwrap_or_else(|e| panic!("read_hwp failed for {stem}.hwp: {e}"));
     md::write_markdown(&doc, false)
 }
 
@@ -48,9 +48,7 @@ fn load_golden(stem: &str) -> String {
 /// Structural comparison: counts lines that begin with one or more `#`
 /// characters (ATX headings) and returns how many appear in `text`.
 fn count_heading_lines(text: &str) -> usize {
-    text.lines()
-        .filter(|l| l.starts_with('#'))
-        .count()
+    text.lines().filter(|l| l.starts_with('#')).count()
 }
 
 /// Returns `true` if `text` contains any of the known garbled byte sequences
@@ -98,9 +96,7 @@ fn real_fixtures_no_garbled_chars() {
                 .lines()
                 .find(|l| contains_garbled_chars(l))
                 .unwrap_or("<no line found>");
-            failures.push(format!(
-                "  {stem}: first garbled line: {offending_line:?}"
-            ));
+            failures.push(format!("  {stem}: first garbled line: {offending_line:?}"));
         }
     }
 
@@ -204,7 +200,10 @@ fn real_fixture_moel_01_goyang_center_structural() {
     let stem = "moel_01_goyang_center";
     let actual = convert_hwp_to_md(stem);
     let golden = load_golden(stem);
-    assert!(!contains_garbled_chars(&actual), "{stem}: garbled characters in output");
+    assert!(
+        !contains_garbled_chars(&actual),
+        "{stem}: garbled characters in output"
+    );
     assert_heading_fidelity(stem, &actual, &golden);
 }
 
@@ -213,7 +212,10 @@ fn real_fixture_moel_02_vocational_training_structural() {
     let stem = "moel_02_vocational_training";
     let actual = convert_hwp_to_md(stem);
     let golden = load_golden(stem);
-    assert!(!contains_garbled_chars(&actual), "{stem}: garbled characters in output");
+    assert!(
+        !contains_garbled_chars(&actual),
+        "{stem}: garbled characters in output"
+    );
     assert_heading_fidelity(stem, &actual, &golden);
 }
 
@@ -222,7 +224,10 @@ fn real_fixture_moel_03_livelihood_loan_structural() {
     let stem = "moel_03_livelihood_loan";
     let actual = convert_hwp_to_md(stem);
     let golden = load_golden(stem);
-    assert!(!contains_garbled_chars(&actual), "{stem}: garbled characters in output");
+    assert!(
+        !contains_garbled_chars(&actual),
+        "{stem}: garbled characters in output"
+    );
     assert_heading_fidelity(stem, &actual, &golden);
 }
 
@@ -231,7 +236,10 @@ fn real_fixture_moel_04_instructor_education_structural() {
     let stem = "moel_04_instructor_education";
     let actual = convert_hwp_to_md(stem);
     let golden = load_golden(stem);
-    assert!(!contains_garbled_chars(&actual), "{stem}: garbled characters in output");
+    assert!(
+        !contains_garbled_chars(&actual),
+        "{stem}: garbled characters in output"
+    );
     assert_heading_fidelity(stem, &actual, &golden);
 }
 
@@ -240,6 +248,9 @@ fn real_fixture_moel_05_quality_management_structural() {
     let stem = "moel_05_quality_management";
     let actual = convert_hwp_to_md(stem);
     let golden = load_golden(stem);
-    assert!(!contains_garbled_chars(&actual), "{stem}: garbled characters in output");
+    assert!(
+        !contains_garbled_chars(&actual),
+        "{stem}: garbled characters in output"
+    );
     assert_heading_fidelity(stem, &actual, &golden);
 }

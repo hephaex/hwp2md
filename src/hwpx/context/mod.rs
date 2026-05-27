@@ -6,7 +6,7 @@ pub(crate) use flush::flush_paragraph;
 pub(crate) use flush::{
     apply_charpr_attrs, flush_active_paragraph_scope, flush_cell_paragraph,
     flush_footnote_paragraph, flush_list_item_paragraph, flush_nested_scope,
-    flush_paragraph_staged, group_list_paragraphs, StagedBlock,
+    flush_paragraph_staged, group_list_paragraphs, CodeLangHint, StagedBlock,
 };
 pub(crate) use state::{
     FootnoteState, FormattingState, HeaderFooterState, ListState, PageLayoutState, TableState,
@@ -72,10 +72,9 @@ pub(crate) struct ParseContext {
     pub(crate) current_para_pr_id: Option<String>,
     /// `numPrIDRef` value read from the current `<hp:p>` open tag.
     pub(crate) current_num_pr_id: Option<String>,
-    /// When `Some`, the next paragraph flushed should be a `CodeBlock`.
-    /// Inner `Option<String>` distinguishes between code blocks with/without language.
-    #[allow(clippy::option_option)]
-    pub(crate) pending_code_lang: Option<Option<String>>,
+    /// Hint for the next paragraph flush: whether it should become a `CodeBlock`
+    /// and which language to annotate.  Defaults to `Plain` (normal paragraph).
+    pub(crate) pending_code_lang: CodeLangHint,
 
     // ── Per-paragraph font-height tracker (tier-3 heading) ──────────
     /// Maximum `charPr height` value (1/100 pt) seen in the current paragraph.
@@ -123,7 +122,7 @@ impl Default for ParseContext {
             ruby_current_part: RubyPart::None,
             current_para_pr_id: None,
             current_num_pr_id: None,
-            pending_code_lang: None,
+            pending_code_lang: CodeLangHint::Plain,
             para_max_font_height: 0,
             para_max_font_height_bold: false,
             page_layout: PageLayoutState::default(),

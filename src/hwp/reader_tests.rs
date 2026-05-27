@@ -459,4 +459,3 @@ fn parse_style_record_truncated_no_panic() {
     let (name, _) = read_utf16le_str(&data, off);
     assert_eq!(name, "");
 }
-

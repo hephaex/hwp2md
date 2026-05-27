@@ -30,7 +30,9 @@ pub(crate) fn detect_korean_regulation_heading(text: &str) -> Option<u8> {
     let trimmed = text.trim_start();
     let rest = trimmed.strip_prefix('제')?;
     // Must be followed by one or more ASCII digits.
-    let digit_end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
+    let digit_end = rest
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(rest.len());
     if digit_end == 0 {
         return None;
     }

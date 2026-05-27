@@ -243,13 +243,19 @@ fn roundtrip_ir_to_md_to_ir_gfm_table() {
             is_header: false,
         },
     ];
-    let original = make_doc(vec![ir::Block::Table { rows, col_count: 2, inner_margin: None }]);
+    let original = make_doc(vec![ir::Block::Table {
+        rows,
+        col_count: 2,
+        inner_margin: None,
+    }]);
 
     let md = write_markdown(&original, false);
     let parsed = parse_markdown(&md);
 
     let found = first_blocks(&parsed).iter().any(|b| match b {
-        ir::Block::Table { rows, col_count, .. } => *col_count >= 2 && rows.len() >= 2,
+        ir::Block::Table {
+            rows, col_count, ..
+        } => *col_count >= 2 && rows.len() >= 2,
         _ => false,
     });
     assert!(found, "GFM table not preserved; md: {md:?}");

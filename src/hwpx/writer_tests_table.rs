@@ -14,7 +14,11 @@ fn table_doc(rows: Vec<ir::TableRow>) -> Document {
     Document {
         metadata: Metadata::default(),
         sections: vec![Section {
-            blocks: vec![Block::Table { rows, col_count, inner_margin: None }],
+            blocks: vec![Block::Table {
+                rows,
+                col_count,
+                inner_margin: None,
+            }],
             page_layout: None,
             ..Default::default()
         }],
@@ -60,10 +64,7 @@ fn write_table_2x3_has_required_elements() {
         generate_section_xml(sec, 0, &tables, &asset_map).expect("generate_section_xml failed");
 
     assert!(xml.contains("<hp:tbl "), "must contain <hp:tbl>: {xml}");
-    assert!(
-        xml.contains("<hp:tblPr>"),
-        "must contain <hp:tblPr>: {xml}"
-    );
+    assert!(xml.contains("<hp:tblPr>"), "must contain <hp:tblPr>: {xml}");
     assert!(
         xml.contains("<hp:inMargin "),
         "must contain <hp:inMargin>: {xml}"
@@ -99,13 +100,27 @@ fn write_table_2x3_has_required_elements() {
         "must contain <hp:cellMargin>: {xml}"
     );
     // Pin cell padding attribute values against silent const drift.
-    let cm_start = xml.find("<hp:cellMargin ").expect("<hp:cellMargin> missing");
+    let cm_start = xml
+        .find("<hp:cellMargin ")
+        .expect("<hp:cellMargin> missing");
     let cm_end = xml[cm_start..].find("/>").expect("/>") + cm_start;
     let cm_tag = &xml[cm_start..=cm_end + 1];
-    assert!(cm_tag.contains(r#"left="510""#),   "cellMargin left must be 510: {cm_tag}");
-    assert!(cm_tag.contains(r#"right="510""#),  "cellMargin right must be 510: {cm_tag}");
-    assert!(cm_tag.contains(r#"top="141""#),    "cellMargin top must be 141: {cm_tag}");
-    assert!(cm_tag.contains(r#"bottom="141""#), "cellMargin bottom must be 141: {cm_tag}");
+    assert!(
+        cm_tag.contains(r#"left="510""#),
+        "cellMargin left must be 510: {cm_tag}"
+    );
+    assert!(
+        cm_tag.contains(r#"right="510""#),
+        "cellMargin right must be 510: {cm_tag}"
+    );
+    assert!(
+        cm_tag.contains(r#"top="141""#),
+        "cellMargin top must be 141: {cm_tag}"
+    );
+    assert!(
+        cm_tag.contains(r#"bottom="141""#),
+        "cellMargin bottom must be 141: {cm_tag}"
+    );
     assert!(
         xml.contains("<hp:subList>"),
         "must contain <hp:subList>: {xml}"
@@ -131,14 +146,8 @@ fn write_table_row_col_count_attributes() {
     let xml =
         generate_section_xml(sec, 0, &tables, &asset_map).expect("generate_section_xml failed");
 
-    assert!(
-        xml.contains(r#"rowCnt="2""#),
-        "rowCnt must be 2: {xml}"
-    );
-    assert!(
-        xml.contains(r#"colCnt="3""#),
-        "colCnt must be 3: {xml}"
-    );
+    assert!(xml.contains(r#"rowCnt="2""#), "rowCnt must be 2: {xml}");
+    assert!(xml.contains(r#"colCnt="3""#), "colCnt must be 3: {xml}");
 }
 
 /// Cell address attributes `colAddr` and `rowAddr` must reflect the
@@ -230,7 +239,9 @@ fn write_table_roundtrip_cell_text() {
         cell.blocks
             .iter()
             .flat_map(|b| match b {
-                Block::Paragraph { inlines } => inlines.iter().map(|i| i.text.as_str()).collect::<Vec<_>>(),
+                Block::Paragraph { inlines } => {
+                    inlines.iter().map(|i| i.text.as_str()).collect::<Vec<_>>()
+                }
                 _ => vec![],
             })
             .collect::<Vec<_>>()
@@ -289,7 +300,11 @@ fn write_table_colspan_cellsz_scaled() {
     let doc = Document {
         metadata: Metadata::default(),
         sections: vec![Section {
-            blocks: vec![Block::Table { rows, col_count: 3, inner_margin: None }],
+            blocks: vec![Block::Table {
+                rows,
+                col_count: 3,
+                inner_margin: None,
+            }],
             page_layout: None,
             ..Default::default()
         }],
@@ -353,14 +368,8 @@ fn write_table_has_tblpr() {
     let xml =
         generate_section_xml(sec, 0, &tables, &asset_map).expect("generate_section_xml failed");
 
-    assert!(
-        xml.contains("<hp:tblPr>"),
-        "must contain <hp:tblPr>: {xml}"
-    );
-    assert!(
-        xml.contains("</hp:tblPr>"),
-        "must close </hp:tblPr>: {xml}"
-    );
+    assert!(xml.contains("<hp:tblPr>"), "must contain <hp:tblPr>: {xml}");
+    assert!(xml.contains("</hp:tblPr>"), "must close </hp:tblPr>: {xml}");
     assert!(
         xml.contains("<hp:inMargin "),
         "must contain <hp:inMargin>: {xml}"
@@ -370,10 +379,22 @@ fn write_table_has_tblpr() {
     let im_start = xml.find("<hp:inMargin ").expect("<hp:inMargin> missing");
     let im_end = xml[im_start..].find("/>").expect("/>") + im_start;
     let im_tag = &xml[im_start..=im_end + 1];
-    assert!(im_tag.contains(r#"left="141""#),   "inMargin left must be 141: {im_tag}");
-    assert!(im_tag.contains(r#"right="141""#),  "inMargin right must be 141: {im_tag}");
-    assert!(im_tag.contains(r#"top="141""#),    "inMargin top must be 141: {im_tag}");
-    assert!(im_tag.contains(r#"bottom="141""#), "inMargin bottom must be 141: {im_tag}");
+    assert!(
+        im_tag.contains(r#"left="141""#),
+        "inMargin left must be 141: {im_tag}"
+    );
+    assert!(
+        im_tag.contains(r#"right="141""#),
+        "inMargin right must be 141: {im_tag}"
+    );
+    assert!(
+        im_tag.contains(r#"top="141""#),
+        "inMargin top must be 141: {im_tag}"
+    );
+    assert!(
+        im_tag.contains(r#"bottom="141""#),
+        "inMargin bottom must be 141: {im_tag}"
+    );
 
     // tblPr must appear before sz (OWPML child-order requirement).
     let tblpr_pos = xml.find("<hp:tblPr>").expect("<hp:tblPr> missing");
@@ -399,7 +420,12 @@ fn write_table_custom_inner_margin_emitted() {
             blocks: vec![Block::Table {
                 rows,
                 col_count,
-                inner_margin: Some(TableInnerMargin { left: 200, right: 200, top: 100, bottom: 100 }),
+                inner_margin: Some(TableInnerMargin {
+                    left: 200,
+                    right: 200,
+                    top: 100,
+                    bottom: 100,
+                }),
             }],
             page_layout: None,
             ..Default::default()
@@ -415,10 +441,22 @@ fn write_table_custom_inner_margin_emitted() {
     let im_start = xml.find("<hp:inMargin ").expect("<hp:inMargin> missing");
     let im_end = xml[im_start..].find("/>").expect("/>") + im_start;
     let im_tag = &xml[im_start..=im_end + 1];
-    assert!(im_tag.contains(r#"left="200""#),   "inMargin left must be 200: {im_tag}");
-    assert!(im_tag.contains(r#"right="200""#),  "inMargin right must be 200: {im_tag}");
-    assert!(im_tag.contains(r#"top="100""#),    "inMargin top must be 100: {im_tag}");
-    assert!(im_tag.contains(r#"bottom="100""#), "inMargin bottom must be 100: {im_tag}");
+    assert!(
+        im_tag.contains(r#"left="200""#),
+        "inMargin left must be 200: {im_tag}"
+    );
+    assert!(
+        im_tag.contains(r#"right="200""#),
+        "inMargin right must be 200: {im_tag}"
+    );
+    assert!(
+        im_tag.contains(r#"top="100""#),
+        "inMargin top must be 100: {im_tag}"
+    );
+    assert!(
+        im_tag.contains(r#"bottom="100""#),
+        "inMargin bottom must be 100: {im_tag}"
+    );
 }
 
 /// When `inner_margin` is `None` (the default), the writer must still emit
@@ -436,10 +474,22 @@ fn write_table_default_inner_margin_when_none() {
     let im_start = xml.find("<hp:inMargin ").expect("<hp:inMargin> missing");
     let im_end = xml[im_start..].find("/>").expect("/>") + im_start;
     let im_tag = &xml[im_start..=im_end + 1];
-    assert!(im_tag.contains(r#"left="141""#),   "default left must be 141: {im_tag}");
-    assert!(im_tag.contains(r#"right="141""#),  "default right must be 141: {im_tag}");
-    assert!(im_tag.contains(r#"top="141""#),    "default top must be 141: {im_tag}");
-    assert!(im_tag.contains(r#"bottom="141""#), "default bottom must be 141: {im_tag}");
+    assert!(
+        im_tag.contains(r#"left="141""#),
+        "default left must be 141: {im_tag}"
+    );
+    assert!(
+        im_tag.contains(r#"right="141""#),
+        "default right must be 141: {im_tag}"
+    );
+    assert!(
+        im_tag.contains(r#"top="141""#),
+        "default top must be 141: {im_tag}"
+    );
+    assert!(
+        im_tag.contains(r#"bottom="141""#),
+        "default bottom must be 141: {im_tag}"
+    );
 }
 
 /// Write a table with a custom `inner_margin`, read it back, and verify the
@@ -454,7 +504,12 @@ fn write_table_inner_margin_roundtrip() {
             blocks: vec![Block::Table {
                 rows,
                 col_count: 1,
-                inner_margin: Some(TableInnerMargin { left: 300, right: 300, top: 50, bottom: 50 }),
+                inner_margin: Some(TableInnerMargin {
+                    left: 300,
+                    right: 300,
+                    top: 50,
+                    bottom: 50,
+                }),
             }],
             page_layout: None,
             ..Default::default()
@@ -478,10 +533,10 @@ fn write_table_inner_margin_roundtrip() {
         .expect("no Table block found after roundtrip");
 
     let m = table_margin.expect("inner_margin must be Some after roundtrip");
-    assert_eq!(m.left,   300, "roundtrip left");
-    assert_eq!(m.right,  300, "roundtrip right");
-    assert_eq!(m.top,     50, "roundtrip top");
-    assert_eq!(m.bottom,  50, "roundtrip bottom");
+    assert_eq!(m.left, 300, "roundtrip left");
+    assert_eq!(m.right, 300, "roundtrip right");
+    assert_eq!(m.top, 50, "roundtrip top");
+    assert_eq!(m.bottom, 50, "roundtrip bottom");
 }
 
 /// All four margin axes must survive the roundtrip independently — catches
@@ -496,7 +551,12 @@ fn write_table_asymmetric_inner_margin_roundtrip() {
             blocks: vec![Block::Table {
                 rows,
                 col_count: 1,
-                inner_margin: Some(TableInnerMargin { left: 11, right: 22, top: 33, bottom: 44 }),
+                inner_margin: Some(TableInnerMargin {
+                    left: 11,
+                    right: 22,
+                    top: 33,
+                    bottom: 44,
+                }),
             }],
             page_layout: None,
             ..Default::default()
@@ -518,8 +578,8 @@ fn write_table_asymmetric_inner_margin_roundtrip() {
         })
         .expect("inner_margin must be Some after roundtrip");
 
-    assert_eq!(m.left,   11, "roundtrip left");
-    assert_eq!(m.right,  22, "roundtrip right");
-    assert_eq!(m.top,    33, "roundtrip top");
+    assert_eq!(m.left, 11, "roundtrip left");
+    assert_eq!(m.right, 22, "roundtrip right");
+    assert_eq!(m.top, 33, "roundtrip top");
     assert_eq!(m.bottom, 44, "roundtrip bottom");
 }

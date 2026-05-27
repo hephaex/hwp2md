@@ -4,7 +4,7 @@ use crate::ir::{self, InlineFormat};
 use super::context::{
     apply_charpr_attrs, flush_active_paragraph_scope, flush_cell_paragraph,
     flush_footnote_paragraph, flush_list_item_paragraph, flush_nested_scope,
-    flush_paragraph_staged, ParseContext, RubyPart, StagedBlock,
+    flush_paragraph_staged, CodeLangHint, ParseContext, RubyPart, StagedBlock,
 };
 
 // Handles all XML element parse logic; splitting would lose locality.
@@ -215,16 +215,13 @@ pub(super) fn handle_end_element(
                 std::mem::take(&mut ctx.current_text)
             };
             if !text.is_empty() {
-                let inline = ir::Inline::with_formatting(
-                    text,
-                    &InlineFormat::from(&ctx.fmt),
-                )
-                .with_font_name(ctx.fmt.font_name.clone())
-                .with_link(if ctx.in_hyperlink {
-                    ctx.hyperlink_url.clone()
-                } else {
-                    None
-                });
+                let inline = ir::Inline::with_formatting(text, &InlineFormat::from(&ctx.fmt))
+                    .with_font_name(ctx.fmt.font_name.clone())
+                    .with_link(if ctx.in_hyperlink {
+                        ctx.hyperlink_url.clone()
+                    } else {
+                        None
+                    });
                 ctx.push_inline(inline);
             }
         }
@@ -240,7 +237,11 @@ pub(super) fn handle_end_element(
             let inner_margin = ctx.table.inner_margin.take();
             if !ctx.table.rows.is_empty() {
                 let rows = std::mem::take(&mut ctx.table.rows);
-                staged.push(StagedBlock::Plain(ir::Block::Table { rows, col_count, inner_margin }));
+                staged.push(StagedBlock::Plain(ir::Block::Table {
+                    rows,
+                    col_count,
+                    inner_margin,
+                }));
             }
             ctx.table.active = false;
         }
@@ -252,7 +253,7 @@ pub(super) fn handle_end_element(
             });
         }
         "tc" | "hp:tc" => {
-            flush_cell_paragraph(ctx);
+            flush_cell_paragraph(ctx, CodeLangHint::Plain);
             let blocks = std::mem::take(&mut ctx.table.cell_blocks);
             ctx.table.current_row_cells.push(ir::TableCell {
                 blocks,
@@ -262,7 +263,7 @@ pub(super) fn handle_end_element(
             ctx.table.in_cell = false;
         }
         "li" | "hp:li" => {
-            flush_list_item_paragraph(ctx);
+            flush_list_item_paragraph(ctx, CodeLangHint::Plain);
             let blocks = std::mem::take(&mut ctx.list.item_blocks);
             ctx.list.items.push(ir::ListItem {
                 blocks,
@@ -309,22 +310,19 @@ pub(super) fn handle_end_element(
             let base = std::mem::take(&mut ctx.ruby_base_text);
             let annotation = std::mem::take(&mut ctx.ruby_annotation_text);
             if !base.is_empty() || !annotation.is_empty() {
-                let inline = ir::Inline::with_formatting(
-                    base,
-                    &InlineFormat::from(&ctx.fmt),
-                )
-                .with_ruby(if annotation.is_empty() {
-                    None
-                } else {
-                    Some(annotation)
-                });
+                let inline = ir::Inline::with_formatting(base, &InlineFormat::from(&ctx.fmt))
+                    .with_ruby(if annotation.is_empty() {
+                        None
+                    } else {
+                        Some(annotation)
+                    });
                 ctx.push_inline(inline);
             }
             ctx.in_ruby = false;
             ctx.ruby_current_part = RubyPart::None;
         }
         "fn" | "hp:fn" | "footnote" | "hp:footnote" | "en" | "hp:en" | "endnote" | "hp:endnote" => {
-            flush_footnote_paragraph(ctx);
+            flush_footnote_paragraph(ctx, CodeLangHint::Plain);
             if ctx.footnote.blocks.is_empty() {
                 ctx.footnote.id.clear();
             } else {

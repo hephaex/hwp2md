@@ -449,8 +449,14 @@ fn detect_korean_regulation_heading_amendment_notation_jo_ui_n() {
 fn detect_korean_regulation_heading_inline_reference_particle_returns_none() {
     // Korean grammatical particles directly after 장/절/조 signal an inline
     // reference, not a heading (e.g. "제3장은 적용되지 않는다").
-    assert_eq!(detect_korean_regulation_heading("제3장은 적용되지 않는다"), None);
-    assert_eq!(detect_korean_regulation_heading("제5조에서 정한 사항"), None);
+    assert_eq!(
+        detect_korean_regulation_heading("제3장은 적용되지 않는다"),
+        None
+    );
+    assert_eq!(
+        detect_korean_regulation_heading("제5조에서 정한 사항"),
+        None
+    );
     assert_eq!(detect_korean_regulation_heading("제2절의 규정"), None); // 의 + non-digit → None
 }
 
@@ -580,10 +586,22 @@ fn is_heading_terminator_canonical_allowed_set() {
     // Whitespace variants — is_whitespace() covers all Unicode White_Space chars
     assert!(is_heading_terminator(' '), "space");
     assert!(is_heading_terminator('\t'), "tab");
-    assert!(is_heading_terminator('\u{3000}'), "U+3000 ideographic space");
-    assert!(is_heading_terminator('\u{00A0}'), "U+00A0 non-breaking space");
-    assert!(is_heading_terminator('\u{202F}'), "U+202F narrow non-breaking space");
-    assert!(is_heading_terminator('\u{205F}'), "U+205F medium mathematical space");
+    assert!(
+        is_heading_terminator('\u{3000}'),
+        "U+3000 ideographic space"
+    );
+    assert!(
+        is_heading_terminator('\u{00A0}'),
+        "U+00A0 non-breaking space"
+    );
+    assert!(
+        is_heading_terminator('\u{202F}'),
+        "U+202F narrow non-breaking space"
+    );
+    assert!(
+        is_heading_terminator('\u{205F}'),
+        "U+205F medium mathematical space"
+    );
     // ASCII parens and brackets (both directions)
     assert!(is_heading_terminator('('), "open paren");
     assert!(is_heading_terminator(')'), "close paren");
@@ -639,10 +657,19 @@ fn is_heading_terminator_blocked_set() {
     assert!(!is_heading_terminator('"'), "double quote");
     // ASCII semicolon ';' is NOT in the allowlist — only the fullwidth variant '；' is.
     // This guards against accidentally promoting ASCII ';' to terminator status.
-    assert!(!is_heading_terminator(';'), "ASCII semicolon (fullwidth ； is allowed, ASCII ';' is not)");
+    assert!(
+        !is_heading_terminator(';'),
+        "ASCII semicolon (fullwidth ； is allowed, ASCII ';' is not)"
+    );
     // Zero-width chars that look whitespace-adjacent but are NOT Unicode White_Space.
-    assert!(!is_heading_terminator('\u{200B}'), "U+200B ZWSP is not is_whitespace() — must NOT terminate");
-    assert!(!is_heading_terminator('\u{FEFF}'), "U+FEFF BOM/ZWNBSP is not is_whitespace() — must NOT terminate");
+    assert!(
+        !is_heading_terminator('\u{200B}'),
+        "U+200B ZWSP is not is_whitespace() — must NOT terminate"
+    );
+    assert!(
+        !is_heading_terminator('\u{FEFF}'),
+        "U+FEFF BOM/ZWNBSP is not is_whitespace() — must NOT terminate"
+    );
 }
 
 #[test]

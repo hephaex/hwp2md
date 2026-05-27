@@ -1,5 +1,5 @@
-use super::sanitize_asset_name;
 use super::next_available_name;
+use super::sanitize_asset_name;
 use std::collections::HashMap;
 
 // -----------------------------------------------------------------------

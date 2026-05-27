@@ -4,11 +4,11 @@
 //! S45-07: Negative / edge-case tests
 //! S45-08: Round-trip tests (write IR → Markdown → parse back → compare)
 
-use crate::md::html_table::parse_html_table;
-use crate::md::write_markdown;
 use super::tests::first_section_blocks;
 use super::*;
 use crate::ir;
+use crate::md::html_table::parse_html_table;
+use crate::md::write_markdown;
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -24,9 +24,13 @@ fn cell_text(cell: &ir::TableCell) -> &str {
 
 #[test]
 fn parse_html_table_basic_2x2() {
-    let html = "<table>\n  <tr><td>A</td><td>B</td></tr>\n  <tr><td>C</td><td>D</td></tr>\n</table>\n";
+    let html =
+        "<table>\n  <tr><td>A</td><td>B</td></tr>\n  <tr><td>C</td><td>D</td></tr>\n</table>\n";
     let block = parse_html_table(html).expect("should parse 2x2 table");
-    if let ir::Block::Table { rows, col_count, .. } = block {
+    if let ir::Block::Table {
+        rows, col_count, ..
+    } = block
+    {
         assert_eq!(rows.len(), 2, "expected 2 rows");
         assert_eq!(col_count, 2, "expected col_count=2");
         assert_eq!(cell_text(&rows[0].cells[0]), "A");
@@ -42,7 +46,10 @@ fn parse_html_table_basic_2x2() {
 fn parse_html_table_colspan_only() {
     let html = "<table><tr><td colspan=\"2\">wide</td></tr></table>\n";
     let block = parse_html_table(html).expect("should parse colspan table");
-    if let ir::Block::Table { rows, col_count, .. } = block {
+    if let ir::Block::Table {
+        rows, col_count, ..
+    } = block
+    {
         assert_eq!(col_count, 2, "col_count should reflect colspan");
         let cell = &rows[0].cells[0];
         assert_eq!(cell.colspan, 2, "cell colspan must be 2");
@@ -71,7 +78,10 @@ fn parse_html_table_rowspan_only() {
 fn parse_html_table_colspan_and_rowspan() {
     let html = "<table><tr><td colspan=\"3\" rowspan=\"2\">big</td></tr></table>\n";
     let block = parse_html_table(html).expect("should parse colspan+rowspan table");
-    if let ir::Block::Table { rows, col_count, .. } = block {
+    if let ir::Block::Table {
+        rows, col_count, ..
+    } = block
+    {
         let cell = &rows[0].cells[0];
         assert_eq!(cell.colspan, 3);
         assert_eq!(cell.rowspan, 2);
@@ -88,8 +98,14 @@ fn parse_html_table_header_detection_all_th() {
     let block = parse_html_table(html).expect("should parse header table");
     if let ir::Block::Table { rows, .. } = block {
         assert_eq!(rows.len(), 2);
-        assert!(rows[0].is_header, "row with all <th> must be is_header=true");
-        assert!(!rows[1].is_header, "row with all <td> must be is_header=false");
+        assert!(
+            rows[0].is_header,
+            "row with all <th> must be is_header=true"
+        );
+        assert!(
+            !rows[1].is_header,
+            "row with all <td> must be is_header=false"
+        );
     } else {
         panic!("expected Block::Table");
     }
@@ -118,8 +134,15 @@ fn parse_html_table_thead_tbody_wrappers() {
         <tbody><tr><td>D1</td><td>D2</td></tr></tbody>\
         </table>\n";
     let block = parse_html_table(html).expect("should parse thead/tbody table");
-    if let ir::Block::Table { rows, col_count, .. } = block {
-        assert_eq!(rows.len(), 2, "should have 2 rows (one from thead, one from tbody)");
+    if let ir::Block::Table {
+        rows, col_count, ..
+    } = block
+    {
+        assert_eq!(
+            rows.len(),
+            2,
+            "should have 2 rows (one from thead, one from tbody)"
+        );
         assert_eq!(col_count, 2);
         assert!(rows[0].is_header);
         assert!(!rows[1].is_header);
@@ -160,7 +183,10 @@ fn parse_html_table_no_spans() {
     // Table without any span attributes — all cells default to colspan=1 rowspan=1.
     let html = "<table><tr><td>A</td><td>B</td><td>C</td></tr></table>\n";
     let block = parse_html_table(html).expect("should parse no-span table");
-    if let ir::Block::Table { rows, col_count, .. } = block {
+    if let ir::Block::Table {
+        rows, col_count, ..
+    } = block
+    {
         assert_eq!(col_count, 3);
         for cell in &rows[0].cells {
             assert_eq!(cell.colspan, 1);
@@ -177,7 +203,10 @@ fn parse_html_table_col_count_from_colspan() {
     let html = "<table><tr><td colspan=\"3\">all</td></tr></table>\n";
     let block = parse_html_table(html).expect("should parse colspan col_count table");
     if let ir::Block::Table { col_count, .. } = block {
-        assert_eq!(col_count, 3, "col_count should be sum of colspan in widest row");
+        assert_eq!(
+            col_count, 3,
+            "col_count should be sum of colspan in widest row"
+        );
     } else {
         panic!("expected Block::Table");
     }
@@ -310,7 +339,10 @@ fn html_table_roundtrip_no_spans() {
     ];
     let blocks = roundtrip(rows, 2);
     let table = blocks.iter().find_map(|b| {
-        if let ir::Block::Table { rows, col_count, .. } = b {
+        if let ir::Block::Table {
+            rows, col_count, ..
+        } = b
+        {
             Some((rows, *col_count))
         } else {
             None
@@ -359,7 +391,10 @@ fn html_table_roundtrip_colspan() {
     let (rt_rows, _) = blocks
         .iter()
         .find_map(|b| {
-            if let ir::Block::Table { rows, col_count, .. } = b {
+            if let ir::Block::Table {
+                rows, col_count, ..
+            } = b
+            {
                 Some((rows, *col_count))
             } else {
                 None
@@ -368,7 +403,10 @@ fn html_table_roundtrip_colspan() {
         .expect("round-trip must produce a Table block");
 
     assert_eq!(rt_rows.len(), 2, "round-trip row count must be 2");
-    assert_eq!(rt_rows[0].cells[0].colspan, 2, "colspan must survive round-trip");
+    assert_eq!(
+        rt_rows[0].cells[0].colspan, 2,
+        "colspan must survive round-trip"
+    );
     assert_eq!(cell_text(&rt_rows[0].cells[0]), "wide");
 }
 
@@ -389,7 +427,10 @@ fn html_table_roundtrip_asymmetric_spans() {
     let (rt_rows, _) = blocks
         .iter()
         .find_map(|b| {
-            if let ir::Block::Table { rows, col_count, .. } = b {
+            if let ir::Block::Table {
+                rows, col_count, ..
+            } = b
+            {
                 Some((rows, *col_count))
             } else {
                 None
@@ -410,11 +451,22 @@ fn html_table_roundtrip_asymmetric_spans() {
 fn parse_html_table_self_closing_td_not_dropped() {
     let html = "<table><tr><td/><td>B</td></tr></table>";
     let block = parse_html_table(html).expect("should parse table with self-closing <td/>");
-    if let ir::Block::Table { rows, col_count, .. } = block {
+    if let ir::Block::Table {
+        rows, col_count, ..
+    } = block
+    {
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].cells.len(), 2, "self-closing <td/> must not be dropped");
+        assert_eq!(
+            rows[0].cells.len(),
+            2,
+            "self-closing <td/> must not be dropped"
+        );
         assert_eq!(col_count, 2);
-        assert_eq!(cell_text(&rows[0].cells[0]), "", "self-closing cell has empty text");
+        assert_eq!(
+            cell_text(&rows[0].cells[0]),
+            "",
+            "self-closing cell has empty text"
+        );
         assert_eq!(cell_text(&rows[0].cells[1]), "B");
     } else {
         panic!("expected Block::Table");

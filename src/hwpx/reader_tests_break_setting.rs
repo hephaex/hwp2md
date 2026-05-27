@@ -10,14 +10,21 @@ fn break_setting_defaults_all_false() {
     assert!(!bs.widow_orphan, "widow_orphan must default to false");
     assert!(!bs.keep_with_next, "keep_with_next must default to false");
     assert!(!bs.keep_lines, "keep_lines must default to false");
-    assert!(!bs.page_break_before, "page_break_before must default to false");
+    assert!(
+        !bs.page_break_before,
+        "page_break_before must default to false"
+    );
 }
 
 /// Parsing an empty string (no header.xml) must yield all-false defaults.
 #[test]
 fn break_setting_empty_xml_yields_defaults() {
     let bs = parse_break_setting("");
-    assert_eq!(bs, BreakSetting::default(), "empty XML must yield default BreakSetting");
+    assert_eq!(
+        bs,
+        BreakSetting::default(),
+        "empty XML must yield default BreakSetting"
+    );
 }
 
 /// A header.xml with no paraPr must yield all-false defaults.
@@ -30,7 +37,11 @@ fn break_setting_no_para_pr_yields_defaults() {
   </hh:refList>
 </hh:head>"#;
     let bs = parse_break_setting(xml);
-    assert_eq!(bs, BreakSetting::default(), "header with no paraPr must yield defaults");
+    assert_eq!(
+        bs,
+        BreakSetting::default(),
+        "header with no paraPr must yield defaults"
+    );
 }
 
 /// `widowOrphan="true"` in the id=0 paraPr must be parsed as `true`.
@@ -72,7 +83,10 @@ fn break_setting_keep_with_next_true_parsed() {
 </hh:head>"#;
     let bs = parse_break_setting(xml);
     assert!(!bs.widow_orphan, "widowOrphan must remain false");
-    assert!(bs.keep_with_next, "keepWithNext=\"true\" must parse to true");
+    assert!(
+        bs.keep_with_next,
+        "keepWithNext=\"true\" must parse to true"
+    );
     assert!(!bs.keep_lines, "keepLines must remain false");
     assert!(!bs.page_break_before, "pageBreakBefore must remain false");
 }
@@ -115,7 +129,11 @@ fn break_setting_all_false_parsed() {
   </hh:refList>
 </hh:head>"#;
     let bs = parse_break_setting(xml);
-    assert_eq!(bs, BreakSetting::default(), "all-false paraPr must equal BreakSetting::default()");
+    assert_eq!(
+        bs,
+        BreakSetting::default(),
+        "all-false paraPr must equal BreakSetting::default()"
+    );
 }
 
 /// Only id=0 is read; a breakSetting in id=1 must not affect the result.

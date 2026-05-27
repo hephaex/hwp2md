@@ -93,7 +93,10 @@ fn control_to_block_table_groups_cells_into_rows() {
     };
     let doc_info = DocInfo::default();
     let block = control_to_block(&ctrl, &doc_info).expect("Some");
-    if let ir::Block::Table { rows, col_count, .. } = block {
+    if let ir::Block::Table {
+        rows, col_count, ..
+    } = block
+    {
         assert_eq!(col_count, 2);
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].cells.len(), 2);

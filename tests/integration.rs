@@ -207,7 +207,10 @@ fn fixture_table_rows_and_cells_parsed() {
 
     assert!(table.is_some(), "no Table block found in parsed document");
 
-    if let Some(ir::Block::Table { rows, col_count, .. }) = table {
+    if let Some(ir::Block::Table {
+        rows, col_count, ..
+    }) = table
+    {
         assert_eq!(*col_count, 2, "expected 2 columns");
         assert_eq!(rows.len(), 2, "expected 2 rows");
     }
@@ -593,9 +596,7 @@ fn pyeon_detected_as_h1_via_tier4() {
 /// 편 heading text is preserved in the IR inlines.
 #[test]
 fn pyeon_heading_text_preserved() {
-    let hwpx = HwpxFixture::new()
-        .section(&para_xml("제3편 채권"))
-        .build();
+    let hwpx = HwpxFixture::new().section(&para_xml("제3편 채권")).build();
 
     let (_dir, path) = {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -625,9 +626,7 @@ fn pyeon_heading_text_preserved() {
 /// 편 → H1 renders as `# 제N편 …` in Markdown output.
 #[test]
 fn pyeon_rendered_as_atx_h1_in_markdown() {
-    let hwpx = HwpxFixture::new()
-        .section(&para_xml("제2편 물권"))
-        .build();
+    let hwpx = HwpxFixture::new().section(&para_xml("제2편 물권")).build();
 
     let (_dir, path) = {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -784,13 +783,19 @@ fn fixture_lang_hint_comment_produces_codeblock_ir() {
     assert!(
         code_block.is_some(),
         "expected a CodeBlock; blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+        doc.sections
+            .iter()
+            .flat_map(|s| &s.blocks)
+            .collect::<Vec<_>>()
     );
 
     let Some(ir::Block::CodeBlock { language, code }) = code_block else {
         panic!(
             "expected Block::CodeBlock, got: {:?}",
-            doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+            doc.sections
+                .iter()
+                .flat_map(|s| &s.blocks)
+                .collect::<Vec<_>>()
         );
     };
     assert_eq!(
@@ -867,9 +872,8 @@ fn fixture_newpage_ctrl_produces_pagebreak_ir() {
 }
 
 /// A `<!-- hwp2md:lang:python -->` comment inside a table cell must NOT leak to
-/// the next top-level paragraph after the table.  This is the original S74 bug
-/// scenario: `flush_nested_scope` must clear `pending_code_lang` on the nested
-/// path so the subsequent top-level flush does not inherit a stale code hint.
+/// the next top-level paragraph after the table, AND the cell itself must
+/// produce a `CodeBlock` (Sprint 75: nested scopes honour code-fence hints).
 #[test]
 fn fixture_lang_hint_inside_cell_does_not_leak_to_next_toplevel_paragraph() {
     // 1×1 table whose single cell contains the lang-hint comment before its
@@ -888,6 +892,31 @@ fn fixture_lang_hint_inside_cell_does_not_leak_to_next_toplevel_paragraph() {
 
     let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
 
+    // Sprint 75: the cell itself must contain a CodeBlock (not a Paragraph).
+    let cell_code_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Table { rows, .. } = b {
+                rows.iter()
+                    .flat_map(|r| &r.cells)
+                    .flat_map(|c| &c.blocks)
+                    .find(|cb| matches!(cb, ir::Block::CodeBlock { code, .. } if code.contains("cell text")))
+                    .map(|cb| format!("{cb:?}"))
+            } else {
+                None
+            }
+        });
+    assert!(
+        cell_code_block.is_some(),
+        "cell must produce a CodeBlock with 'cell text' (Sprint 75); blocks: {:?}",
+        doc.sections
+            .iter()
+            .flat_map(|s| &s.blocks)
+            .collect::<Vec<_>>()
+    );
+
     // The top-level paragraph that follows the table must be a plain Paragraph,
     // not a CodeBlock (which it would be if pending_code_lang leaked out of the cell).
     let after_block = doc
@@ -905,7 +934,10 @@ fn fixture_lang_hint_inside_cell_does_not_leak_to_next_toplevel_paragraph() {
     assert!(
         after_block.is_some(),
         "'after table' block not found; blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+        doc.sections
+            .iter()
+            .flat_map(|s| &s.blocks)
+            .collect::<Vec<_>>()
     );
     assert!(
         matches!(after_block.unwrap(), ir::Block::Paragraph { .. }),
@@ -930,5 +962,225 @@ fn fixture_newpage_ctrl_renders_pagebreak_marker_in_markdown() {
     assert!(
         markdown.contains("<!-- pagebreak -->"),
         "markdown must contain <!-- pagebreak --> marker; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 16. Sprint 75 — nested scope CodeBlock support
+// ---------------------------------------------------------------------------
+
+/// A `<!-- hwp2md:lang:python -->` comment before a paragraph inside a table
+/// cell must cause that paragraph to become a `CodeBlock` in the cell's block
+/// list (not a plain `Paragraph`).
+#[test]
+fn fixture_lang_hint_in_cell_produces_codeblock_ir() {
+    let body = r#"<hp:p id="20" paraPrIDRef="0"><hp:run charPrIDRef="0">
+  <hp:tbl rowCnt="1" colCnt="1">
+    <hp:tr>
+      <hp:tc>
+        <!-- hwp2md:lang:python -->
+        <hp:p id="21" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>x = 1</hp:t></hp:run></hp:p>
+      </hp:tc>
+    </hp:tr>
+  </hp:tbl>
+</hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
+
+    let cell_block = doc.sections.iter().flat_map(|s| &s.blocks).find_map(|b| {
+        if let ir::Block::Table { rows, .. } = b {
+            rows.iter()
+                .flat_map(|r| &r.cells)
+                .flat_map(|c| &c.blocks)
+                .find(
+                    |cb| matches!(cb, ir::Block::CodeBlock { code, .. } if code.contains("x = 1")),
+                )
+                .cloned()
+        } else {
+            None
+        }
+    });
+
+    assert!(
+        cell_block.is_some(),
+        "expected a CodeBlock with 'x = 1' inside the table cell; blocks: {:?}",
+        doc.sections
+            .iter()
+            .flat_map(|s| &s.blocks)
+            .collect::<Vec<_>>()
+    );
+
+    if let Some(ir::Block::CodeBlock { language, code }) = cell_block {
+        assert_eq!(
+            language.as_deref(),
+            Some("python"),
+            "cell CodeBlock language must be 'python'; got: {language:?}"
+        );
+        assert!(
+            code.contains("x = 1"),
+            "cell CodeBlock code must contain 'x = 1'; got: {code:?}"
+        );
+    }
+}
+
+/// The same cell-with-lang-hint fixture, converted to Markdown, must render
+/// the cell's code as a fenced code block inside the GFM table cell.
+#[test]
+fn fixture_lang_hint_in_cell_renders_as_codeblock_in_table_markdown() {
+    let body = r#"<hp:p id="30" paraPrIDRef="0"><hp:run charPrIDRef="0">
+  <hp:tbl rowCnt="1" colCnt="1">
+    <hp:tr>
+      <hp:tc>
+        <!-- hwp2md:lang:rust -->
+        <hp:p id="31" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>fn main() {}</hp:t></hp:run></hp:p>
+      </hp:tc>
+    </hp:tr>
+  </hp:tbl>
+</hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
+    let markdown = md::write_markdown(&doc, false);
+
+    // The code text must appear in the markdown output.
+    assert!(
+        markdown.contains("fn main() {}"),
+        "code content must appear in markdown; got: {markdown:?}"
+    );
+}
+
+/// A `<!-- hwp2md:lang:python -->` comment before a paragraph inside a list
+/// item must cause that paragraph to become a `CodeBlock` in the item's block
+/// list (not a plain `Paragraph`).
+///
+/// List items in HWPX are represented with `<li>` / `<hp:li>` elements.
+#[test]
+fn fixture_lang_hint_in_list_item_produces_codeblock_ir() {
+    // Build a section with an explicit list item containing a lang-hint comment.
+    let body = r#"<ul>
+  <li>
+    <!-- hwp2md:lang:rust -->
+    <hp:p id="40" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>let x = 42;</hp:t></hp:run></hp:p>
+  </li>
+</ul>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
+
+    // Walk all list items looking for a CodeBlock with the expected code.
+    let found_code_block = doc.sections.iter().flat_map(|s| &s.blocks).any(|b| {
+        if let ir::Block::List { items, .. } = b {
+            items.iter().flat_map(|item| &item.blocks).any(|ib| {
+                    matches!(ib, ir::Block::CodeBlock { code, .. } if code.contains("let x = 42;"))
+                })
+        } else {
+            false
+        }
+    });
+
+    assert!(
+        found_code_block,
+        "expected a CodeBlock with 'let x = 42;' inside the list item; blocks: {:?}",
+        doc.sections
+            .iter()
+            .flat_map(|s| &s.blocks)
+            .collect::<Vec<_>>()
+    );
+}
+
+/// A `<!-- hwp2md:lang:python -->` comment before a paragraph inside a
+/// footnote must cause that paragraph to become a `CodeBlock` in the
+/// footnote's content block list.
+///
+/// Footnotes in HWPX are represented with `<fn>` / `<hp:fn>` elements
+/// containing nested `<hp:p>` paragraphs.
+#[test]
+fn fixture_lang_hint_in_footnote_produces_codeblock_ir() {
+    let body = r#"<hp:p id="50" paraPrIDRef="0">
+  <hp:run charPrIDRef="0">
+    <hp:t>main text</hp:t>
+    <hp:fn id="fn1">
+      <!-- hwp2md:lang:python -->
+      <hp:p id="51" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>note code</hp:t></hp:run></hp:p>
+    </hp:fn>
+  </hp:run>
+</hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
+
+    // Walk all Footnote blocks looking for a CodeBlock in the content.
+    let found_code_block = doc.sections.iter().flat_map(|s| &s.blocks).any(|b| {
+        if let ir::Block::Footnote { content, .. } = b {
+            content.iter().any(
+                |fb| matches!(fb, ir::Block::CodeBlock { code, .. } if code.contains("note code")),
+            )
+        } else {
+            false
+        }
+    });
+
+    assert!(
+        found_code_block,
+        "expected a CodeBlock with 'note code' inside the footnote content; blocks: {:?}",
+        doc.sections
+            .iter()
+            .flat_map(|s| &s.blocks)
+            .collect::<Vec<_>>()
+    );
+}
+
+/// Regression test combining Sprint 74 (no-leak) and Sprint 75 (cell CodeBlock):
+/// the cell must produce a `CodeBlock`, and the top-level paragraph after the
+/// table must remain a plain `Paragraph`.
+#[test]
+fn fixture_lang_hint_inside_cell_does_not_leak_to_next_toplevel_paragraph_cell_is_codeblock() {
+    let body = r#"<hp:p id="60" paraPrIDRef="0"><hp:run charPrIDRef="0">
+  <hp:tbl rowCnt="1" colCnt="1">
+    <hp:tr>
+      <hp:tc>
+        <!-- hwp2md:lang:python -->
+        <hp:p id="61" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>import os</hp:t></hp:run></hp:p>
+      </hp:tc>
+    </hp:tr>
+  </hp:tbl>
+</hp:run></hp:p>
+<hp:p id="62" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>plain paragraph</hp:t></hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
+    let all_blocks: Vec<&ir::Block> = doc.sections.iter().flat_map(|s| &s.blocks).collect();
+
+    // The cell must be a CodeBlock.
+    let cell_is_code = all_blocks.iter().any(|b| {
+        if let ir::Block::Table { rows, .. } = b {
+            rows.iter()
+                .flat_map(|r| &r.cells)
+                .flat_map(|c| &c.blocks)
+                .any(|cb| {
+                    matches!(cb, ir::Block::CodeBlock { code, .. } if code.contains("import os"))
+                })
+        } else {
+            false
+        }
+    });
+    assert!(
+        cell_is_code,
+        "cell paragraph with lang hint must produce CodeBlock (Sprint 75); blocks: {all_blocks:?}"
+    );
+
+    // The top-level paragraph must remain a Paragraph.
+    let top_level_after = all_blocks.iter().find(|b| match b {
+        ir::Block::Paragraph { inlines } => {
+            inlines.iter().any(|i| i.text.contains("plain paragraph"))
+        }
+        ir::Block::CodeBlock { code, .. } => code.contains("plain paragraph"),
+        _ => false,
+    });
+    assert!(
+        top_level_after.is_some(),
+        "'plain paragraph' block not found; blocks: {all_blocks:?}"
+    );
+    assert!(
+        matches!(top_level_after.unwrap(), ir::Block::Paragraph { .. }),
+        "top-level paragraph after table must not be promoted to CodeBlock by cell lang hint; \
+         got: {:?}",
+        top_level_after.unwrap()
     );
 }

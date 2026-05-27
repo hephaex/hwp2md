@@ -110,7 +110,9 @@ fn write_block(out: &mut String, block: &ir::Block, indent: usize) {
                 let _ = writeln!(out, "{prefix}{safe}\n");
             }
         }
-        ir::Block::Table { rows, col_count, .. } => {
+        ir::Block::Table {
+            rows, col_count, ..
+        } => {
             write_table(out, rows, *col_count);
         }
         ir::Block::CodeBlock { language, code } => {

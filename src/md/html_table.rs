@@ -66,7 +66,11 @@ pub fn parse_html_table(literal: &str) -> Option<ir::Block> {
         .max()
         .unwrap_or(0);
 
-    Some(ir::Block::Table { rows, col_count, inner_margin: None })
+    Some(ir::Block::Table {
+        rows,
+        col_count,
+        inner_margin: None,
+    })
 }
 
 /// Walk `quick_xml` events for a `<table>` block and return completed rows.
@@ -107,8 +111,12 @@ fn walk_table_events(reader: &mut Reader<&[u8]>) -> Option<Vec<ir::TableRow>> {
                         }
                         let is_th = local.eq_ignore_ascii_case("th");
                         let (colspan, rowspan) = parse_span_attrs(e);
-                        current_cell =
-                            Some(CellBuilder { text: String::new(), colspan, rowspan, is_th });
+                        current_cell = Some(CellBuilder {
+                            text: String::new(),
+                            colspan,
+                            rowspan,
+                            is_th,
+                        });
                     }
                     _ => {}
                 }
@@ -140,7 +148,12 @@ fn walk_table_events(reader: &mut Reader<&[u8]>) -> Option<Vec<ir::TableRow>> {
                         }
                         let is_th = local.eq_ignore_ascii_case("th");
                         let (colspan, rowspan) = parse_span_attrs(e);
-                        let cell = CellBuilder { text: String::new(), colspan, rowspan, is_th };
+                        let cell = CellBuilder {
+                            text: String::new(),
+                            colspan,
+                            rowspan,
+                            is_th,
+                        };
                         if let Some(row) = current_row.as_mut() {
                             row.cells.push(cell);
                         }

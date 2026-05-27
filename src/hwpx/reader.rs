@@ -9,7 +9,7 @@ use std::path::Path;
 #[path = "context/mod.rs"]
 mod context;
 pub(crate) use context::ParseContext;
-use context::{flush_paragraph_staged, group_list_paragraphs, StagedBlock};
+use context::{flush_paragraph_staged, group_list_paragraphs, CodeLangHint, StagedBlock};
 
 #[path = "handlers.rs"]
 mod handlers;
@@ -486,7 +486,10 @@ pub(crate) fn parse_section_xml_with_face_names(
                     } else {
                         Some(lang_part.to_string())
                     };
-                    context.pending_code_lang = Some(language);
+                    context.pending_code_lang = match language {
+                        None => CodeLangHint::CodeNoLang,
+                        Some(lang) => CodeLangHint::Code(lang),
+                    };
                 }
             }
             Ok(Event::Eof) => break,
