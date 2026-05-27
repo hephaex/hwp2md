@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 72 완료 (build_block 헬퍼 추출 + list-staging 정밀화)
+## 현재 상태: v0.5.0 Sprint 73 완료 (HWPX tier-3 heading 감지 + nested scope dedup)
 
 ### 완료
 
@@ -709,6 +709,56 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+### 2026-05-27 — v0.5.0 Sprint 73: HWPX tier-3 heading 감지 + nested scope dedup
+
+**S73-01: HWPX tier-3 heading 감지** (`src/hwpx/context/state.rs`, `src/hwpx/context/mod.rs`, `src/hwpx/context/flush.rs`, `src/hwpx/handlers.rs`):
+
+Sprint 73 P3 해결. HWP binary reader의 tier-1/2/3/4 파이프라인에서 HWPX reader는 tier-3(폰트 높이 + bold) 감지가 없었음.
+
+- `FormattingState.font_height: Option<u32>` — charPr `height` 속성 캡처
+- `ParseContext.para_max_font_height: u32`, `para_max_font_height_bold: bool` — 단락 내 최대 폰트 높이 추적
+- `apply_charpr_attrs` `"height"` 핸들러 + max 갱신 로직 추가
+- 상수: `HWPX_H1_MIN_HEIGHT=1600`, `HWPX_H2_MIN_HEIGHT=1400`, `HWPX_H3_MIN_HEIGHT=1200`
+- `effective_heading_level(style_level, inlines, height_hint: Option<(u32, bool)>)` — tier-3: bold+폰트높이 임계값; 100자 이상 본문 가드
+- `build_block` + `flush_paragraph_staged`: `height_hint=Some((para_max_font_height, para_max_font_height_bold))` 전달
+- `<hp:p>` start: `para_max_font_height=0`, `para_max_font_height_bold=false` 리셋
+
+**S73-02: `flush_nested_scope` 헬퍼 추출** (`src/hwpx/context/flush.rs`, `src/hwpx/handlers.rs`):
+
+Sprint 73 P2 해결. `flush_active_paragraph_scope`와 `handlers.rs` p-end 핸들러의 5-분기 중첩 스코프 라우터 중복 → `flush_nested_scope` 추출.
+
+```rust
+pub(crate) fn flush_nested_scope(ctx: &mut ParseContext) -> bool {
+    // header → footer → footnote → cell → list (cell-first 통일)
+    // true 반환: 중첩 스코프 flush 완료; false: 최상위 (호출자가 책임)
+}
+```
+
+- `handlers.rs` p-end: `flush_nested_scope(ctx)` 호출 → false이면 `flush_paragraph_staged`
+- `flush_active_paragraph_scope`: `flush_nested_scope(ctx)` 호출 → false이면 top-level flush
+- docstring: 분기 순서(cell-first) 명시 + 이전 list-first와 통일 이유 기록
+
+**S73 follow-up** (`src/hwpx/context/flush.rs`, `src/hwpx/reader_tests_charpr.rs`):
+
+코드 리뷰 H1/M1 해결:
+- H1: `flush_nested_scope` docstring에 cell-first 순서 통일 명시 (이전 `flush_active_paragraph_scope`는 list-first였음)
+- M1: `tier3_99char_boundary_promotes_to_heading` 추가 — 99자에서는 가드 미발동(>= 100), H1 promote 확인
+
+**신규 테스트** (`src/hwpx/reader_tests_charpr.rs`): 12+1건 = 13건
+- `apply_charpr_attrs` height 파싱 4건 (기본/max 추적/낮은 값 무시/갱신)
+- 통합 7건 (H1/H2/H3 promote, not-bold 가드, threshold 미달, 100자 가드, style-level 우선)
+- 99자 경계 1건 (follow-up)
+- 회귀 1건 (style_level_takes_priority)
+
+**Commits**: `b354d5d` (refactor:sprint73) + `9f26193` (docs:follow-up)
+
+**검증**: 1435 tests (0 failures). Clippy -D warnings 0 경고.
+
+**리뷰 (code-reviewer opus)**: 조건부 APPROVE. CRITICAL/HIGH 없음. H1(flush_nested_scope 분기 순서 변경 명시화) + M1(99자 경계 테스트) — 모두 follow-up에서 해결.
+리뷰 전문: `~/.claude/references/2026-05-27_hwp2md_sprint73_tier3_heading_review.md`
+
+---
 
 ### 2026-05-26 — v0.5.0 Sprint 72: build_block 헬퍼 추출 + list-staging 정밀화
 
