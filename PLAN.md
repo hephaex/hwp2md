@@ -201,14 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 77 로드맵
+## Sprint 78 로드맵
 
-Sprint 76 완료 (2026-05-27). CodeBlock 중복 제거 + HeaderFooterState 헬퍼 + HWPX 왕복 안정성 테스트.
+Sprint 77 완료 (2026-05-27). HWPTAG_NUMBERING 파싱 + Tier-4 정책 doc-comment + lang-hint 헬퍼.
 
 - **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지)
-- **P2**: `flush_inlines_to_blocks` Plain fallback에 Tier-4 heading detection 적용 여부 결정 — 현재 nested scope에서는 한국 법령 헤딩이 감지되지 않음; top-level과 동일하게 할지 명시적 정책화
-- **P3**: HWP 5.0 reader 개선 — Phase 2 항목(테이블, 이미지, 하이퍼링크) 중 가장 완성도 낮은 것부터
-- **P4**: `HwpxFixture`에 lang-hint comment 삽입 헬퍼 추가 (현재 raw XML 문자열로 삽입 중)
+- **P2**: HWPTAG_NUMBERING byte 오프셋 실제 HWP 파일 검증 — 단위 테스트는 합성 데이터 기반; 실 파일로 ordered/unordered 결정 정확도 측정
+- **P3**: HWP 5.0 reader Phase 2 — 하이퍼링크(CTRL_HYPERLINK) 파싱 개선 또는 이미지(BinData) 추출
+- **P4**: HwpxFixture lang-hint 마이그레이션 나머지 완료 (현재 2건 마이그레이션, 6+건 잔여)
 
 ## 라이선스
 

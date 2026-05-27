@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 75 완료 (CodeLangHint enum + nested scope CodeBlock 지원)
+## 현재 상태: v0.5.0 Sprint 77 완료 (HWPTAG_NUMBERING 파싱 + Tier-4 정책 doc-comment + lang-hint 헬퍼)
 
 ### 완료
 
@@ -709,6 +709,40 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 77 — 2026-05-27
+**주제**: HWPTAG_NUMBERING 파싱 + Tier-4 정책 명시화 + lang-hint 헬퍼
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/hwpx/context/flush.rs` | Tier-4 정책 doc-comment 추가 (flush_inlines_to_blocks, build_block, effective_heading_level) |
+| `src/hwp/record.rs` | HWPTAG_NUMBERING(0x001C), HWPTAG_BULLET(0x001D) 상수 추가 |
+| `src/hwp/model.rs` | NumberingDef { id, ordered } + DocInfo::numbering_defs 추가 |
+| `src/hwp/reader.rs` | read_doc_info에 NUMBERING/BULLET match arm 추가 |
+| `src/hwp/convert.rs` | detect_list_kind Tier-1: numbering_defs 이진 조회 → text 휴리스틱 fallback |
+| `src/hwp/reader_tests.rs` | NumberingDef 파싱 단위 테스트 5건 |
+| `src/hwp/convert_tests_detect.rs` | detect_list_kind def 기반 결정 단위 테스트 5건 |
+| `tests/fixtures/mod.rs` | lang_hint_comment(), lang_hint_para_xml(), with_lang_hint_paragraph() 헬퍼 |
+| `tests/integration.rs` | 테스트 2건 lang-hint 헬퍼로 마이그레이션 |
+
+### 검증
+- **1463 tests, 0 failures** (커밋 `deb87b3`)
+- Clippy: 0 경고
+
+### 리뷰 요약 (opus)
+**REQUEST CHANGES → APPROVE (follow-up 3eeba30)**. S77-02(HWPTAG_NUMBERING) HIGH 3건:
+- HIGH-1: `data[2]` 오프셋 오류 → `data[0]` (`parse_numbering_ordered` 추출)
+- HIGH-2: NUMBERING/BULLET ID 공간 공유 → BULLET arm no-op으로 분리
+- HIGH-3: 테스트가 수식 인라인 중복 → `super::parse_numbering_ordered` 직접 호출
+- MED-2: `<= 26` 항상-true → `<= 6` (ordered numeric formats 0-6)
+리뷰 전문: `~/.claude/references/2026-05-27_hwp2md_sprint77_numbering_parsing_review.md`
+
+### 관련 커밋
+- `deb87b3` feat(hwp): Sprint 77 — HWPTAG_NUMBERING parsing + Tier-4 policy doc + lang-hint helper
+- `3eeba30` fix(hwp): Sprint 77 follow-up — HIGH-1/2/3 byte offset + ID space + testability
+
+---
 
 ## Sprint 76 — 2026-05-27
 **주제**: CodeBlock 중복 제거 + HeaderFooterState 헬퍼 추출 + HWPX 왕복 안정성 테스트
