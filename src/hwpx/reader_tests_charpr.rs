@@ -748,6 +748,23 @@ fn tier3_100char_guard_prevents_heading() {
 }
 
 #[test]
+fn tier3_99char_boundary_promotes_to_heading() {
+    // 1600 pt + bold + exactly 99 characters → guard is `>= 100`, so 99 must still promote
+    let text_99 = "가".repeat(99);
+    let sec = tier3_section(&text_99, 1600, true);
+    assert_eq!(sec.blocks.len(), 1);
+    match &sec.blocks[0] {
+        ir::Block::Heading { level, .. } => {
+            assert_eq!(
+                *level, 1,
+                "99-char bold 1600pt must promote to H1 (guard fires at >= 100); got level {level}"
+            );
+        }
+        other => panic!("expected Heading block for 99-char text, got {other:?}"),
+    }
+}
+
+#[test]
 fn tier3_style_level_takes_priority_over_height() {
     // styleIDRef="2" (tier-1/2) + 1600pt bold → must use tier-1 level H2, not H1
     let xml = r#"<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"

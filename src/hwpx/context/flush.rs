@@ -406,6 +406,10 @@ pub(crate) fn flush_footer_paragraph(ctx: &mut ParseContext) {
 ///
 /// Returns `true` when a nested scope was flushed; `false` at top level.
 /// Callers that return `false` are responsible for the top-level flush.
+///
+/// Branch order: header → footer → footnote → **cell → list** (cell-first).
+/// The previous `flush_active_paragraph_scope` top-level handler used list-first;
+/// this function unifies to cell-first throughout, matching `handlers.rs` table logic.
 pub(crate) fn flush_nested_scope(ctx: &mut ParseContext) -> bool {
     if ctx.header_footer.in_header {
         flush_header_paragraph(ctx);
