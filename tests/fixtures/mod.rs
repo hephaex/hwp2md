@@ -28,6 +28,12 @@ pub struct HwpxFixture {
     /// Raw XML snippets (paragraph / table / etc.) that go *inside* `<hs:sec …>`.
     section_body: String,
     bin_data_entries: Vec<(String, Vec<u8>)>, // (name, data)
+    /// Optional raw XML that is embedded inside `<hp:header>` within a
+    /// `<hp:headerFooter>` element appended to the section body.
+    header_xml: Option<String>,
+    /// Optional raw XML that is embedded inside `<hp:footer>` within a
+    /// `<hp:headerFooter>` element appended to the section body.
+    footer_xml: Option<String>,
 }
 
 impl HwpxFixture {
@@ -37,6 +43,8 @@ impl HwpxFixture {
             author: None,
             section_body: String::new(),
             bin_data_entries: Vec::new(),
+            header_xml: None,
+            footer_xml: None,
         }
     }
 
@@ -60,6 +68,32 @@ impl HwpxFixture {
     #[allow(dead_code)]
     pub fn bin_data(mut self, name: &str, data: Vec<u8>) -> Self {
         self.bin_data_entries.push((name.to_owned(), data));
+        self
+    }
+
+    /// Embed raw XML paragraphs inside a `<hp:header>` element.
+    ///
+    /// The XML is placed inside a `<hp:headerFooter>` wrapper that is appended
+    /// to the section body.  Use this to test lang-hint comment handling in
+    /// the header parsing path.
+    ///
+    /// Calling this more than once replaces the previous header XML.
+    #[allow(dead_code)]
+    pub fn with_header_xml(mut self, xml: &str) -> Self {
+        self.header_xml = Some(xml.to_owned());
+        self
+    }
+
+    /// Embed raw XML paragraphs inside a `<hp:footer>` element.
+    ///
+    /// Analogous to [`with_header_xml`] but routes content into
+    /// `<hp:footer>` instead.  The `<hp:headerFooter>` wrapper is shared with
+    /// any header XML set via `with_header_xml`.
+    ///
+    /// Calling this more than once replaces the previous footer XML.
+    #[allow(dead_code)]
+    pub fn with_footer_xml(mut self, xml: &str) -> Self {
+        self.footer_xml = Some(xml.to_owned());
         self
     }
 
@@ -96,8 +130,12 @@ impl HwpxFixture {
 
         // Contents/section0.xml
         zip.start_file("Contents/section0.xml", deflated).unwrap();
-        zip.write_all(build_section_xml(&self.section_body).as_bytes())
-            .unwrap();
+        let section_xml = build_section_xml_with_hf(
+            &self.section_body,
+            self.header_xml.as_deref(),
+            self.footer_xml.as_deref(),
+        );
+        zip.write_all(section_xml.as_bytes()).unwrap();
 
         for (name, data) in &self.bin_data_entries {
             zip.start_file(format!("BinData/{name}"), stored).unwrap();
@@ -151,12 +189,32 @@ fn build_header_xml(title: &str, author: &str) -> String {
     )
 }
 
-fn build_section_xml(body: &str) -> String {
+fn build_section_xml_with_hf(
+    body: &str,
+    header_xml: Option<&str>,
+    footer_xml: Option<&str>,
+) -> String {
+    // Build the optional <hp:headerFooter> element when at least one of header
+    // or footer XML is provided.
+    let hf_block = match (header_xml, footer_xml) {
+        (None, None) => String::new(),
+        (h, f) => {
+            let header_part = h.map_or(String::new(), |xml| {
+                format!("  <hp:header>\n{xml}\n  </hp:header>")
+            });
+            let footer_part = f.map_or(String::new(), |xml| {
+                format!("  <hp:footer>\n{xml}\n  </hp:footer>")
+            });
+            format!("<hp:headerFooter>\n{header_part}{footer_part}\n</hp:headerFooter>")
+        }
+    };
+
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
         xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">
 {body}
+{hf_block}
 </hs:sec>"#
     )
 }

@@ -1025,6 +1025,19 @@ fn fixture_lang_hint_in_cell_produces_codeblock_ir() {
 
 /// The same cell-with-lang-hint fixture, converted to Markdown, must render
 /// the cell's code as a fenced code block inside the GFM table cell.
+///
+/// NOTE: GFM table cells cannot truly host fenced code blocks — a fenced block
+/// is a block-level construct and a GFM table row is a single line.  The
+/// renderer serialises the `CodeBlock` IR node via `write_block`, which emits
+/// the standard `` ``` `` fence, trims it, and embeds the result inline in the
+/// `| … |` cell column.  The markdown is therefore not valid GFM for
+/// round-tripping purposes, but it does preserve the code content and the
+/// fence markers in the output, which is the best achievable for this case.
+///
+/// Assertions distinguish a `CodeBlock` output from a plain `Paragraph`:
+/// * The code text itself must be present.
+/// * The language-tagged backtick fence (`` ```rust ``) must be present,
+///   proving the block was serialised as `CodeBlock`, not `Paragraph`.
 #[test]
 fn fixture_lang_hint_in_cell_renders_as_codeblock_in_table_markdown() {
     let body = r#"<hp:p id="30" paraPrIDRef="0"><hp:run charPrIDRef="0">
@@ -1041,10 +1054,27 @@ fn fixture_lang_hint_in_cell_renders_as_codeblock_in_table_markdown() {
     let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
     let markdown = md::write_markdown(&doc, false);
 
-    // The code text must appear in the markdown output.
+    // The code content must appear in the markdown output.
     assert!(
         markdown.contains("fn main() {}"),
         "code content must appear in markdown; got: {markdown:?}"
+    );
+
+    // The language-tagged code fence must be present.  A plain Paragraph would
+    // emit the text without any backtick markers; the presence of "```rust"
+    // confirms the block was serialised as a CodeBlock, not a Paragraph.
+    assert!(
+        markdown.contains("```rust"),
+        "markdown must contain the ```rust language fence to confirm CodeBlock serialisation \
+         (not plain Paragraph); got: {markdown:?}"
+    );
+
+    // A closing fence must also be present, confirming the fence is well-formed.
+    let fence_open = markdown.find("```rust").unwrap();
+    let after_open = &markdown[fence_open + 7..]; // skip "```rust"
+    assert!(
+        after_open.contains("```"),
+        "a closing ``` fence must follow the opening ```rust; got: {markdown:?}"
     );
 }
 
@@ -1182,5 +1212,108 @@ fn fixture_lang_hint_inside_cell_does_not_leak_to_next_toplevel_paragraph_cell_i
         "top-level paragraph after table must not be promoted to CodeBlock by cell lang hint; \
          got: {:?}",
         top_level_after.unwrap()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 17. Sprint 75 follow-up — lang-hint CodeBlock in header and footer scopes
+// ---------------------------------------------------------------------------
+
+/// A `<!-- hwp2md:lang:python -->` comment inside an HWPX header section must
+/// cause the following `<hp:p>` to be parsed as `ir::Block::CodeBlock` in the
+/// section's header block list.
+///
+/// The `flush_nested_scope` header branch routes through `flush_header_paragraph`
+/// when `header_footer.active && header_footer.in_header`.  Without the `active`
+/// guard (Fix M2), a stale `in_header` flag could cause an incorrect flush path.
+#[test]
+fn fixture_lang_hint_in_header_produces_codeblock_ir() {
+    // The header XML contains a lang-hint comment followed by an <hp:p>.
+    let header_body = r#"<!-- hwp2md:lang:python -->
+<hp:p id="70" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>header_code()</hp:t></hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(
+        HwpxFixture::new()
+            .section(&para_xml("body paragraph"))
+            .with_header_xml(header_body),
+    );
+
+    // The section header must be present and contain a CodeBlock.
+    let header_blocks = doc
+        .sections
+        .iter()
+        .find_map(|s| s.header.as_ref())
+        .expect("section.header must be Some when header XML is provided");
+
+    let code_block = header_blocks
+        .iter()
+        .find(|b| matches!(b, ir::Block::CodeBlock { .. }));
+
+    assert!(
+        code_block.is_some(),
+        "header must contain a CodeBlock when lang-hint comment precedes the paragraph; \
+         header_blocks: {header_blocks:?}"
+    );
+
+    let Some(ir::Block::CodeBlock { language, code }) = code_block else {
+        unreachable!()
+    };
+    assert_eq!(
+        language.as_deref(),
+        Some("python"),
+        "header CodeBlock language must be 'python'; got: {language:?}"
+    );
+    assert!(
+        code.contains("header_code()"),
+        "header CodeBlock code must contain 'header_code()'; got: {code:?}"
+    );
+}
+
+/// A `<!-- hwp2md:lang:python -->` comment inside an HWPX footer section must
+/// cause the following `<hp:p>` to be parsed as `ir::Block::CodeBlock` in the
+/// section's footer block list.
+///
+/// Mirrors `fixture_lang_hint_in_header_produces_codeblock_ir` for the footer
+/// path (`flush_footer_paragraph`).
+#[test]
+fn fixture_lang_hint_in_footer_produces_codeblock_ir() {
+    // The footer XML contains a lang-hint comment followed by an <hp:p>.
+    let footer_body = r#"<!-- hwp2md:lang:python -->
+<hp:p id="80" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>footer_code()</hp:t></hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(
+        HwpxFixture::new()
+            .section(&para_xml("body paragraph"))
+            .with_footer_xml(footer_body),
+    );
+
+    // The section footer must be present and contain a CodeBlock.
+    let footer_blocks = doc
+        .sections
+        .iter()
+        .find_map(|s| s.footer.as_ref())
+        .expect("section.footer must be Some when footer XML is provided");
+
+    let code_block = footer_blocks
+        .iter()
+        .find(|b| matches!(b, ir::Block::CodeBlock { .. }));
+
+    assert!(
+        code_block.is_some(),
+        "footer must contain a CodeBlock when lang-hint comment precedes the paragraph; \
+         footer_blocks: {footer_blocks:?}"
+    );
+
+    let Some(ir::Block::CodeBlock { language, code }) = code_block else {
+        unreachable!()
+    };
+    assert_eq!(
+        language.as_deref(),
+        Some("python"),
+        "footer CodeBlock language must be 'python'; got: {language:?}"
+    );
+    assert!(
+        code.contains("footer_code()"),
+        "footer CodeBlock code must contain 'footer_code()'; got: {code:?}"
     );
 }

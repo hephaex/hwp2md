@@ -825,16 +825,21 @@ fn pending_code_lang_cleared_after_nested_scope_flush() {
         }};
     }
 
-    // in_header
+    // in_header — `active` must also be true; the parser always sets it first
+    // when entering <hp:headerFooter>, so `in_header` without `active` is an
+    // impossible state.  The `active` guard in flush_nested_scope matches the
+    // routing in ParseContext::active_text_buf / push_inline.
     {
         let mut ctx = super::context::ParseContext::default();
+        ctx.header_footer.active = true;
         ctx.header_footer.in_header = true;
         check_scope!(ctx, "in_header");
     }
 
-    // in_footer
+    // in_footer — same `active` invariant as in_header.
     {
         let mut ctx = super::context::ParseContext::default();
+        ctx.header_footer.active = true;
         ctx.header_footer.in_footer = true;
         check_scope!(ctx, "in_footer");
     }

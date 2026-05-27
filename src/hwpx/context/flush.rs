@@ -455,11 +455,19 @@ pub(crate) fn flush_footer_paragraph(ctx: &mut ParseContext, code_lang: CodeLang
 /// `pending_code_lang` is consumed and forwarded to the nested-scope flush so
 /// that code-fence annotations (`<!-- hwp2md:lang:LANG -->`) take effect inside
 /// cells, list items, footnotes, headers, and footers.
+///
+/// The `active` guard on the header/footer branches matches the routing logic
+/// in [`ParseContext::active_text_buf`] and [`ParseContext::push_inline`], which
+/// both require `header_footer.active && (in_header || in_footer)` before
+/// directing content into the header/footer buffers.  Without the `active`
+/// check, a stale `in_header`/`in_footer` flag left over after the
+/// `</hp:headerFooter>` closing tag could cause a spurious flush into the
+/// wrong block list.
 pub(crate) fn flush_nested_scope(ctx: &mut ParseContext) -> bool {
-    if ctx.header_footer.in_header {
+    if ctx.header_footer.active && ctx.header_footer.in_header {
         let code_lang = std::mem::take(&mut ctx.pending_code_lang);
         flush_header_paragraph(ctx, code_lang);
-    } else if ctx.header_footer.in_footer {
+    } else if ctx.header_footer.active && ctx.header_footer.in_footer {
         let code_lang = std::mem::take(&mut ctx.pending_code_lang);
         flush_footer_paragraph(ctx, code_lang);
     } else if ctx.footnote.active {
