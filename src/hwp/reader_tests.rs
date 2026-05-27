@@ -460,120 +460,33 @@ fn parse_style_record_truncated_no_panic() {
     assert_eq!(name, "");
 }
 
-// --- HWPTAG_NUMBERING / HWPTAG_BULLET parsing ---
+// --- parse_numbering_ordered ---
 
-/// Build a minimal HWPTAG_NUMBERING record payload where the number-type nibble
-/// of the first level is `num_type` (low 4 bits of byte 2).
-fn make_numbering_data(num_type: u8) -> Vec<u8> {
-    // Byte 0-1: start number u16 (set to 1)
-    // Byte 2: first level's num_type in low nibble
-    // Remaining bytes: zero-padded to a realistic minimum size.
-    let mut data = vec![0u8; 36];
-    data[0] = 1; // start number = 1
-    data[1] = 0;
-    data[2] = num_type & 0x0F;
-    data
+#[test]
+fn parse_numbering_ordered_arabic_type_0_is_ordered() {
+    // PARA_HEAD low nibble = 0 (Arabic) → ordered
+    assert!(super::parse_numbering_ordered(&[0x00, 0x00, 0x00, 0x00]));
 }
 
 #[test]
-fn numbering_def_ordered_id1_parsed_from_arabic_type() {
-    // num_type = 0 = arabic → ordered
-    let data = make_numbering_data(0x00);
-    let rec = crate::hwp::record::Record {
-        tag_id: HWPTAG_NUMBERING,
-        level: 0,
-        data,
-    };
-    let mut doc_info = DocInfo::default();
-    // Manually apply the same branch logic used in read_doc_info.
-    let id = (doc_info.numbering_defs.len() as u32) + 1;
-    let ordered = if rec.data.len() >= 3 {
-        let num_type = rec.data[2] & 0x0F;
-        num_type <= 26
-    } else {
-        false
-    };
-    doc_info
-        .numbering_defs
-        .push(crate::hwp::model::NumberingDef { id, ordered });
-
-    assert_eq!(doc_info.numbering_defs.len(), 1);
-    let def = &doc_info.numbering_defs[0];
-    assert_eq!(def.id, 1);
-    assert!(def.ordered, "arabic (type 0) should be ordered");
+fn parse_numbering_ordered_format_6_hangul_circle_is_ordered() {
+    // Low nibble = 6 (Hangul circle) → still ordered
+    assert!(super::parse_numbering_ordered(&[0x06]));
 }
 
 #[test]
-fn numbering_def_unordered_from_bullet_tag() {
-    // HWPTAG_BULLET definitions are always unordered.
-    let mut doc_info = DocInfo::default();
-    let id = (doc_info.numbering_defs.len() as u32) + 1;
-    doc_info
-        .numbering_defs
-        .push(crate::hwp::model::NumberingDef { id, ordered: false });
-
-    assert_eq!(doc_info.numbering_defs.len(), 1);
-    let def = &doc_info.numbering_defs[0];
-    assert_eq!(def.id, 1);
-    assert!(!def.ordered, "bullet tag should produce unordered def");
+fn parse_numbering_ordered_format_7_is_unordered() {
+    // Low nibble = 7 → first unordered type
+    assert!(!super::parse_numbering_ordered(&[0x07]));
 }
 
 #[test]
-fn numbering_def_empty_data_falls_back_to_unordered() {
-    // A HWPTAG_NUMBERING record shorter than 3 bytes → defensive fallback.
-    let rec = crate::hwp::record::Record {
-        tag_id: HWPTAG_NUMBERING,
-        level: 0,
-        data: vec![0x00, 0x01], // only 2 bytes
-    };
-    let mut doc_info = DocInfo::default();
-    let id = (doc_info.numbering_defs.len() as u32) + 1;
-    let ordered = if rec.data.len() >= 3 {
-        let num_type = rec.data[2] & 0x0F;
-        num_type <= 26
-    } else {
-        false
-    };
-    doc_info
-        .numbering_defs
-        .push(crate::hwp::model::NumberingDef { id, ordered });
-
-    assert!(!doc_info.numbering_defs[0].ordered, "short record should fall back to unordered");
+fn parse_numbering_ordered_empty_data_is_unordered() {
+    assert!(!super::parse_numbering_ordered(&[]));
 }
 
 #[test]
-fn numbering_def_ids_are_sequential_and_one_based() {
-    // Multiple NUMBERING + BULLET records should get IDs 1, 2, 3, …
-    let mut doc_info = DocInfo::default();
-    for ordered in [true, false, true] {
-        let id = (doc_info.numbering_defs.len() as u32) + 1;
-        doc_info
-            .numbering_defs
-            .push(crate::hwp::model::NumberingDef { id, ordered });
-    }
-    assert_eq!(doc_info.numbering_defs[0].id, 1);
-    assert_eq!(doc_info.numbering_defs[1].id, 2);
-    assert_eq!(doc_info.numbering_defs[2].id, 3);
-    assert!(doc_info.numbering_defs[0].ordered);
-    assert!(!doc_info.numbering_defs[1].ordered);
-    assert!(doc_info.numbering_defs[2].ordered);
-}
-
-#[test]
-fn numbering_def_high_num_type_is_unordered() {
-    // num_type >= 27 (e.g. 0x0F = 15 is still ≤26; use 0x0F max of nibble)
-    // Nibble max is 0x0F = 15 which is ≤ 26 → ordered.
-    // To test unordered path from num_type > 26 we'd need a multi-byte field.
-    // Since 4-bit nibble max = 15 ≤ 26, type 27+ can't be represented in 4 bits.
-    // Verify the boundary: type 26 → ordered, type 0x0F (15) → ordered.
-    // (The unordered path via num_type for HWPTAG_NUMBERING is unreachable via
-    // nibble but is exercised through HWPTAG_BULLET → always-false.)
-    let data_type15 = make_numbering_data(0x0F);
-    let ordered = if data_type15.len() >= 3 {
-        let num_type = data_type15[2] & 0x0F;
-        num_type <= 26
-    } else {
-        false
-    };
-    assert!(ordered, "num_type 15 (max nibble) should still be ordered (<= 26)");
+fn parse_numbering_ordered_high_nibble_ignored() {
+    // Only low nibble matters; high nibble 0xF0 should not affect result
+    assert!(super::parse_numbering_ordered(&[0xF0])); // 0xF0 & 0x0F = 0 = Arabic → ordered
 }

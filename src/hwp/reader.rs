@@ -236,6 +236,26 @@ fn read_stream_bytes(
     }
 }
 
+/// Parse a HWPTAG_NUMBERING record body and return whether the first level
+/// is an ordered (numeric) numbering format.
+///
+/// Per HWP 5.0 spec §4.1.7, each `LevelInfo` begins with a `UINT32 PARA_HEAD`
+/// (little-endian). The low nibble of `PARA_HEAD` (= byte 0, bits 0-3) encodes
+/// the paragraph numbering format:
+///   0 = Arabic, 1 = Roman lower, 2 = Roman upper, 3 = Alpha lower,
+///   4 = Alpha upper, 5 = Hangul (가나다), 6 = Hangul (가나다 circle)
+///   — all ordered; 7+ are bullet/unordered formats.
+///
+/// Returns `false` for malformed (short) data and on parse ambiguity.
+pub(crate) fn parse_numbering_ordered(data: &[u8]) -> bool {
+    // data[0] is the low byte of LevelInfo[0].PARA_HEAD (UINT32 LE).
+    // bits 0-3 = paragraph numbering format.
+    match data.first() {
+        Some(b) => (b & 0x0F) <= 6, // 0-6 are ordered numeric formats
+        None => false,
+    }
+}
+
 fn read_doc_info(
     cfb: &mut cfb::CompoundFile<std::fs::File>,
     compressed: bool,
@@ -273,31 +293,16 @@ fn read_doc_info(
                 }
             }
             HWPTAG_NUMBERING => {
-                // Numbering definition record (tag 0x001C).
-                // Layout: 2 bytes header (start number, u16 LE), then 7 level
-                // entries each 36 bytes.  First level entry byte 0 encodes the
-                // number type in bits 0-3 (low nibble).
-                // Number types 0–26 are numeric formats (arabic, roman, alpha…);
-                // type 27+ are circle-bullet / no-number formats → unordered.
-                // We are defensive: if the record is shorter than expected, fall
-                // back to unordered rather than panic.
                 let id = (doc_info.numbering_defs.len() as u32) + 1;
-                let ordered = if rec.data.len() >= 3 {
-                    // Byte 0-1: start number (u16); byte 2: first level's number
-                    // type byte (low nibble = number type).
-                    let num_type = rec.data[2] & 0x0F;
-                    num_type <= 26
-                } else {
-                    false // malformed / empty record → treat as unordered
-                };
+                let ordered = parse_numbering_ordered(&rec.data);
                 doc_info.numbering_defs.push(NumberingDef { id, ordered });
             }
             HWPTAG_BULLET => {
-                // Bullet definitions (tag 0x001D) are always unordered.
-                let id = (doc_info.numbering_defs.len() as u32) + 1;
-                doc_info
-                    .numbering_defs
-                    .push(NumberingDef { id, ordered: false });
+                // Bullet definitions use a separate ID space (bullet_id in ParaShape,
+                // not numbering_id). Do not add to numbering_defs to avoid ID conflicts.
+                // Bullet paragraphs are always unordered; this is handled by the
+                // text-heuristic fallback in detect_list_kind.
+                let _ = &rec.data; // parsed but not stored (bullet_id not yet wired up)
             }
             HWPTAG_DISTRIBUTE_DOC_DATA if rec.data.len() >= 4 => {
                 doc_info.distribute_seed = Some(rec.data[4..].to_vec());

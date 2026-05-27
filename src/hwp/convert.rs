@@ -30,9 +30,11 @@ pub(crate) enum ListKind {
 /// **Tier 1 — binary `numbering_id`** (preferred):
 /// When the paragraph's `ParaShape` record carries a non-zero `numbering_id`
 /// the paragraph is formally defined as a list item by the HWP document model.
-/// We inspect the paragraph text to heuristically decide whether it is ordered
-/// or unordered, because the numbering _style_ is stored in a separate
-/// `HWPTAG_NUMBERING` record that we do not currently parse.
+/// The `ordered` flag is resolved from the `DocInfo::numbering_defs` table,
+/// which is populated from `HWPTAG_NUMBERING` records via
+/// [`crate::hwp::reader::parse_numbering_ordered`]. When the definition is not
+/// found (e.g., older files without `HWPTAG_NUMBERING`), a text-heuristic
+/// fallback is used.
 ///
 /// **Tier 2 — text heuristics** (pragmatic fallback):
 /// When no `numbering_id` is available we scan the leading characters of the
