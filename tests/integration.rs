@@ -755,3 +755,127 @@ fn write_assets_extracts_bindata_to_disk() {
         "extracted data must match"
     );
 }
+
+// ---------------------------------------------------------------------------
+// 14. Code block language hint — XML comment round-trip through HWPX fixture
+// ---------------------------------------------------------------------------
+
+/// A `<!-- hwp2md:lang:python -->` XML comment immediately before an `<hp:p>`
+/// element causes the HWPX reader to interpret that paragraph as a CodeBlock
+/// with `language == Some("python")`.
+#[test]
+fn fixture_lang_hint_comment_produces_codeblock_ir() {
+    // The section XML embeds the lang-hint comment directly before the paragraph
+    // that carries the code text. This mirrors what the HWPX writer emits when
+    // serialising a `Block::CodeBlock { language: Some("python") }`.
+    let id = 999u32;
+    let body = format!(
+        r#"<!-- hwp2md:lang:python -->
+<hp:p id="{id}" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>print("hello")</hp:t></hp:run></hp:p>"#
+    );
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
+
+    let code_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::CodeBlock { .. }));
+
+    assert!(
+        code_block.is_some(),
+        "expected a CodeBlock; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+
+    if let Some(ir::Block::CodeBlock { language, code }) = code_block {
+        assert_eq!(
+            language.as_deref(),
+            Some("python"),
+            "language must be 'python'; got: {language:?}"
+        );
+        assert!(
+            code.contains("print(\"hello\")"),
+            "code content must contain print call; got: {code:?}"
+        );
+    }
+}
+
+/// The same fixture as above, converted to Markdown, must produce a fenced
+/// code block opened with ` ```python `.
+#[test]
+fn fixture_lang_hint_comment_renders_python_fence_in_markdown() {
+    let id = 998u32;
+    let body = format!(
+        r#"<!-- hwp2md:lang:python -->
+<hp:p id="{id}" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>print("hello")</hp:t></hp:run></hp:p>"#
+    );
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
+    let markdown = md::write_markdown(&doc, false);
+
+    assert!(
+        markdown.contains("```python"),
+        "markdown must contain ```python fence; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("print(\"hello\")"),
+        "code content must appear in markdown; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 15. Page break — `<hp:ctrl id="newPage"/>` round-trip through HWPX fixture
+// ---------------------------------------------------------------------------
+
+/// A fixture whose section XML contains `<hp:ctrl id="newPage"/>` must parse
+/// into an IR that includes a `Block::PageBreak` located between the two
+/// surrounding paragraph blocks.
+#[test]
+fn fixture_newpage_ctrl_produces_pagebreak_ir() {
+    let body = format!(
+        "{}<hp:p><hp:run><hp:ctrl id=\"newPage\"/></hp:run></hp:p>{}",
+        para_xml("before"),
+        para_xml("after"),
+    );
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
+
+    let blocks: Vec<&ir::Block> = doc.sections.iter().flat_map(|s| &s.blocks).collect();
+
+    let has_pagebreak = blocks.iter().any(|b| matches!(b, ir::Block::PageBreak));
+    assert!(
+        has_pagebreak,
+        "expected a PageBreak block; blocks: {blocks:?}"
+    );
+
+    // PageBreak must sit between the two paragraphs.
+    let kinds: Vec<&str> = blocks
+        .iter()
+        .map(|b| match b {
+            ir::Block::Paragraph { .. } => "para",
+            ir::Block::PageBreak => "pb",
+            _ => "other",
+        })
+        .collect();
+    let pb_idx = kinds.iter().position(|k| *k == "pb").unwrap();
+    assert!(
+        kinds[..pb_idx].contains(&"para") && kinds[pb_idx + 1..].contains(&"para"),
+        "PageBreak must sit between the two paragraphs; kinds: {kinds:?}"
+    );
+}
+
+/// The same fixture, converted to Markdown, must contain the `<!-- pagebreak -->`
+/// HTML comment that the Markdown writer emits for `Block::PageBreak`.
+#[test]
+fn fixture_newpage_ctrl_renders_pagebreak_marker_in_markdown() {
+    let body = format!(
+        "{}<hp:p><hp:run><hp:ctrl id=\"newPage\"/></hp:run></hp:p>{}",
+        para_xml("before"),
+        para_xml("after"),
+    );
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
+    let markdown = md::write_markdown(&doc, false);
+
+    assert!(
+        markdown.contains("<!-- pagebreak -->"),
+        "markdown must contain <!-- pagebreak --> marker; got: {markdown:?}"
+    );
+}

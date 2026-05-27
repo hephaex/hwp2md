@@ -410,25 +410,29 @@ pub(crate) fn flush_footer_paragraph(ctx: &mut ParseContext) {
 /// Branch order: header → footer → footnote → **cell → list** (cell-first).
 /// The previous `flush_active_paragraph_scope` top-level handler used list-first;
 /// this function unifies to cell-first throughout, matching `handlers.rs` table logic.
+///
+/// `pending_code_lang` is cleared on the nested path: code-fence annotations
+/// (`<!-- hwp2md:lang:LANG -->`) apply only to top-level paragraphs and must not
+/// leak to the next top-level [`flush_paragraph_staged`] call.
 pub(crate) fn flush_nested_scope(ctx: &mut ParseContext) -> bool {
     if ctx.header_footer.in_header {
         flush_header_paragraph(ctx);
-        true
     } else if ctx.header_footer.in_footer {
         flush_footer_paragraph(ctx);
-        true
     } else if ctx.footnote.active {
         flush_footnote_paragraph(ctx);
-        true
     } else if ctx.table.in_cell {
         flush_cell_paragraph(ctx);
-        true
     } else if ctx.list.in_item {
         flush_list_item_paragraph(ctx);
-        true
     } else {
-        false
+        return false;
     }
+    // Code-fence annotations (<!-- hwp2md:lang:LANG -->) apply only to top-level
+    // paragraphs; discard any pending hint so it cannot leak to the next
+    // top-level paragraph flush.
+    ctx.pending_code_lang = None;
+    true
 }
 
 /// Flush whichever scope is currently active (footnote → list-item → cell →
