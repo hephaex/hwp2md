@@ -797,15 +797,16 @@ fn tier3_style_level_takes_priority_over_height() {
 fn pending_code_lang_cleared_after_nested_scope_flush() {
     use super::context::flush_nested_scope;
 
-    // Helper macro to verify flush_nested_scope returns true and clears pending_code_lang.
+    // Helper macro: verify flush_nested_scope returns true and clears pending_code_lang.
+    // The $label parameter appears in failure messages so the failing branch is identifiable.
     macro_rules! check_scope {
-        ($ctx:ident) => {{
+        ($ctx:ident, $label:expr) => {{
             $ctx.pending_code_lang = Some(Some("python".to_string()));
             let result = flush_nested_scope(&mut $ctx);
-            assert!(result, "flush_nested_scope must return true in nested scope");
+            assert!(result, "[{}] flush_nested_scope must return true in nested scope", $label);
             assert!(
                 $ctx.pending_code_lang.is_none(),
-                "pending_code_lang must be cleared after nested scope flush"
+                "[{}] pending_code_lang must be cleared after nested scope flush", $label
             );
         }};
     }
@@ -814,35 +815,35 @@ fn pending_code_lang_cleared_after_nested_scope_flush() {
     {
         let mut ctx = super::context::ParseContext::default();
         ctx.header_footer.in_header = true;
-        check_scope!(ctx);
+        check_scope!(ctx, "in_header");
     }
 
     // in_footer
     {
         let mut ctx = super::context::ParseContext::default();
         ctx.header_footer.in_footer = true;
-        check_scope!(ctx);
+        check_scope!(ctx, "in_footer");
     }
 
     // footnote.active
     {
         let mut ctx = super::context::ParseContext::default();
         ctx.footnote.active = true;
-        check_scope!(ctx);
+        check_scope!(ctx, "footnote.active");
     }
 
     // table.in_cell
     {
         let mut ctx = super::context::ParseContext::default();
         ctx.table.in_cell = true;
-        check_scope!(ctx);
+        check_scope!(ctx, "table.in_cell");
     }
 
     // list.in_item
     {
         let mut ctx = super::context::ParseContext::default();
         ctx.list.in_item = true;
-        check_scope!(ctx);
+        check_scope!(ctx, "list.in_item");
     }
 }
 

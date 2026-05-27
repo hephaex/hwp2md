@@ -787,17 +787,21 @@ fn fixture_lang_hint_comment_produces_codeblock_ir() {
         doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
     );
 
-    if let Some(ir::Block::CodeBlock { language, code }) = code_block {
-        assert_eq!(
-            language.as_deref(),
-            Some("python"),
-            "language must be 'python'; got: {language:?}"
+    let Some(ir::Block::CodeBlock { language, code }) = code_block else {
+        panic!(
+            "expected Block::CodeBlock, got: {:?}",
+            doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
         );
-        assert!(
-            code.contains("print(\"hello\")"),
-            "code content must contain print call; got: {code:?}"
-        );
-    }
+    };
+    assert_eq!(
+        language.as_deref(),
+        Some("python"),
+        "language must be 'python'; got: {language:?}"
+    );
+    assert!(
+        code.contains("print(\"hello\")"),
+        "code content must contain print call; got: {code:?}"
+    );
 }
 
 /// The same fixture as above, converted to Markdown, must produce a fenced
@@ -859,6 +863,55 @@ fn fixture_newpage_ctrl_produces_pagebreak_ir() {
     assert!(
         kinds[..pb_idx].contains(&"para") && kinds[pb_idx + 1..].contains(&"para"),
         "PageBreak must sit between the two paragraphs; kinds: {kinds:?}"
+    );
+}
+
+/// A `<!-- hwp2md:lang:python -->` comment inside a table cell must NOT leak to
+/// the next top-level paragraph after the table.  This is the original S74 bug
+/// scenario: `flush_nested_scope` must clear `pending_code_lang` on the nested
+/// path so the subsequent top-level flush does not inherit a stale code hint.
+#[test]
+fn fixture_lang_hint_inside_cell_does_not_leak_to_next_toplevel_paragraph() {
+    // 1×1 table whose single cell contains the lang-hint comment before its
+    // inner paragraph.  A top-level paragraph follows the table.
+    let body = r#"<hp:p id="10" paraPrIDRef="0"><hp:run charPrIDRef="0">
+  <hp:tbl rowCnt="1" colCnt="1">
+    <hp:tr>
+      <hp:tc>
+        <!-- hwp2md:lang:python -->
+        <hp:p id="11" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>cell text</hp:t></hp:run></hp:p>
+      </hp:tc>
+    </hp:tr>
+  </hp:tbl>
+</hp:run></hp:p>
+<hp:p id="12" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>after table</hp:t></hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(body));
+
+    // The top-level paragraph that follows the table must be a plain Paragraph,
+    // not a CodeBlock (which it would be if pending_code_lang leaked out of the cell).
+    let after_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| match b {
+            ir::Block::Paragraph { inlines } => {
+                inlines.iter().any(|i| i.text.contains("after table"))
+            }
+            ir::Block::CodeBlock { code, .. } => code.contains("after table"),
+            _ => false,
+        });
+
+    assert!(
+        after_block.is_some(),
+        "'after table' block not found; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    assert!(
+        matches!(after_block.unwrap(), ir::Block::Paragraph { .. }),
+        "top-level paragraph after table must be Paragraph (not CodeBlock); \
+         pending_code_lang from inside the cell must not leak; got: {:?}",
+        after_block.unwrap()
     );
 }
 
