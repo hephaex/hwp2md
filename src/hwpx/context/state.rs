@@ -158,6 +158,20 @@ pub(crate) struct HeaderFooterState {
     pub(crate) hf_type: Option<ir::HeaderFooterType>,
 }
 
+impl HeaderFooterState {
+    pub(crate) fn in_header_active(&self) -> bool {
+        self.active && self.in_header
+    }
+
+    pub(crate) fn in_footer_active(&self) -> bool {
+        self.active && self.in_footer
+    }
+
+    pub(crate) fn in_either_active(&self) -> bool {
+        self.active && (self.in_header || self.in_footer)
+    }
+}
+
 /// Page layout parsed from `<hp:secPr>` and its children.
 #[derive(Debug, Default)]
 pub(crate) struct PageLayoutState {

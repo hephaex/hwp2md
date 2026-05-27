@@ -141,9 +141,7 @@ impl ParseContext {
     ///
     /// Priority: header/footer > footnote > `list_item` > cell > default paragraph buffer.
     pub(crate) fn active_text_buf(&mut self) -> &mut String {
-        if self.header_footer.active
-            && (self.header_footer.in_header || self.header_footer.in_footer)
-        {
+        if self.header_footer.in_either_active() {
             &mut self.header_footer.text
         } else if self.footnote.active {
             &mut self.footnote.text
@@ -158,9 +156,7 @@ impl ParseContext {
 
     /// Push an inline to the active inline buffer.
     pub(crate) fn push_inline(&mut self, inline: ir::Inline) {
-        if self.header_footer.active
-            && (self.header_footer.in_header || self.header_footer.in_footer)
-        {
+        if self.header_footer.in_either_active() {
             self.header_footer.inlines.push(inline);
         } else if self.footnote.active {
             self.footnote.inlines.push(inline);
@@ -177,10 +173,10 @@ impl ParseContext {
     ///
     /// Returns `Some(block)` when at top level (caller routes through staging).
     pub(crate) fn push_block_scoped(&mut self, block: ir::Block) -> Option<ir::Block> {
-        if self.header_footer.in_header {
+        if self.header_footer.in_header_active() {
             self.header_footer.header_blocks.push(block);
             None
-        } else if self.header_footer.in_footer {
+        } else if self.header_footer.in_footer_active() {
             self.header_footer.footer_blocks.push(block);
             None
         } else if self.footnote.active {

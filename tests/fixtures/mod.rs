@@ -53,6 +53,7 @@ impl HwpxFixture {
         self
     }
 
+    #[allow(dead_code)]
     pub fn author(mut self, a: &str) -> Self {
         self.author = Some(a.to_owned());
         self

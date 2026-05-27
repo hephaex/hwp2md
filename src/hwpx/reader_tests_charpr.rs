@@ -885,3 +885,33 @@ fn pending_code_lang_preserved_at_top_level_no_nested_scope() {
         ctx.pending_code_lang
     );
 }
+
+// -----------------------------------------------------------------------
+// flush_cell_paragraph — nested scope must NOT apply heading detection
+// -----------------------------------------------------------------------
+
+#[test]
+fn nested_scope_korean_regulation_text_stays_paragraph_not_heading() {
+    // Regression: flush_inlines_to_blocks (used by nested scopes such as table
+    // cells) must NOT apply Tier-4 Korean-regulation heading detection.  The
+    // text "제1조 (목적)" would be promoted to Heading at top level via
+    // build_block, but inside a table cell it must remain a Paragraph.
+    use super::context::{flush_cell_paragraph, CodeLangHint};
+
+    let mut ctx = super::context::ParseContext::default();
+    ctx.table.in_cell = true;
+    ctx.table.cell_text = "제1조 (목적)".to_string();
+
+    flush_cell_paragraph(&mut ctx, CodeLangHint::Plain);
+
+    assert_eq!(
+        ctx.table.cell_blocks.len(),
+        1,
+        "flush_cell_paragraph must produce exactly one block"
+    );
+    assert!(
+        matches!(ctx.table.cell_blocks[0], crate::ir::Block::Paragraph { .. }),
+        "nested scope must not apply heading detection; got: {:?}",
+        ctx.table.cell_blocks[0]
+    );
+}

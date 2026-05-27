@@ -157,7 +157,32 @@ pub(crate) fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut Pa
     }
 }
 
+/// Attempt to build a `CodeBlock` from `code_lang`.
+///
+/// Returns `Ok(block)` when the hint specifies a code block,
+/// `Err(inlines)` when the hint is `Plain` (inlines returned to caller).
+fn try_code_block(
+    code_lang: CodeLangHint,
+    inlines: Vec<ir::Inline>,
+) -> Result<ir::Block, Vec<ir::Inline>> {
+    match code_lang {
+        CodeLangHint::CodeNoLang => Ok(ir::Block::CodeBlock {
+            language: None,
+            code: collect_inline_text(inlines),
+        }),
+        CodeLangHint::Code(lang) => Ok(ir::Block::CodeBlock {
+            language: Some(lang),
+            code: collect_inline_text(inlines),
+        }),
+        CodeLangHint::Plain => Err(inlines),
+    }
+}
+
 /// Drain accumulated `text` + `inlines` into `blocks` as a `Paragraph` or `CodeBlock`.
+///
+/// When `code_lang` is `Plain`, always produces a `Paragraph` — heading detection
+/// is deliberately absent here because this function is only called from nested
+/// scopes (cell, list-item, footnote, header, footer).
 fn flush_inlines_to_blocks(
     text: &mut String,
     inlines: &mut Vec<ir::Inline>,
@@ -174,17 +199,8 @@ fn flush_inlines_to_blocks(
     }
     if !inlines.is_empty() {
         let i = std::mem::take(inlines);
-        let block = match code_lang {
-            CodeLangHint::Plain => ir::Block::Paragraph { inlines: i },
-            CodeLangHint::CodeNoLang => ir::Block::CodeBlock {
-                language: None,
-                code: collect_inline_text(i),
-            },
-            CodeLangHint::Code(lang) => ir::Block::CodeBlock {
-                language: Some(lang),
-                code: collect_inline_text(i),
-            },
-        };
+        let block = try_code_block(code_lang, i)
+            .unwrap_or_else(|i| ir::Block::Paragraph { inlines: i });
         blocks.push(block);
     }
 }
@@ -220,24 +236,14 @@ fn build_block(
     heading_level: Option<u8>,
     height_hint: Option<(u32, bool)>,
 ) -> ir::Block {
-    match code_lang {
-        CodeLangHint::CodeNoLang => ir::Block::CodeBlock {
-            language: None,
-            code: collect_inline_text(inlines),
-        },
-        CodeLangHint::Code(lang) => ir::Block::CodeBlock {
-            language: Some(lang),
-            code: collect_inline_text(inlines),
-        },
-        CodeLangHint::Plain => {
-            let effective_level = effective_heading_level(heading_level, &inlines, height_hint);
-            if let Some(level) = effective_level {
-                ir::Block::Heading { level, inlines }
-            } else {
-                ir::Block::Paragraph { inlines }
-            }
+    try_code_block(code_lang, inlines).unwrap_or_else(|inlines| {
+        let effective_level = effective_heading_level(heading_level, &inlines, height_hint);
+        if let Some(level) = effective_level {
+            ir::Block::Heading { level, inlines }
+        } else {
+            ir::Block::Paragraph { inlines }
         }
-    }
+    })
 }
 
 /// Flush any pending paragraph inlines to `section.blocks` (test-only).
@@ -464,10 +470,10 @@ pub(crate) fn flush_footer_paragraph(ctx: &mut ParseContext, code_lang: CodeLang
 /// `</hp:headerFooter>` closing tag could cause a spurious flush into the
 /// wrong block list.
 pub(crate) fn flush_nested_scope(ctx: &mut ParseContext) -> bool {
-    if ctx.header_footer.active && ctx.header_footer.in_header {
+    if ctx.header_footer.in_header_active() {
         let code_lang = std::mem::take(&mut ctx.pending_code_lang);
         flush_header_paragraph(ctx, code_lang);
-    } else if ctx.header_footer.active && ctx.header_footer.in_footer {
+    } else if ctx.header_footer.in_footer_active() {
         let code_lang = std::mem::take(&mut ctx.pending_code_lang);
         flush_footer_paragraph(ctx, code_lang);
     } else if ctx.footnote.active {
