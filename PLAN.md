@@ -201,14 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 75 로드맵
+## Sprint 76 로드맵
 
-Sprint 74 완료 (2026-05-27). `pending_code_lang` 누수 수정 + CodeBlock/PageBreak HwpxFixture 통합 테스트.
+Sprint 75 완료 (2026-05-27). CodeLangHint enum + nested scope CodeBlock 지원 전범위.
 
-- **P1**: 관(subsection, 절과 조 사이) 감지 — 실제 픽스처 없음; 일반 명사 '관'과 충돌 위험. **대형 법령 픽스처 확보 시 검토.** (계속 BLOCKER)
-- **P2**: 중첩 스코프 CodeBlock 언어 힌트 보존 (Sprint 74 M1) — `flush_inlines_to_blocks`에 `pending_code_lang` 파라미터 추가, 셀/리스트/각주 내부 CodeBlock 지원
-- **P3**: `Option<Option<String>>` → 전용 enum 리팩토링 — `pending_code_lang` 타입을 `CodeLangHint { None, NoLang, Lang(String) }`로 교체하여 의미 명확화
-- **P4**: roundtrip 커버리지 확장 — 실제 hwp2md 출력을 다시 읽는 HWPX→MD→HWPX→MD 왕복 테스트
+- **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지)
+- **P2**: `flush_active_paragraph_scope` 상단 CodeBlock 힌트 지원 완료 → 다음 P2: `flush_inlines_to_blocks`에서 `build_block` 호출로 통합 (M3 중복 제거)
+- **P3**: `flush_nested_scope` + `active_text_buf` 라우팅 일관성 강화 — `header_footer.in_header_active()` 헬퍼 추출 (M2 deep-fix)
+- **P4**: roundtrip 커버리지 확장 — HWPX→MD→HWPX→MD 왕복 테스트
 
 ## 라이선스
 

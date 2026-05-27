@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 74 완료 (pending_code_lang 누수 수정 + CodeBlock/PageBreak 픽스처 테스트)
+## 현재 상태: v0.5.0 Sprint 75 완료 (CodeLangHint enum + nested scope CodeBlock 지원)
 
 ### 완료
 
@@ -709,6 +709,33 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 75 — 2026-05-27
+**주제**: CodeLangHint enum + nested scope CodeBlock 지원
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/hwpx/context/flush.rs` | `CodeLangHint` enum 추가; `flush_inlines_to_blocks` + `build_block` + 5개 nested flush 함수 + `flush_nested_scope` + `flush_active_paragraph_scope` 전체 업데이트 |
+| `src/hwpx/context/mod.rs` | `pending_code_lang` 타입 → `CodeLangHint`; `#[allow(clippy::option_option)]` 제거; re-export 추가 |
+| `src/hwpx/reader.rs` | set site 업데이트 (`Some(language)` → `CodeLangHint::CodeNoLang/Code`) |
+| `src/hwpx/handlers.rs` | nested flush 함수 호출부 `CodeLangHint::Plain` 전달 |
+| `src/hwpx/reader_tests_charpr.rs` | 단위 테스트 `Some(...)` → `CodeLangHint::...` 전환 |
+| `tests/fixtures/mod.rs` | `HwpxFixture` header/footer XML 지원 추가 |
+| `tests/integration.rs` | Sprint 75 통합 테스트 7건 추가 (cell/list/footnote/header/footer + markdown 렌더링) |
+
+### 검증
+- **1449 tests, 0 failures** (커밋 `d4ba6aa`)
+- Clippy: 0 경고
+
+### 리뷰 요약 (opus)
+APPROVE. M2 active guard 수정, M1 header/footer 테스트 추가 후 완료.
+
+### 관련 커밋
+- `c10644f` feat(hwpx): Sprint 75 — CodeLangHint enum + nested scope CodeBlock support
+- `d4ba6aa` fix(hwpx): Sprint 75 follow-up — H1/M1/M2 review items
+
+---
 
 ### 2026-05-27 — v0.5.0 Sprint 74: pending_code_lang 누수 수정 + CodeBlock/PageBreak 픽스처 테스트
 
