@@ -767,12 +767,9 @@ fn fixture_lang_hint_comment_produces_codeblock_ir() {
     // The section XML embeds the lang-hint comment directly before the paragraph
     // that carries the code text. This mirrors what the HWPX writer emits when
     // serialising a `Block::CodeBlock { language: Some("python") }`.
-    let id = 999u32;
-    let body = format!(
-        r#"<!-- hwp2md:lang:python -->
-<hp:p id="{id}" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>print("hello")</hp:t></hp:run></hp:p>"#
+    let (_dir, doc) = read_fixture(
+        HwpxFixture::new().with_lang_hint_paragraph("python", "print(\"hello\")")
     );
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
 
     let code_block = doc
         .sections
@@ -813,12 +810,9 @@ fn fixture_lang_hint_comment_produces_codeblock_ir() {
 /// code block opened with ` ```python `.
 #[test]
 fn fixture_lang_hint_comment_renders_python_fence_in_markdown() {
-    let id = 998u32;
-    let body = format!(
-        r#"<!-- hwp2md:lang:python -->
-<hp:p id="{id}" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>print("hello")</hp:t></hp:run></hp:p>"#
+    let (_dir, doc) = read_fixture(
+        HwpxFixture::new().with_lang_hint_paragraph("python", "print(\"hello\")")
     );
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
     let markdown = md::write_markdown(&doc, false);
 
     assert!(

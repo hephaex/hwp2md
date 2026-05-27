@@ -1,6 +1,6 @@
 use super::*;
 use crate::hwp::heading_style::is_heading_terminator;
-use crate::hwp::model::{CharShape, DocInfo, HwpParagraph, ParaShape};
+use crate::hwp::model::{CharShape, DocInfo, HwpParagraph, NumberingDef, ParaShape};
 
 // -----------------------------------------------------------------------
 // guess_mime
@@ -972,4 +972,114 @@ fn detect_heading_level_para_shape_tier1_ignores_bold() {
 
     let para = make_para_with_cs("제1조 목적", 0);
     assert_eq!(detect_heading_level(&para, &doc_info), Some(1));
+}
+
+// -----------------------------------------------------------------------
+// detect_list_kind — NumberingDef (Tier-1 binary lookup)
+// -----------------------------------------------------------------------
+
+/// Build a paragraph with a given `para_shape_id`.
+fn make_list_para(text: &str, ps_id: u16) -> HwpParagraph {
+    HwpParagraph {
+        text: text.to_string(),
+        char_shape_ids: Vec::new(),
+        para_shape_id: ps_id,
+        style_id: 0,
+        controls: Vec::new(),
+        raw_para_text: None,
+    }
+}
+
+/// Build a `DocInfo` with one `ParaShape` that has the given `numbering_id`
+/// and one `NumberingDef` with `id = numbering_id` and the given `ordered` flag.
+fn make_doc_info_with_numbering(numbering_id: u16, ordered: bool) -> DocInfo {
+    let mut doc_info = DocInfo::default();
+    doc_info.para_shapes.push(ParaShape {
+        numbering_id: Some(numbering_id),
+        ..Default::default()
+    });
+    doc_info.numbering_defs.push(NumberingDef {
+        id: u32::from(numbering_id),
+        ordered,
+    });
+    doc_info
+}
+
+#[test]
+fn detect_list_kind_uses_numbering_def_ordered_when_available() {
+    // Tier-1: numbering_id=1 → NumberingDef { id:1, ordered:true } → Ordered,
+    // regardless of whether the text looks like a bullet.
+    let doc_info = make_doc_info_with_numbering(1, true);
+    // Use bullet-looking text to confirm the def wins over text heuristic.
+    let para = make_list_para("● 항목", 0);
+    assert_eq!(
+        detect_list_kind(&para, &doc_info),
+        Some(ListKind::Ordered),
+        "NumberingDef ordered=true must win even when text looks like a bullet"
+    );
+}
+
+#[test]
+fn detect_list_kind_uses_numbering_def_unordered_when_available() {
+    // Tier-1: numbering_id=1 → NumberingDef { id:1, ordered:false } → Unordered,
+    // regardless of whether the text looks like "1. something".
+    let doc_info = make_doc_info_with_numbering(1, false);
+    // Use ordered-looking text to confirm the def wins.
+    let para = make_list_para("1. 항목", 0);
+    assert_eq!(
+        detect_list_kind(&para, &doc_info),
+        Some(ListKind::Unordered),
+        "NumberingDef ordered=false must win even when text looks ordered"
+    );
+}
+
+#[test]
+fn detect_list_kind_falls_back_to_text_heuristic_when_no_def() {
+    // Tier-2: paragraph has numbering_id but no matching NumberingDef
+    // → text heuristic is used.
+    let mut doc_info = DocInfo::default();
+    doc_info.para_shapes.push(ParaShape {
+        numbering_id: Some(5), // ID 5, but numbering_defs is empty
+        ..Default::default()
+    });
+    // "1. 항목" is a recognisable ordered prefix → Ordered via text heuristic.
+    let para = make_list_para("1. 항목", 0);
+    assert_eq!(
+        detect_list_kind(&para, &doc_info),
+        Some(ListKind::Ordered),
+        "text heuristic should kick in when no matching NumberingDef exists"
+    );
+}
+
+#[test]
+fn detect_list_kind_falls_back_to_text_heuristic_bullet_text() {
+    // Tier-2: paragraph has numbering_id but no matching NumberingDef;
+    // text starts with bullet char → Unordered via text heuristic.
+    let mut doc_info = DocInfo::default();
+    doc_info.para_shapes.push(ParaShape {
+        numbering_id: Some(3),
+        ..Default::default()
+    });
+    let para = make_list_para("● 항목", 0);
+    assert_eq!(
+        detect_list_kind(&para, &doc_info),
+        Some(ListKind::Unordered),
+        "bullet text heuristic should apply when no NumberingDef found"
+    );
+}
+
+#[test]
+fn detect_list_kind_no_numbering_id_uses_text_heuristic_only() {
+    // Tier-2 pure text detection — no numbering_id at all.
+    let mut doc_info = DocInfo::default();
+    doc_info.para_shapes.push(ParaShape::default()); // numbering_id = None
+    // Ordered text.
+    let para_ord = make_list_para("2. 두번째", 0);
+    assert_eq!(detect_list_kind(&para_ord, &doc_info), Some(ListKind::Ordered));
+    // Bullet text.
+    let para_bul = make_list_para("• 항목", 0);
+    assert_eq!(detect_list_kind(&para_bul, &doc_info), Some(ListKind::Unordered));
+    // Plain text → None.
+    let para_plain = make_list_para("일반 텍스트", 0);
+    assert_eq!(detect_list_kind(&para_plain, &doc_info), None);
 }

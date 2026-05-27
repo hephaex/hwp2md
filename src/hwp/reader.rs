@@ -5,7 +5,7 @@ use crate::hwp::crypto::{
     decrypt_seed, decrypt_viewtext, extract_aes_key, HWPTAG_DISTRIBUTE_DOC_DATA,
 };
 use crate::hwp::lenient;
-use crate::hwp::model::{DocInfo, FileHeader, HwpDocument, HwpSection, HwpVersion};
+use crate::hwp::model::{DocInfo, FileHeader, HwpDocument, HwpSection, HwpVersion, NumberingDef};
 // record::* is intentionally kept as a glob: it re-exports many tag/ctrl
 // constants that are matched on throughout this module.
 #[allow(clippy::wildcard_imports)]
@@ -271,6 +271,33 @@ fn read_doc_info(
                 if let Some(entry) = parse_bin_data_entry(&rec.data) {
                     doc_info.bin_data_entries.push(entry);
                 }
+            }
+            HWPTAG_NUMBERING => {
+                // Numbering definition record (tag 0x001C).
+                // Layout: 2 bytes header (start number, u16 LE), then 7 level
+                // entries each 36 bytes.  First level entry byte 0 encodes the
+                // number type in bits 0-3 (low nibble).
+                // Number types 0–26 are numeric formats (arabic, roman, alpha…);
+                // type 27+ are circle-bullet / no-number formats → unordered.
+                // We are defensive: if the record is shorter than expected, fall
+                // back to unordered rather than panic.
+                let id = (doc_info.numbering_defs.len() as u32) + 1;
+                let ordered = if rec.data.len() >= 3 {
+                    // Byte 0-1: start number (u16); byte 2: first level's number
+                    // type byte (low nibble = number type).
+                    let num_type = rec.data[2] & 0x0F;
+                    num_type <= 26
+                } else {
+                    false // malformed / empty record → treat as unordered
+                };
+                doc_info.numbering_defs.push(NumberingDef { id, ordered });
+            }
+            HWPTAG_BULLET => {
+                // Bullet definitions (tag 0x001D) are always unordered.
+                let id = (doc_info.numbering_defs.len() as u32) + 1;
+                doc_info
+                    .numbering_defs
+                    .push(NumberingDef { id, ordered: false });
             }
             HWPTAG_DISTRIBUTE_DOC_DATA if rec.data.len() >= 4 => {
                 doc_info.distribute_seed = Some(rec.data[4..].to_vec());

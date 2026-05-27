@@ -57,6 +57,9 @@ fn parse_bool_preserve(val: &str, current: bool) -> bool {
 ///
 /// Uses `or_else` chains (not `or`) so allocations are skipped when an earlier
 /// tier already produced `Some`.
+///
+/// Called only by [`build_block`] (top-level paragraphs).
+/// Nested-scope flush paths bypass heading detection by design.
 fn effective_heading_level(
     style_level: Option<u8>,
     inlines: &[Inline],
@@ -183,6 +186,16 @@ fn try_code_block(
 /// When `code_lang` is `Plain`, always produces a `Paragraph` — heading detection
 /// is deliberately absent here because this function is only called from nested
 /// scopes (cell, list-item, footnote, header, footer).
+///
+/// This function is called from nested-scope flush paths (cell, list-item,
+/// footnote, header, footer).  The `Plain` fallback deliberately emits
+/// `Paragraph` **without** any heading detection (Tier-1 through Tier-4).
+///
+/// **Policy**: Nested-scope paragraphs do not become headings, even when
+/// they match the Korean-regulation pattern (`제N조`, `제N장`).  Heading
+/// promotion is reserved for top-level paragraphs (see `build_block`).
+/// This invariant is enforced by the regression test
+/// `nested_scope_korean_regulation_text_stays_paragraph_not_heading`.
 fn flush_inlines_to_blocks(
     text: &mut String,
     inlines: &mut Vec<ir::Inline>,
@@ -230,6 +243,9 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 ///
 /// Both `flush_paragraph` and `flush_paragraph_staged` delegate here so CodeBlock / Heading /
 /// Paragraph construction stays in one place.
+///
+/// Unlike [`flush_inlines_to_blocks`], this function applies the full
+/// heading-detection pipeline (Tier-1 through Tier-4) for `Plain` hints.
 fn build_block(
     inlines: Vec<ir::Inline>,
     code_lang: CodeLangHint,

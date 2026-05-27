@@ -31,6 +31,8 @@ pub const HWPTAG_FACE_NAME: u16 = HWPTAG_BEGIN + 3;
 pub const HWPTAG_CHAR_SHAPE: u16 = HWPTAG_BEGIN + 5;
 pub const HWPTAG_PARA_SHAPE: u16 = HWPTAG_BEGIN + 9;
 pub const HWPTAG_STYLE: u16 = HWPTAG_BEGIN + 10;
+pub(crate) const HWPTAG_NUMBERING: u16 = HWPTAG_BEGIN + 12; // DocInfo Numbering definition (tag 0x001C)
+pub(crate) const HWPTAG_BULLET: u16 = HWPTAG_BEGIN + 13; // DocInfo Bullet definition (tag 0x001D)
 
 pub const HWPTAG_PARA_HEADER: u16 = HWPTAG_BEGIN + 50;
 pub const HWPTAG_PARA_TEXT: u16 = HWPTAG_BEGIN + 51;

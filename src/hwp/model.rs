@@ -82,6 +82,19 @@ mod tests {
     }
 }
 
+/// A single numbering or bullet style definition from a `HWPTAG_NUMBERING` or
+/// `HWPTAG_BULLET` record in the DocInfo stream.
+///
+/// The `id` is 1-based and matches the `numbering_id` field stored in
+/// `ParaShape` records for paragraphs that belong to a list.
+#[derive(Debug, Default, Clone)]
+pub(crate) struct NumberingDef {
+    /// 1-based ID that matches `ParaShape::numbering_id` in paragraph attributes.
+    pub(crate) id: u32,
+    /// `true` if this is an ordered (numeric) list; `false` for bullet/unordered.
+    pub(crate) ordered: bool,
+}
+
 #[derive(Debug, Default)]
 pub struct DocInfo {
     pub char_shapes: Vec<CharShape>,
@@ -95,6 +108,9 @@ pub struct DocInfo {
     /// Raw 256-byte seed payload from `DISTRIBUTE_DOC_DATA` (tag 0x0026).
     /// Present only in distribution (배포용) documents.
     pub distribute_seed: Option<Vec<u8>>,
+    /// Numbering and bullet style definitions from `HWPTAG_NUMBERING` / `HWPTAG_BULLET`
+    /// records.  Indexed by 1-based ID; entry at position `id - 1` has `id == id`.
+    pub(crate) numbering_defs: Vec<NumberingDef>,
 }
 
 #[derive(Debug, Default)]

@@ -98,6 +98,16 @@ impl HwpxFixture {
         self
     }
 
+    /// Append a lang-hint comment followed by a paragraph to the section body.
+    ///
+    /// The `<!-- hwp2md:lang:{lang} -->` comment causes the next paragraph to be
+    /// read as a `CodeBlock` with the given language.  Pass an empty string for a
+    /// no-language code block (`<!-- hwp2md:lang: -->`).
+    #[allow(dead_code)]
+    pub fn with_lang_hint_paragraph(self, lang: &str, text: &str) -> Self {
+        self.section(&lang_hint_para_xml(lang, text))
+    }
+
     /// Produce the in-memory bytes of a valid HWPX ZIP.
     pub fn build(self) -> Vec<u8> {
         let buf = Cursor::new(Vec::new());
@@ -229,6 +239,24 @@ fn xml_escape(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
+}
+
+// ---------------------------------------------------------------------------
+// Lang-hint comment helpers
+// ---------------------------------------------------------------------------
+
+/// Returns a `<!-- hwp2md:lang:{lang} -->` XML comment string for use in HWPX section XML.
+///
+/// Pass an empty string for a no-language code block (`<!-- hwp2md:lang: -->`).
+pub fn lang_hint_comment(lang: &str) -> String {
+    format!("<!-- hwp2md:lang:{lang} -->")
+}
+
+/// Returns XML for a lang-hint comment followed by a paragraph, suitable for
+/// embedding in an HWPX section body.  Produces a `CodeBlock` in the IR with
+/// the given language when parsed by `hwpx::read_hwpx`.
+pub fn lang_hint_para_xml(lang: &str, text: &str) -> String {
+    format!("{}\n{}", lang_hint_comment(lang), para_xml(text))
 }
 
 // ---------------------------------------------------------------------------

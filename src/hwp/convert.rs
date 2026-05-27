@@ -45,14 +45,28 @@ pub(crate) fn detect_list_kind(para: &HwpParagraph, doc_info: &DocInfo) -> Optio
         return None;
     }
 
-    // Tier 1: use the binary numbering_id field when present.
+    // Tier 1: binary lookup — resolve numbering_id → NumberingDef → ordered flag.
     let ps_id = para.para_shape_id as usize;
-    let has_numbering_id =
-        ps_id < doc_info.para_shapes.len() && doc_info.para_shapes[ps_id].numbering_id.is_some();
-
-    if has_numbering_id {
-        // The paragraph is formally a list item.  Determine order by inspecting
-        // the text prefix (the numbering _style_ record is not yet parsed).
+    if let Some(num_id) = doc_info
+        .para_shapes
+        .get(ps_id)
+        .and_then(|ps| ps.numbering_id)
+    {
+        // The paragraph is formally a list item.  Check the numbering definition
+        // table first (populated from HWPTAG_NUMBERING / HWPTAG_BULLET records).
+        if let Some(def) = doc_info
+            .numbering_defs
+            .iter()
+            .find(|d| d.id == u32::from(num_id))
+        {
+            return Some(if def.ordered {
+                ListKind::Ordered
+            } else {
+                ListKind::Unordered
+            });
+        }
+        // Numbering def not found (e.g., older file without HWPTAG_NUMBERING) —
+        // fall back to text heuristic while still treating as a list item.
         return Some(if is_ordered_prefix(text) {
             ListKind::Ordered
         } else {
