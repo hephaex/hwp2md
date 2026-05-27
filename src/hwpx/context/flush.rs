@@ -4,6 +4,16 @@ use crate::ir::{self, Inline, InlineFormat};
 use super::state::FormattingState;
 use super::ParseContext;
 
+// ── Tier-3 heading thresholds (HWPX charPr `height`, 1/100 pt units) ──────
+//
+// These constants mirror the HWP binary reader's tier-3 logic.  Tier-3 fires
+// only when tier-1/2 (styleIDRef) has already failed to assign a heading level,
+// so the thresholds are tuned to real-world Korean government document heading
+// sizes without risk of false-positive promotion of body text.
+const HWPX_H1_MIN_HEIGHT: u32 = 1600; // >= 16 pt
+const HWPX_H2_MIN_HEIGHT: u32 = 1400; // >= 14 pt
+const HWPX_H3_MIN_HEIGHT: u32 = 1200; // >= 12 pt
+
 /// Parse a boolean XML attribute value, preserving the existing value for
 /// unrecognised strings (i.e. neither "true"/"1" nor "false"/"0").
 fn parse_bool_preserve(val: &str, current: bool) -> bool {
@@ -16,20 +26,55 @@ fn parse_bool_preserve(val: &str, current: bool) -> bool {
 
 /// Resolves the effective heading level for a paragraph's inline content.
 ///
-/// Returns `style_level` when a tier-1/2/3 signal was already resolved, or
-/// falls back to tier-4 text-pattern detection via
-/// `detect_korean_regulation_heading`.  Both `flush_paragraph` and
-/// `flush_paragraph_staged` call this helper so the **level-resolution rule**
-/// stays in lockstep.  List-staging precedence (`if is_heading { … }`) is a
-/// separate concern that only `flush_paragraph_staged` handles.
+/// Resolution priority (highest → lowest):
+/// 1. **Tier-1/2** — `style_level` already set from `styleIDRef` (HWPX style name or
+///    numeric ID).  Returned immediately when `Some`.
+/// 2. **Tier-3** — font height + bold heuristic via `height_hint`.  Activates only
+///    when tier-1/2 is absent; requires the run to be bold and the paragraph to
+///    contain fewer than 100 characters (body-text guard).
+/// 3. **Tier-4** — Korean regulation text-pattern detection via
+///    `detect_korean_regulation_heading`.
 ///
-/// Uses `or_else` (not `or`) so the `String` allocation is skipped when
-/// `style_level` is already `Some`.
-fn effective_heading_level(style_level: Option<u8>, inlines: &[Inline]) -> Option<u8> {
-    style_level.or_else(|| {
-        let combined: String = inlines.iter().map(|i| i.text.as_str()).collect();
-        detect_korean_regulation_heading(&combined)
-    })
+/// Both `flush_paragraph` and `flush_paragraph_staged` call this helper so the
+/// level-resolution rule stays in lockstep.  List-staging precedence
+/// (`if is_heading { … }`) is a separate concern handled only by
+/// `flush_paragraph_staged`.
+///
+/// Uses `or_else` chains (not `or`) so allocations are skipped when an earlier
+/// tier already produced `Some`.
+fn effective_heading_level(
+    style_level: Option<u8>,
+    inlines: &[Inline],
+    height_hint: Option<(u32, bool)>,
+) -> Option<u8> {
+    style_level
+        .or_else(|| {
+            // Tier-3: font height + bold (HWPX charPr-based).
+            let (h, bold) = height_hint?;
+            if !bold {
+                return None;
+            }
+            // Guard: paragraphs with >= 100 characters are likely body text even
+            // when they happen to use a large, bold font.
+            let char_count: usize = inlines.iter().map(|i| i.text.chars().count()).sum();
+            if char_count >= 100 {
+                return None;
+            }
+            if h >= HWPX_H1_MIN_HEIGHT {
+                Some(1)
+            } else if h >= HWPX_H2_MIN_HEIGHT {
+                Some(2)
+            } else if h >= HWPX_H3_MIN_HEIGHT {
+                Some(3)
+            } else {
+                None
+            }
+        })
+        .or_else(|| {
+            // Tier-4: Korean regulation text pattern.
+            let combined: String = inlines.iter().map(|i| i.text.as_str()).collect();
+            detect_korean_regulation_heading(&combined)
+        })
 }
 
 /// Parse `bold`, `italic`, `underline`, `strikeout`, and font-face attributes
@@ -75,12 +120,25 @@ pub(crate) fn apply_charpr_attrs(e: &quick_xml::events::BytesStart, ctx: &mut Pa
                     face_id = Some(idx);
                 }
             }
+            "height" | "hp:height" => {
+                if let Ok(h) = val.as_ref().parse::<u32>() {
+                    ctx.fmt.font_height = Some(h);
+                }
+            }
             _ => {}
         }
     }
 
     if let Some(idx) = face_id {
         ctx.fmt.font_name = ctx.face_names.get(idx).cloned();
+    }
+
+    // Update the per-paragraph max-height tracker used by tier-3 heading detection.
+    if let Some(h) = ctx.fmt.font_height {
+        if h > ctx.para_max_font_height {
+            ctx.para_max_font_height = h;
+            ctx.para_max_font_height_bold = ctx.fmt.bold;
+        }
     }
 }
 
@@ -123,12 +181,17 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 /// into a [`ir::Block::CodeBlock`].  Otherwise [`effective_heading_level`] decides between
 /// [`ir::Block::Heading`] and [`ir::Block::Paragraph`].
 ///
+/// `height_hint` is `Some((max_height, was_bold))` carrying the per-paragraph
+/// font-height tracker values for tier-3 heading detection.  Pass `None` when
+/// the tracker is unavailable (e.g. non-top-level flush paths).
+///
 /// Both `flush_paragraph` and `flush_paragraph_staged` delegate here so CodeBlock / Heading /
 /// Paragraph construction stays in one place.
 fn build_block(
     inlines: Vec<ir::Inline>,
     code_lang: Option<Option<String>>,
     heading_level: Option<u8>,
+    height_hint: Option<(u32, bool)>,
 ) -> ir::Block {
     if let Some(language) = code_lang {
         return ir::Block::CodeBlock {
@@ -136,7 +199,7 @@ fn build_block(
             code: collect_inline_text(inlines),
         };
     }
-    let effective_level = effective_heading_level(heading_level, &inlines);
+    let effective_level = effective_heading_level(heading_level, &inlines, height_hint);
     if let Some(level) = effective_level {
         ir::Block::Heading { level, inlines }
     } else {
@@ -158,8 +221,9 @@ pub(crate) fn flush_paragraph(ctx: &mut ParseContext, section: &mut ir::Section)
         return;
     }
 
+    let height_hint = Some((ctx.para_max_font_height, ctx.para_max_font_height_bold));
     let inlines = std::mem::take(&mut ctx.current_inlines);
-    section.blocks.push(build_block(inlines, code_lang, ctx.heading_level));
+    section.blocks.push(build_block(inlines, code_lang, ctx.heading_level, height_hint));
 }
 
 /// Variant of `flush_paragraph` used during OWPML flat-paragraph list
@@ -178,8 +242,9 @@ pub(crate) fn flush_paragraph_staged(ctx: &mut ParseContext) -> Option<StagedBlo
         return None;
     }
 
+    let height_hint = Some((ctx.para_max_font_height, ctx.para_max_font_height_bold));
     let inlines = std::mem::take(&mut ctx.current_inlines);
-    let block = build_block(inlines, code_lang, ctx.heading_level);
+    let block = build_block(inlines, code_lang, ctx.heading_level, height_hint);
 
     // Only Paragraph blocks are list-stageable: Heading and CodeBlock are always Plain.
     // A tier-4 regulation heading (e.g. "제1편 총칙") must not be re-staged as a ListPara
@@ -337,6 +402,31 @@ pub(crate) fn flush_footer_paragraph(ctx: &mut ParseContext) {
     );
 }
 
+/// Flush the active nested scope (header, footer, footnote, list-item, or cell) if one is open.
+///
+/// Returns `true` when a nested scope was flushed; `false` at top level.
+/// Callers that return `false` are responsible for the top-level flush.
+pub(crate) fn flush_nested_scope(ctx: &mut ParseContext) -> bool {
+    if ctx.header_footer.in_header {
+        flush_header_paragraph(ctx);
+        true
+    } else if ctx.header_footer.in_footer {
+        flush_footer_paragraph(ctx);
+        true
+    } else if ctx.footnote.active {
+        flush_footnote_paragraph(ctx);
+        true
+    } else if ctx.table.in_cell {
+        flush_cell_paragraph(ctx);
+        true
+    } else if ctx.list.in_item {
+        flush_list_item_paragraph(ctx);
+        true
+    } else {
+        false
+    }
+}
+
 /// Flush whichever scope is currently active (footnote → list-item → cell →
 /// top-level paragraph) so that any buffered inline run becomes a finished
 /// block before the caller stages a sibling block.
@@ -348,29 +438,15 @@ pub(crate) fn flush_footer_paragraph(ctx: &mut ParseContext) {
 /// in-context and `None` is returned.
 #[must_use = "top-level paragraph must be appended to the section staging vector"]
 pub(crate) fn flush_active_paragraph_scope(ctx: &mut ParseContext) -> Option<StagedBlock> {
-    if ctx.header_footer.in_header {
-        flush_header_paragraph(ctx);
-        None
-    } else if ctx.header_footer.in_footer {
-        flush_footer_paragraph(ctx);
-        None
-    } else if ctx.footnote.active {
-        flush_footnote_paragraph(ctx);
-        None
-    } else if ctx.list.in_item {
-        flush_list_item_paragraph(ctx);
-        None
-    } else if ctx.table.in_cell {
-        flush_cell_paragraph(ctx);
-        None
-    } else {
-        let mut top: Vec<ir::Block> = Vec::new();
-        flush_inlines_to_blocks(
-            &mut ctx.current_text,
-            &mut ctx.current_inlines,
-            &mut top,
-            &ctx.fmt,
-        );
-        top.pop().map(StagedBlock::Plain)
+    if flush_nested_scope(ctx) {
+        return None;
     }
+    let mut top: Vec<ir::Block> = Vec::new();
+    flush_inlines_to_blocks(
+        &mut ctx.current_text,
+        &mut ctx.current_inlines,
+        &mut top,
+        &ctx.fmt,
+    );
+    top.pop().map(StagedBlock::Plain)
 }

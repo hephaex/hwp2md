@@ -563,3 +563,211 @@ fn flush_paragraph_staged_code_block_with_list_para_pr_id_is_plain() {
         ),
     }
 }
+
+// -----------------------------------------------------------------------
+// apply_charpr_attrs — height attribute parsing (tier-3 heading support)
+// -----------------------------------------------------------------------
+
+#[test]
+fn apply_charpr_attrs_height_sets_font_height() {
+    let ctx = apply_attrs_via_xml("charPr", &[("height", "1600")]);
+    assert_eq!(
+        ctx.fmt.font_height,
+        Some(1600),
+        "height=\"1600\" must set font_height to Some(1600)"
+    );
+}
+
+#[test]
+fn apply_charpr_attrs_hp_height_prefix_accepted() {
+    let ctx = apply_attrs_via_xml("hp:charPr", &[("hp:height", "1400")]);
+    assert_eq!(
+        ctx.fmt.font_height,
+        Some(1400),
+        "hp:height must be accepted identically to height"
+    );
+}
+
+#[test]
+fn apply_charpr_attrs_height_invalid_value_leaves_none() {
+    let ctx = apply_attrs_via_xml("charPr", &[("height", "auto")]);
+    assert!(
+        ctx.fmt.font_height.is_none(),
+        "invalid height value must not set font_height"
+    );
+}
+
+#[test]
+fn apply_charpr_attrs_height_updates_para_max_when_greater() {
+    use quick_xml::events::BytesStart;
+
+    // Pre-seed the tracker with a smaller value (1200), then apply height=1600.
+    let xml_bytes = make_bytes_start_with_attrs("charPr", &[("height", "1600"), ("bold", "true")]);
+    let start_bytes: Vec<u8> = xml_bytes
+        .iter()
+        .take_while(|&&b| b != b'>')
+        .copied()
+        .collect();
+    let e = BytesStart::from_content(
+        std::str::from_utf8(&start_bytes[1..]).unwrap(),
+        "charPr".len(),
+    );
+
+    let mut ctx = super::context::ParseContext {
+        para_max_font_height: 1200,
+        para_max_font_height_bold: false,
+        ..Default::default()
+    };
+    super::context::apply_charpr_attrs(&e, &mut ctx);
+
+    assert_eq!(ctx.para_max_font_height, 1600, "tracker must update to the larger height");
+    assert!(ctx.para_max_font_height_bold, "bold flag must reflect the run that set the max");
+}
+
+#[test]
+fn apply_charpr_attrs_height_does_not_decrease_para_max() {
+    use quick_xml::events::BytesStart;
+
+    // Pre-seed with a large value (2000), then apply a smaller height (1400).
+    let xml_bytes = make_bytes_start_with_attrs("charPr", &[("height", "1400"), ("bold", "true")]);
+    let start_bytes: Vec<u8> = xml_bytes
+        .iter()
+        .take_while(|&&b| b != b'>')
+        .copied()
+        .collect();
+    let e = BytesStart::from_content(
+        std::str::from_utf8(&start_bytes[1..]).unwrap(),
+        "charPr".len(),
+    );
+
+    let mut ctx = super::context::ParseContext {
+        para_max_font_height: 2000,
+        para_max_font_height_bold: true,
+        ..Default::default()
+    };
+    super::context::apply_charpr_attrs(&e, &mut ctx);
+
+    assert_eq!(ctx.para_max_font_height, 2000, "tracker must not decrease for a smaller height");
+}
+
+// -----------------------------------------------------------------------
+// Tier-3 heading detection via flush_paragraph (integration path)
+// -----------------------------------------------------------------------
+
+/// Build a section that has a single paragraph whose charPr carries the given
+/// height and bold attributes.  Returns the parsed `ir::Section`.
+fn tier3_section(text: &str, height: u32, bold: bool) -> ir::Section {
+    let bold_str = if bold { "true" } else { "false" };
+    let xml = format!(
+        r#"<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
+                         xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">
+        <hp:p>
+            <hp:run>
+                <hp:charPr height="{height}" bold="{bold_str}"/>
+                <hp:t>{text}</hp:t>
+            </hp:run>
+        </hp:p>
+    </hs:sec>"#,
+    );
+    section(&xml)
+}
+
+#[test]
+fn tier3_bold_16pt_produces_h1() {
+    // 1600 (16 pt) + bold, short text → H1
+    let sec = tier3_section("제1장 총칙", 1600, true);
+    assert_eq!(sec.blocks.len(), 1);
+    match &sec.blocks[0] {
+        ir::Block::Heading { level, .. } => {
+            assert_eq!(*level, 1, "1600pt bold must produce H1; got level {level}");
+        }
+        other => panic!("expected Heading block, got {other:?}"),
+    }
+}
+
+#[test]
+fn tier3_bold_14pt_produces_h2() {
+    // 1400 (14 pt) + bold, short text → H2
+    let sec = tier3_section("제1절 적용범위", 1400, true);
+    assert_eq!(sec.blocks.len(), 1);
+    match &sec.blocks[0] {
+        ir::Block::Heading { level, .. } => {
+            assert_eq!(*level, 2, "1400pt bold must produce H2; got level {level}");
+        }
+        other => panic!("expected Heading block, got {other:?}"),
+    }
+}
+
+#[test]
+fn tier3_bold_12pt_produces_h3() {
+    // 1200 (12 pt) + bold, short text → H3
+    let sec = tier3_section("제1조 목적", 1200, true);
+    assert_eq!(sec.blocks.len(), 1);
+    match &sec.blocks[0] {
+        ir::Block::Heading { level, .. } => {
+            assert_eq!(*level, 3, "1200pt bold must produce H3; got level {level}");
+        }
+        other => panic!("expected Heading block, got {other:?}"),
+    }
+}
+
+#[test]
+fn tier3_not_bold_16pt_no_heading() {
+    // 1600 (16 pt) + NOT bold → must not promote to heading
+    let sec = tier3_section("큰 글자지만 굵지 않음", 1600, false);
+    assert_eq!(sec.blocks.len(), 1);
+    match &sec.blocks[0] {
+        ir::Block::Paragraph { .. } => {} // correct: no promotion
+        other => panic!("expected Paragraph (not bold must not trigger tier-3), got {other:?}"),
+    }
+}
+
+#[test]
+fn tier3_bold_below_12pt_no_heading() {
+    // 1199 (11.99 pt) + bold → below threshold, stays Paragraph
+    let sec = tier3_section("작은 굵은 글자", 1199, true);
+    assert_eq!(sec.blocks.len(), 1);
+    match &sec.blocks[0] {
+        ir::Block::Paragraph { .. } => {} // correct: below HWPX_H3_MIN_HEIGHT
+        other => panic!("expected Paragraph (height below threshold), got {other:?}"),
+    }
+}
+
+#[test]
+fn tier3_100char_guard_prevents_heading() {
+    // 1600 pt + bold but text >= 100 characters → body-text guard kicks in
+    let long_text = "가".repeat(100); // exactly 100 characters
+    let sec = tier3_section(&long_text, 1600, true);
+    assert_eq!(sec.blocks.len(), 1);
+    match &sec.blocks[0] {
+        ir::Block::Paragraph { .. } => {} // correct: 100-char guard
+        other => panic!(
+            "expected Paragraph (100-char guard must suppress tier-3 heading), got {other:?}"
+        ),
+    }
+}
+
+#[test]
+fn tier3_style_level_takes_priority_over_height() {
+    // styleIDRef="2" (tier-1/2) + 1600pt bold → must use tier-1 level H2, not H1
+    let xml = r#"<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section"
+                         xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">
+        <hp:p styleIDRef="2">
+            <hp:run>
+                <hp:charPr height="1600" bold="true"/>
+                <hp:t>스타일 우선 테스트</hp:t>
+            </hp:run>
+        </hp:p>
+    </hs:sec>"#;
+    let sec = section(xml);
+    assert_eq!(sec.blocks.len(), 1);
+    match &sec.blocks[0] {
+        ir::Block::Heading { level, .. } => {
+            assert_eq!(
+                *level, 2,
+                "styleIDRef=2 must win over tier-3 height (1600pt would produce H1); got level {level}"
+            );
+        }
+        other => panic!("expected Heading block, got {other:?}"),
+    }
+}

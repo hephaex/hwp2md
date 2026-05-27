@@ -15,6 +15,8 @@ pub(crate) struct FormattingState {
     pub(crate) subscript: bool,
     pub(crate) color: Option<String>,
     pub(crate) font_name: Option<String>,
+    /// Font height in 1/100 pt units, parsed from `<hp:charPr height="…"/>`.
+    pub(crate) font_height: Option<u32>,
 }
 
 impl FormattingState {
@@ -27,6 +29,7 @@ impl FormattingState {
         self.subscript = false;
         self.color = None;
         self.font_name = None;
+        self.font_height = None;
     }
 }
 

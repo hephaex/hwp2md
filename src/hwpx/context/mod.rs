@@ -4,8 +4,8 @@ mod state;
 #[cfg(test)]
 pub(crate) use flush::flush_paragraph;
 pub(crate) use flush::{
-    apply_charpr_attrs, flush_active_paragraph_scope, flush_cell_paragraph, flush_footer_paragraph,
-    flush_footnote_paragraph, flush_header_paragraph, flush_list_item_paragraph,
+    apply_charpr_attrs, flush_active_paragraph_scope, flush_cell_paragraph,
+    flush_footnote_paragraph, flush_list_item_paragraph, flush_nested_scope,
     flush_paragraph_staged, group_list_paragraphs, StagedBlock,
 };
 pub(crate) use state::{
@@ -77,6 +77,12 @@ pub(crate) struct ParseContext {
     #[allow(clippy::option_option)]
     pub(crate) pending_code_lang: Option<Option<String>>,
 
+    // ── Per-paragraph font-height tracker (tier-3 heading) ──────────
+    /// Maximum `charPr height` value (1/100 pt) seen in the current paragraph.
+    pub(crate) para_max_font_height: u32,
+    /// Whether the run that produced `para_max_font_height` was also bold.
+    pub(crate) para_max_font_height_bold: bool,
+
     // ── Page layout ────────────────────────────────────────────────
     pub(crate) page_layout: PageLayoutState,
 
@@ -118,6 +124,8 @@ impl Default for ParseContext {
             current_para_pr_id: None,
             current_num_pr_id: None,
             pending_code_lang: None,
+            para_max_font_height: 0,
+            para_max_font_height_bold: false,
             page_layout: PageLayoutState::default(),
             header_footer: HeaderFooterState::default(),
         }

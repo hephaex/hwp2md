@@ -2,8 +2,8 @@ use crate::hwp::heading_style::parse_heading_style;
 use crate::ir::{self, InlineFormat};
 
 use super::context::{
-    apply_charpr_attrs, flush_active_paragraph_scope, flush_cell_paragraph, flush_footer_paragraph,
-    flush_footnote_paragraph, flush_header_paragraph, flush_list_item_paragraph,
+    apply_charpr_attrs, flush_active_paragraph_scope, flush_cell_paragraph,
+    flush_footnote_paragraph, flush_list_item_paragraph, flush_nested_scope,
     flush_paragraph_staged, ParseContext, RubyPart, StagedBlock,
 };
 
@@ -22,6 +22,8 @@ pub(super) fn handle_start_element(
             ctx.heading_level = None;
             ctx.current_para_pr_id = None;
             ctx.current_num_pr_id = None;
+            ctx.para_max_font_height = 0;
+            ctx.para_max_font_height_bold = false;
 
             for attr in e.attributes().flatten() {
                 let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
@@ -190,18 +192,10 @@ pub(super) fn handle_end_element(
 ) {
     match local {
         "p" | "hp:p" => {
-            if ctx.header_footer.in_header {
-                flush_header_paragraph(ctx);
-            } else if ctx.header_footer.in_footer {
-                flush_footer_paragraph(ctx);
-            } else if ctx.footnote.active {
-                flush_footnote_paragraph(ctx);
-            } else if ctx.table.in_cell {
-                flush_cell_paragraph(ctx);
-            } else if ctx.list.in_item {
-                flush_list_item_paragraph(ctx);
-            } else if let Some(sb) = flush_paragraph_staged(ctx) {
-                staged.push(sb);
+            if !flush_nested_scope(ctx) {
+                if let Some(sb) = flush_paragraph_staged(ctx) {
+                    staged.push(sb);
+                }
             }
             ctx.in_paragraph = false;
         }
