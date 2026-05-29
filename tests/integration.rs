@@ -2364,7 +2364,10 @@ fn hwpx_canonical_unordered_list_flat_para_produces_list_block() {
 /// and renders as a display-math `$$..$$` fence in Markdown.
 #[test]
 fn hwpx_equation_element_produces_math_block_and_latex_markdown() {
-    // EQEDIT passthrough: plain identifiers are preserved by eqedit_to_latex.
+    // NOTE: The HWPX <hp:equation> handler (handlers.rs:284-288) stores the raw
+    // element text directly as `tex` — it does NOT call `eqedit_to_latex`.
+    // That function is only wired into the HWP 5.0 binary reader path.
+    // So `tex` is exactly the literal XML text content ("x + y" here).
     let eq_xml = r#"<hp:equation>x + y</hp:equation>"#;
 
     let (_dir, doc) = read_fixture(HwpxFixture::new().section(eq_xml));
@@ -2463,19 +2466,10 @@ fn ir_block_quote_renders_as_quoted_text_in_markdown() {
 
     let markdown = md::write_markdown(&doc, false);
 
+    // The writer (writer.rs:127-135) emits "> " + content on the same line.
+    // Assert the exact line format produced rather than just presence.
     assert!(
-        markdown.contains("> "),
-        "BlockQuote must render with '> ' prefix; got: {markdown:?}"
-    );
-    assert!(
-        markdown.contains("Quoted text."),
-        "BlockQuote content must appear; got: {markdown:?}"
-    );
-    // The quoted text should be preceded by the '> ' prefix on the same or adjacent line.
-    let quote_pos = markdown.find("> ").expect("'> ' prefix");
-    let text_pos = markdown.find("Quoted text.").expect("text");
-    assert!(
-        quote_pos < text_pos,
-        "'> ' must precede 'Quoted text.' in output; got: {markdown:?}"
+        markdown.contains("> Quoted text."),
+        "BlockQuote must render as '> Quoted text.' line; got: {markdown:?}"
     );
 }
