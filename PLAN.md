@@ -201,14 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 81 로드맵
+## Sprint 82 로드맵
 
-Sprint 80 완료 (2026-05-30). RFC 3986 §3.1 scheme prefix 검증 (ALPHA-led, tail ALPHA/DIGIT/+/-/.); moel_01/03/04/05 단방향 → 양방향 밴드 테스트.
+Sprint 81 완료 (2026-05-30). HWPX ruby 전체 파이프라인 통합 테스트 (annotation+empty+HTML escape); BinData id=0 엣지케이스 핀; GSOTYPE 휴리스틱 문서화; hyperlink C: 단일-문자 두-레이어 주석.
 
 - **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지)
-- **P2**: HWP 5.0 reader Phase 2 — 이미지(BinData) 추출 실태 감사 (기존 구현 범위 확인 후 갭 처리)
-- **P3**: parse_hyperlink_url M1 follow-up — C:\path 단일-문자 스킴 통과 문제를 두-레이어 아키텍처 주석으로만 문서화 (코드 변경 불필요, 단 test 추가 가능)
-- **P4**: CTRL_RUBY 강건성 감사 — 실 파일 기반 ruby 렌더링 통합 테스트 (기존 35개 단위 테스트 보완)
+- **P2**: ruby 추가 엣지케이스 통합 테스트 (Sprint 81 리뷰 LOW): 빈 base 텍스트 + 비어있지 않은 annotation; 동일 단락 내 다중 ruby; 주변 일반 텍스트 + ruby
+- **P3**: 하이퍼링크 test coverage — target blank 속성이나 HWPX field begin/end 상호작용 테스트
+- **P4**: HWP/HWPX 공통 audit — 기존 회귀 테스트 중 `#[ignore]` 또는 `unwrap()` 패닉 위험 검토
 
 ## 라이선스
 

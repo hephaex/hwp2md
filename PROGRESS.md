@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 80 완료 (RFC 3986 scheme 검증 + moel 양방향 밴드 테스트)
+## 현재 상태: v0.5.0 Sprint 81 완료 (HWPX ruby 통합 테스트 + BinData 감사 + hyperlink 주석)
 
 ### 완료
 
@@ -709,6 +709,31 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 81 — 2026-05-30
+**주제**: HWPX ruby 전체 파이프라인 통합 테스트 + BinData 감사 + hyperlink 주석
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/integration.rs` | ruby_annotation_survives_full_pipeline + ruby_empty_annotation_renders_as_plain_text + ruby_annotation_html_chars_escaped_in_output (3건) |
+| `src/hwp/convert_tests_control.rs` | control_to_block_image_bin_data_id_zero_produces_image_0_bin — id=0 → "image_0.bin" 핀 |
+| `src/hwp/control/image.rs` | find_gsotype_bin_id doc-comment — 오프셋 [4,5] 휴리스틱 솔직화, candidate>0 가드 근거 설명 |
+| `src/hwp/control/hyperlink.rs` | C: 단일-문자 스킴 통과 → 두-레이어 아키텍처 명시 주석 |
+
+### 검증
+- **1486 tests, 0 failures** (커밋 `43eac39`)
+- Clippy: 0 경고
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. MEDIUM 없음. LOW 4건: 빈 base+비어있지 않은 annotation 미테스트; HTML escape 통합 테스트 누락(follow-up에서 즉시 처리); 다중 ruby 통합 미커버; image.rs 비-actionable TODO 문구.
+리뷰 전문: `~/.claude/references/2026-05-30_hwp2md_sprint81_ruby_integration_bindata_audit_review.md`
+
+### 관련 커밋
+- `357db94` feat(hwp): Sprint 81 — ruby integration test + BinData audit + scheme comment
+- `43eac39` fix(hwpx): Sprint 81 follow-up — ruby annotation HTML escape integration test
+
+---
 
 ## Sprint 80 — 2026-05-30
 **주제**: RFC 3986 scheme prefix 검증 + moel_01/03/04/05 양방향 밴드 테스트
