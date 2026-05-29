@@ -201,14 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 85 로드맵
+## Sprint 86 로드맵
 
-Sprint 84 완료 (2026-05-30). 고아 noteRef graceful-degradation; ctrl-fn idRef alternate path; HWPX img binaryItemIDRef/src attribute image 블록 통합 테스트.
+Sprint 85 완료 (2026-05-30). ol/ul/li 통합 테스트(secondary ingestion path 명시); colspan HTML 폴백(hp:cellSpan 인코딩); empty lang-hint → CodeBlock{language:None} 핀.
 
 - **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지)
-- **P2**: 리스트(ordered/unordered) 통합 테스트 — HWPX `<hp:li>` XML → IR List → GFM `1.`/`-` 렌더링
-- **P3**: 테이블 colspan/rowspan 통합 테스트 — `<hp:tc colSpan="2">` → HTML 폴백 렌더링 확인
-- **P4**: 코드 블록 lang-hint + 전체 파이프라인 통합 테스트 보강 (기존 cell-leak 테스트에 추가)
+- **P2**: HWPX canonical list (flat hp:p paraPrIDRef/numPrIDRef) 통합 테스트 — 진짜 OWPML 리스트 파이프라인 커버
+- **P3**: HWPX 수식(`<hp:equation>`) 통합 테스트 → IR Math block → LaTeX 렌더링
+- **P4**: HorizontalRule 또는 BlockQuote 통합 테스트
 
 ## 라이선스
 

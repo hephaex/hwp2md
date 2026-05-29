@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 84 완료 (고아 noteRef + ctrl-fn + HWPX image 통합 테스트)
+## 현재 상태: v0.5.0 Sprint 85 완료 (list ol/ul/li + colspan HTML폴백 + no-lang CodeBlock 통합 테스트)
 
 ### 완료
 
@@ -709,6 +709,28 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 85 — 2026-05-30
+**주제**: ol/ul/li 통합 테스트 + colspan HTML폴백 + no-lang CodeBlock
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/integration.rs` | ol/li ordered list + 순서 검증; ul/li unordered list (- bullet); colspan HTML 폴백(hp:cellSpan 인코딩 문서화); empty lang-hint → CodeBlock{language:None} (+4 테스트, follow-up M1/M2/L1 처리) |
+
+### 검증
+- **1504 tests, 0 failures** (커밋 `e31590c`)
+- Clippy: 0 경고
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. M1(ol/ul/li가 secondary ingestion path임을 명시 → 섹션 주석 추가), M2(순서 번호 검증 → "2. Second item" 추가), L1(dead `|| "* Apple"` 제거, `-` 하드코딩 확인). MEDIUM: colspan은 `<hp:tc colSpan>` 아닌 `<hp:cellSpan>` child element임을 문서화(commit message에 이미 기록됨).
+리뷰 전문: `~/.claude/references/2026-05-30_hwp2md_sprint85_list_colspan_nolang_review.md`
+
+### 관련 커밋
+- `2ed08a9` feat(hwpx): Sprint 85 — list/table-colspan/no-lang-code integration tests
+- `e31590c` fix(hwpx): Sprint 85 follow-up — list test precision and docs
+
+---
 
 ## Sprint 84 — 2026-05-30
 **주제**: 고아 noteRef graceful-degradation + ctrl-fn alternate path + HWPX image 통합 테스트
