@@ -201,14 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 83 로드맵
+## Sprint 84 로드맵
 
-Sprint 82 완료 (2026-05-30). ruby 엣지케이스 3건(빈 base, 다중 ruby, 주변 텍스트+ruby 순서); HWPX hyperlink fieldBegin/End 2건; P4 audit (ignore 없음, production unwrap 없음).
+Sprint 83 완료 (2026-05-30). footnote fn/en/noteRef 통합 테스트; pageBreak/cnpb variant 핀; M1(noteRef count assertion), M2(block count assertion) follow-up 처리.
 
 - **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지)
-- **P2**: HWPX footnote/endnote 통합 테스트 — `<hp:fn>`/`<hp:en>` XML fixture → IR Footnote → Markdown `[^id]` 렌더링
-- **P3**: PageBreak 통합 테스트 — `<hp:ctrl id="newPage"/>` → IR Block::PageBreak → MD `<!-- pagebreak -->` 마커
-- **P4**: HWP binary reader regression — moel 실 파일에서 ruby/superscript 추출 정확도 검증 (선택적)
+- **P2**: 고아 noteRef 테스트 — `<hp:noteRef noteId="X"/>` 없이 정의 없는 참조 → `[^X]` 렌더링 (reference/definition 상관관계 미검증 확인)
+- **P3**: `<hp:ctrl id="fn" idRef="X"/>` alternate footnote-ref 경로 통합 테스트 (handlers.rs:487 경로 — noteRef와 별개)
+- **P4**: 이미지 integration test — HwpxFixture에 BinData 이미지 추가 → IR Block::Image src 확인
 
 ## 라이선스
 

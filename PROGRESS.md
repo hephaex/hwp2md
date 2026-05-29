@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 82 완료 (ruby 엣지케이스 + hyperlink fieldBegin/End 통합 테스트)
+## 현재 상태: v0.5.0 Sprint 83 완료 (footnote/endnote + pageBreak variant 통합 테스트)
 
 ### 완료
 
@@ -709,6 +709,28 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 83 — 2026-05-30
+**주제**: HWPX footnote/endnote 전체 파이프라인 통합 테스트 + pageBreak 변형 핀
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/integration.rs` | fn/en 블록 → IR Footnote → [^N]: MD; noteRef → body [^N] + [^N]: 정의; pageBreak ctrl variant; cnpb ctrl variant (+5 테스트, follow-up M1/M2 강화) |
+
+### 검증
+- **1496 tests, 0 failures** (커밋 `1f229bb`)
+- Clippy: 0 경고
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. M1(noteRef [^1] assertion이 [^1]: 에 서브섬됨 → count >= 2로 강화), M2(block count assertion 누락 → 2 blocks 검증 추가). LOW: 고아 noteRef 미테스트 → Sprint 84 P2.
+리뷰 전문: `~/.claude/references/2026-05-30_hwp2md_sprint83_footnote_pagebreak_review.md`
+
+### 관련 커밋
+- `ecabe37` feat(hwpx): Sprint 83 — footnote/endnote + pagebreak variant integration tests
+- `1f229bb` fix(hwpx): Sprint 83 follow-up — tighten M1/M2 footnote assertions
+
+---
 
 ## Sprint 82 — 2026-05-30
 **주제**: ruby 엣지케이스 통합 테스트 + HWPX hyperlink fieldBegin/End 통합 테스트
