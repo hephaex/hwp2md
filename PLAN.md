@@ -201,14 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 84 로드맵
+## Sprint 85 로드맵
 
-Sprint 83 완료 (2026-05-30). footnote fn/en/noteRef 통합 테스트; pageBreak/cnpb variant 핀; M1(noteRef count assertion), M2(block count assertion) follow-up 처리.
+Sprint 84 완료 (2026-05-30). 고아 noteRef graceful-degradation; ctrl-fn idRef alternate path; HWPX img binaryItemIDRef/src attribute image 블록 통합 테스트.
 
 - **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지)
-- **P2**: 고아 noteRef 테스트 — `<hp:noteRef noteId="X"/>` 없이 정의 없는 참조 → `[^X]` 렌더링 (reference/definition 상관관계 미검증 확인)
-- **P3**: `<hp:ctrl id="fn" idRef="X"/>` alternate footnote-ref 경로 통합 테스트 (handlers.rs:487 경로 — noteRef와 별개)
-- **P4**: 이미지 integration test — HwpxFixture에 BinData 이미지 추가 → IR Block::Image src 확인
+- **P2**: 리스트(ordered/unordered) 통합 테스트 — HWPX `<hp:li>` XML → IR List → GFM `1.`/`-` 렌더링
+- **P3**: 테이블 colspan/rowspan 통합 테스트 — `<hp:tc colSpan="2">` → HTML 폴백 렌더링 확인
+- **P4**: 코드 블록 lang-hint + 전체 파이프라인 통합 테스트 보강 (기존 cell-leak 테스트에 추가)
 
 ## 라이선스
 

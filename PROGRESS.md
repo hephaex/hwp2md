@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 83 완료 (footnote/endnote + pageBreak variant 통합 테스트)
+## 현재 상태: v0.5.0 Sprint 84 완료 (고아 noteRef + ctrl-fn + HWPX image 통합 테스트)
 
 ### 완료
 
@@ -709,6 +709,28 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 84 — 2026-05-30
+**주제**: 고아 noteRef graceful-degradation + ctrl-fn alternate path + HWPX image 통합 테스트
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/integration.rs` | 고아 noteRef [^99] body only; ctrl-fn idRef path; binaryItemIDRef image + src image (+4 테스트, follow-up M1/M2 강화) |
+
+### 검증
+- **1500 tests, 0 failures** (커밋 `e27bfb8`)
+- Clippy: 0 경고
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. M1(binaryItemIDRef image: alt 및 ![](photo.png) 정확한 assertion → 즉시 처리), M2(if let → let-else 안전 패턴 → 즉시 처리). LOW: handlers.rs 행 번호 comment가 변경 시 rot됨(기존 style과 일치, non-blocking).
+리뷰 전문: `~/.claude/references/2026-05-30_hwp2md_sprint84_orphan_ctrlfn_image_review.md`
+
+### 관련 커밋
+- `f927d49` feat(hwpx): Sprint 84 — orphan noteRef + ctrl-fn + image integration tests
+- `e27bfb8` fix(hwpx): Sprint 84 follow-up — tighten M1/M2 image assertions
+
+---
 
 ## Sprint 83 — 2026-05-30
 **주제**: HWPX footnote/endnote 전체 파이프라인 통합 테스트 + pageBreak 변형 핀
