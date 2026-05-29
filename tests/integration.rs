@@ -1849,3 +1849,198 @@ fn fixture_cnpb_ctrl_variant_produces_pagebreak_ir() {
         "cnpb ctrl variant must produce Block::PageBreak"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 84 P2: orphan noteRef (no matching footnote definition)
+// ---------------------------------------------------------------------------
+
+/// A `<hp:noteRef noteId="99"/>` with no matching `<hp:fn id="99">` is a
+/// dangling reference. The reader emits the `[^99]` body reference regardless
+/// because reference and definition are independent in the current IR model.
+/// The Markdown output must contain `[^99]` (body ref) but NOT `[^99]:`
+/// (definition) — this pins the graceful-degradation behaviour.
+#[test]
+fn hwpx_orphan_note_ref_body_rendered_without_definition() {
+    let orphan_ref_xml = r#"
+        <hp:p>
+            <hp:run>
+                <hp:t>See note</hp:t>
+                <hp:noteRef noteId="99"/>
+                <hp:t>.</hp:t>
+            </hp:run>
+        </hp:p>"#;
+    // No <hp:fn id="99"> present — dangling reference.
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(orphan_ref_xml));
+
+    // IR layer: must still produce the footnote_ref inline.
+    let ref_inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.footnote_ref.is_some())
+            } else {
+                None
+            }
+        });
+    assert!(
+        ref_inline.is_some(),
+        "orphan noteRef must still produce a footnote_ref inline; \
+         blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    assert_eq!(ref_inline.unwrap().footnote_ref.as_deref(), Some("99"));
+
+    // Markdown layer: body reference present, definition absent.
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("[^99]"),
+        "orphan reference must appear as [^99] in Markdown; got: {markdown:?}"
+    );
+    assert!(
+        !markdown.contains("[^99]:"),
+        "orphan reference must NOT have a [^99]: definition; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 84 P3: <hp:ctrl id="fn" idRef="X"/> alternate footnote-ref path
+// ---------------------------------------------------------------------------
+
+/// `<hp:ctrl id="fn" idRef="1"/>` is the alternate mechanism for a footnote
+/// reference inline (handlers.rs:487 — the `"ctrl"` element path, as opposed
+/// to the `"noteRef"` path at handlers.rs:462).  Both must produce the same
+/// `ir::Inline.footnote_ref` result.
+#[test]
+fn hwpx_ctrl_fn_idref_produces_footnote_ref_inline() {
+    let ctrl_fn_xml = r#"
+        <hp:p>
+            <hp:run>
+                <hp:t>Body text</hp:t>
+                <hp:ctrl id="fn" idRef="1"/>
+            </hp:run>
+        </hp:p>
+        <hp:fn id="1">
+            <hp:p><hp:run><hp:t>Ctrl path note.</hp:t></hp:run></hp:p>
+        </hp:fn>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(ctrl_fn_xml));
+
+    // IR: footnote_ref inline must exist with id="1".
+    let ref_inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.footnote_ref.is_some())
+            } else {
+                None
+            }
+        });
+    assert!(
+        ref_inline.is_some(),
+        "<hp:ctrl id='fn' idRef='1'/> must produce footnote_ref inline; \
+         blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        ref_inline.unwrap().footnote_ref.as_deref(),
+        Some("1"),
+        "footnote_ref id mismatch"
+    );
+
+    // Markdown: [^1] reference + [^1]: definition.
+    let markdown = md::write_markdown(&doc, false);
+    let count = markdown.matches("[^1]").count();
+    assert!(
+        count >= 2,
+        "must have both [^1] body ref and [^1]: definition; \
+         count={count}; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("[^1]:"),
+        "must have [^1]: definition; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 84 P4: HWPX image block (binaryItemIDRef) integration test
+// ---------------------------------------------------------------------------
+
+/// An `<hp:img binaryItemIDRef="photo.png"/>` element must produce an
+/// `ir::Block::Image { src: "photo.png" }` and render as `![](photo.png)`
+/// in Markdown.  Tests the full pipeline from HWPX XML → IR → Markdown.
+#[test]
+fn hwpx_img_element_produces_image_block_and_markdown() {
+    // Minimal PNG magic bytes — must be in BinData/ for the fixture to be
+    // a well-formed HWPX ZIP.
+    let png_data = vec![0x89u8, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+
+    let img_xml = r#"<hp:p><hp:run>
+        <hp:img binaryItemIDRef="photo.png"/>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(
+        HwpxFixture::new()
+            .section(img_xml)
+            .bin_data("photo.png", png_data),
+    );
+
+    // IR layer: must contain an Image block.
+    let image_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::Image { .. }));
+
+    assert!(
+        image_block.is_some(),
+        "expected an Image block; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    if let ir::Block::Image { src, .. } = image_block.unwrap() {
+        assert_eq!(src, "photo.png", "Image src mismatch");
+    }
+
+    // Markdown layer: renders as ![alt](src).
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("photo.png"),
+        "markdown must reference photo.png; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("!["),
+        "markdown must use image syntax ![...]; got: {markdown:?}"
+    );
+}
+
+/// `<hp:img src="explicit.png"/>` (using the `src` attribute directly, rather
+/// than `binaryItemIDRef`) must also produce an Image block.
+/// Pins the alternate `src` attribute path in the HWPX reader.
+#[test]
+fn hwpx_img_element_src_attr_also_produces_image_block() {
+    let img_xml = r#"<hp:p><hp:run>
+        <hp:img src="inline.png" alt="A picture"/>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(img_xml));
+
+    let image_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::Image { .. }));
+
+    assert!(
+        image_block.is_some(),
+        "expected an Image block from src= attr; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    if let ir::Block::Image { src, alt } = image_block.unwrap() {
+        assert_eq!(src, "inline.png", "Image src mismatch");
+        assert_eq!(alt, "A picture", "Image alt mismatch");
+    }
+}
