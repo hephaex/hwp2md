@@ -2044,3 +2044,215 @@ fn hwpx_img_element_src_attr_also_produces_image_block() {
     assert_eq!(src, "inline.png", "Image src mismatch");
     assert_eq!(alt, "A picture", "Image alt mismatch");
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 85 P2: ordered/unordered list integration tests
+// ---------------------------------------------------------------------------
+
+/// `<ol><li>` produces `ir::Block::List { ordered: true }` with item text
+/// preserved, and renders as a GFM numbered list in Markdown.
+#[test]
+fn hwpx_ol_li_produces_ordered_list_block() {
+    let list_xml = r#"
+        <ol>
+            <li><hp:run><hp:t>First item</hp:t></hp:run></li>
+            <li><hp:run><hp:t>Second item</hp:t></hp:run></li>
+        </ol>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(list_xml));
+
+    // IR layer: must contain an ordered List block.
+    let list_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::List { ordered: true, .. }));
+
+    assert!(
+        list_block.is_some(),
+        "expected Block::List {{ ordered: true }}; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let ir::Block::List { items, .. } = list_block.unwrap() else {
+        unreachable!()
+    };
+    assert_eq!(items.len(), 2, "ordered list must have 2 items");
+
+    // Markdown layer: GFM numbered list format.
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("1.") && markdown.contains("First item"),
+        "markdown must contain '1. First item'; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("Second item"),
+        "markdown must contain 'Second item'; got: {markdown:?}"
+    );
+}
+
+/// `<ul><li>` produces `ir::Block::List { ordered: false }` and renders as
+/// a GFM bullet list (`-`) in Markdown.
+#[test]
+fn hwpx_ul_li_produces_unordered_list_block() {
+    let list_xml = r#"
+        <ul>
+            <li><hp:run><hp:t>Apple</hp:t></hp:run></li>
+            <li><hp:run><hp:t>Banana</hp:t></hp:run></li>
+            <li><hp:run><hp:t>Cherry</hp:t></hp:run></li>
+        </ul>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(list_xml));
+
+    // IR layer: must contain an unordered List block.
+    let list_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::List { ordered: false, .. }));
+
+    assert!(
+        list_block.is_some(),
+        "expected Block::List {{ ordered: false }}; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let ir::Block::List { items, .. } = list_block.unwrap() else {
+        unreachable!()
+    };
+    assert_eq!(items.len(), 3, "unordered list must have 3 items");
+
+    // Markdown layer: GFM bullet list format.
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("- Apple") || markdown.contains("* Apple"),
+        "markdown must contain bullet 'Apple'; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("Banana") && markdown.contains("Cherry"),
+        "all items must appear; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 85 P3: table colspan → HTML fallback integration test
+// ---------------------------------------------------------------------------
+
+/// A table cell with `colSpan="2"` triggers the HTML fallback renderer.
+/// The Markdown writer must emit an HTML `<table>` with `colspan="2"` when
+/// any cell has colspan > 1.
+#[test]
+fn hwpx_table_with_colspan_renders_html_fallback() {
+    // 2×2 table where the first row has a single cell spanning 2 columns.
+    // OWPML encodes colspan via <hp:cellSpan colSpan="N"/> child element,
+    // not as an attribute on <hp:tc> itself.
+    let table_xml = r#"<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:tbl rowCnt="2" colCnt="2">
+        <hp:tr>
+            <hp:tc>
+                <hp:cellSpan colSpan="2" rowSpan="1"/>
+                <hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>Merged Header</hp:t></hp:run></hp:p>
+            </hp:tc>
+        </hp:tr>
+        <hp:tr>
+            <hp:tc>
+                <hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>Cell A</hp:t></hp:run></hp:p>
+            </hp:tc>
+            <hp:tc>
+                <hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>Cell B</hp:t></hp:run></hp:p>
+            </hp:tc>
+        </hp:tr>
+    </hp:tbl></hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(table_xml));
+
+    // IR layer: must contain a Table block.
+    let table_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::Table { .. }));
+
+    assert!(
+        table_block.is_some(),
+        "expected a Table block; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+
+    // Check that the merged cell carries colspan=2 in the IR.
+    let ir::Block::Table { rows, .. } = table_block.unwrap() else {
+        unreachable!()
+    };
+    let first_row_cell = rows.first().and_then(|r| r.cells.first());
+    assert!(
+        first_row_cell.is_some(),
+        "first row must have at least one cell"
+    );
+    assert_eq!(
+        first_row_cell.unwrap().colspan,
+        2,
+        "merged cell must carry colspan=2 in the IR"
+    );
+
+    // Markdown layer: must fall back to HTML <table> with colspan attribute.
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("<table>") || markdown.contains("<TABLE>"),
+        "colspan table must render as HTML <table>; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("colspan=\"2\"") || markdown.contains("colspan=2"),
+        "HTML table must include colspan=2; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("Merged Header"),
+        "merged cell text must appear in output; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 85 P4: no-language code block integration test
+// ---------------------------------------------------------------------------
+
+/// `<!-- hwp2md:lang: -->` (empty language) produces a `CodeBlock` with
+/// `language = None` and renders as a plain ``` fence in Markdown (no tag).
+#[test]
+fn hwpx_lang_hint_empty_language_produces_code_block_no_tag() {
+    let (_dir, doc) = read_fixture(
+        // Pass empty string → <!-- hwp2md:lang: --> → CodeBlock { language: None }
+        HwpxFixture::new().with_lang_hint_paragraph("", "no_lang_code()"),
+    );
+
+    let code_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::CodeBlock { .. }));
+
+    assert!(
+        code_block.is_some(),
+        "expected a CodeBlock; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let ir::Block::CodeBlock { language, code } = code_block.unwrap() else {
+        unreachable!()
+    };
+    assert!(
+        language.is_none(),
+        "empty lang hint must produce CodeBlock {{ language: None }}; got: {language:?}"
+    );
+    assert!(
+        code.contains("no_lang_code"),
+        "code content must be preserved; got: {code:?}"
+    );
+
+    // Markdown layer: ``` fence without a language tag.
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("```"),
+        "markdown must contain code fence; got: {markdown:?}"
+    );
+    // Must NOT have a language tag immediately after the opening fence.
+    // The fence line should be exactly "```" (or "```\n"), not "```python" etc.
+    assert!(
+        !markdown.contains("```no_lang") && !markdown.contains("```None"),
+        "no-language fence must not have a language tag; got: {markdown:?}"
+    );
+}
