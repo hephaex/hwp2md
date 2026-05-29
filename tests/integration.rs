@@ -2264,3 +2264,218 @@ fn hwpx_lang_hint_empty_language_produces_code_block_no_tag() {
         "no-language fence must not have a language tag; got: {markdown:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 86 P2: canonical OWPML flat-paragraph list integration tests
+// ---------------------------------------------------------------------------
+//
+// Real HWPX/OWPML encodes lists as FLAT <hp:p paraPrIDRef="2"> paragraphs with
+// optional numPrIDRef="1" for ordered.  The reader groups consecutive list-paragraph
+// sentinels via `group_list_paragraphs` (flush.rs/reader.rs).
+//
+// paraPrIDRef="2" → depth-0 list item (PARA_PR_LIST_D0)
+// numPrIDRef="1"  → ordered (absent = unordered)
+
+/// Three flat `<hp:p paraPrIDRef="2" numPrIDRef="1">` paragraphs in section
+/// XML → single `Block::List { ordered: true, items: 3 }` after grouping.
+#[test]
+fn hwpx_canonical_ordered_list_flat_para_produces_list_block() {
+    // This is the real-world OWPML encoding (NOT <ol>/<li> elements).
+    let list_xml = r#"
+        <hp:p paraPrIDRef="2" numPrIDRef="1"><hp:run><hp:t>Alpha</hp:t></hp:run></hp:p>
+        <hp:p paraPrIDRef="2" numPrIDRef="1"><hp:run><hp:t>Beta</hp:t></hp:run></hp:p>
+        <hp:p paraPrIDRef="2" numPrIDRef="1"><hp:run><hp:t>Gamma</hp:t></hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(list_xml));
+
+    let list_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::List { ordered: true, .. }));
+
+    assert!(
+        list_block.is_some(),
+        "expected Block::List {{ ordered: true }} from paraPrIDRef=2 numPrIDRef=1; \
+         blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let ir::Block::List { items, .. } = list_block.unwrap() else {
+        unreachable!()
+    };
+    assert_eq!(items.len(), 3, "must have 3 list items");
+
+    // Markdown: sequential numbered items.
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("1. ") && markdown.contains("Alpha"),
+        "must contain '1. Alpha'; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("3. ") && markdown.contains("Gamma"),
+        "must contain '3. Gamma' (sequential); got: {markdown:?}"
+    );
+}
+
+/// Three flat `<hp:p paraPrIDRef="2">` paragraphs WITHOUT numPrIDRef
+/// → single `Block::List { ordered: false, items: 3 }` (unordered).
+#[test]
+fn hwpx_canonical_unordered_list_flat_para_produces_list_block() {
+    let list_xml = r#"
+        <hp:p paraPrIDRef="2"><hp:run><hp:t>Red</hp:t></hp:run></hp:p>
+        <hp:p paraPrIDRef="2"><hp:run><hp:t>Green</hp:t></hp:run></hp:p>
+        <hp:p paraPrIDRef="2"><hp:run><hp:t>Blue</hp:t></hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(list_xml));
+
+    let list_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::List { ordered: false, .. }));
+
+    assert!(
+        list_block.is_some(),
+        "expected Block::List {{ ordered: false }} from paraPrIDRef=2 without numPrIDRef; \
+         blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let ir::Block::List { items, .. } = list_block.unwrap() else {
+        unreachable!()
+    };
+    assert_eq!(items.len(), 3, "must have 3 unordered list items");
+
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("- Red"),
+        "must contain '- Red'; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("- Blue"),
+        "must contain '- Blue'; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 86 P3: HWPX equation element → Math block → LaTeX Markdown
+// ---------------------------------------------------------------------------
+
+/// `<hp:equation>` with EQEDIT content produces `ir::Block::Math { display: true }`
+/// and renders as a display-math `$$..$$` fence in Markdown.
+#[test]
+fn hwpx_equation_element_produces_math_block_and_latex_markdown() {
+    // EQEDIT passthrough: plain identifiers are preserved by eqedit_to_latex.
+    let eq_xml = r#"<hp:equation>x + y</hp:equation>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(eq_xml));
+
+    // IR layer: must contain a Math block with display=true.
+    let math_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::Math { .. }));
+
+    assert!(
+        math_block.is_some(),
+        "expected Block::Math from <hp:equation>; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let ir::Block::Math { display, tex } = math_block.unwrap() else {
+        unreachable!()
+    };
+    assert!(*display, "HWPX equation must produce display=true Math block");
+    assert!(
+        tex.contains("x") && tex.contains("y"),
+        "LaTeX output must contain 'x' and 'y'; got: {tex:?}"
+    );
+
+    // Markdown layer: display math → $$\n..\n$$ format.
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("$$"),
+        "markdown must contain $$ fence for display math; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("x") && markdown.contains("y"),
+        "math content must appear in markdown; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 86 P4: HorizontalRule and BlockQuote IR → Markdown rendering
+// ---------------------------------------------------------------------------
+// These blocks originate from the Markdown parser (---/> syntax), not from HWPX.
+// Tested here via direct IR → Markdown to pin the writer rendering contract.
+
+/// `ir::Block::HorizontalRule` must render as `---` (thematic break) in Markdown.
+#[test]
+fn ir_horizontal_rule_renders_as_thematic_break_in_markdown() {
+    let doc = ir::Document {
+        metadata: ir::Metadata::default(),
+        sections: vec![ir::Section {
+            blocks: vec![
+                ir::Block::Paragraph {
+                    inlines: vec![ir::Inline::plain("before".to_string())],
+                },
+                ir::Block::HorizontalRule,
+                ir::Block::Paragraph {
+                    inlines: vec![ir::Inline::plain("after".to_string())],
+                },
+            ],
+            ..Default::default()
+        }],
+        assets: Vec::new(),
+    };
+
+    let markdown = md::write_markdown(&doc, false);
+
+    assert!(
+        markdown.contains("---"),
+        "HorizontalRule must render as '---'; got: {markdown:?}"
+    );
+
+    // Ordering: before < HR < after.
+    let pos_before = markdown.find("before").expect("'before' in markdown");
+    let pos_hr = markdown.find("---").expect("'---' in markdown");
+    let pos_after = markdown.find("after").expect("'after' in markdown");
+    assert!(
+        pos_before < pos_hr && pos_hr < pos_after,
+        "order must be before · --- · after; positions: before={pos_before} hr={pos_hr} after={pos_after}"
+    );
+}
+
+/// `ir::Block::BlockQuote` must render with `> ` prefix in Markdown.
+#[test]
+fn ir_block_quote_renders_as_quoted_text_in_markdown() {
+    let doc = ir::Document {
+        metadata: ir::Metadata::default(),
+        sections: vec![ir::Section {
+            blocks: vec![ir::Block::BlockQuote {
+                blocks: vec![ir::Block::Paragraph {
+                    inlines: vec![ir::Inline::plain("Quoted text.".to_string())],
+                }],
+            }],
+            ..Default::default()
+        }],
+        assets: Vec::new(),
+    };
+
+    let markdown = md::write_markdown(&doc, false);
+
+    assert!(
+        markdown.contains("> "),
+        "BlockQuote must render with '> ' prefix; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("Quoted text."),
+        "BlockQuote content must appear; got: {markdown:?}"
+    );
+    // The quoted text should be preceded by the '> ' prefix on the same or adjacent line.
+    let quote_pos = markdown.find("> ").expect("'> ' prefix");
+    let text_pos = markdown.find("Quoted text.").expect("text");
+    assert!(
+        quote_pos < text_pos,
+        "'> ' must precede 'Quoted text.' in output; got: {markdown:?}"
+    );
+}
