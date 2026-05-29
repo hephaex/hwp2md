@@ -1528,6 +1528,7 @@ fn ruby_adjacent_plain_text_and_ruby_both_present() {
     let (_dir, doc) = read_fixture(HwpxFixture::new().section(ruby_xml));
     let markdown = md::write_markdown(&doc, false);
 
+    // All three parts must be present.
     assert!(
         markdown.contains("before"),
         "plain text before ruby must appear; got: {markdown:?}"
@@ -1539,6 +1540,14 @@ fn ruby_adjacent_plain_text_and_ruby_both_present() {
     assert!(
         markdown.contains("after"),
         "plain text after ruby must appear; got: {markdown:?}"
+    );
+    // Ordering: before < ruby < after (prevents swapped output).
+    let pos_before = markdown.find("before").expect("'before' in markdown");
+    let pos_ruby = markdown.find("<ruby>振り仮名").expect("ruby tag in markdown");
+    let pos_after = markdown.find("after").expect("'after' in markdown");
+    assert!(
+        pos_before < pos_ruby && pos_ruby < pos_after,
+        "order must be before · ruby · after; positions: before={pos_before} ruby={pos_ruby} after={pos_after}; markdown: {markdown:?}"
     );
 }
 
@@ -1618,9 +1627,18 @@ fn hwpx_hyperlink_text_after_field_end_has_no_link() {
         .flatten()
         .collect();
 
-    let plain_inlines: Vec<_> = inlines.iter().filter(|i| i.link.is_none()).collect();
+    // Positive: "linked" must carry the URL (verifies fieldBegin actually worked).
     assert!(
-        plain_inlines.iter().any(|i| i.text.contains("plain")),
-        "text after fieldEnd must have no link; inlines: {inlines:?}"
+        inlines
+            .iter()
+            .any(|i| i.text.contains("linked") && i.link.as_deref() == Some("https://example.com")),
+        "linked text must carry the URL; inlines: {inlines:?}"
+    );
+    // Negative: "plain" (after fieldEnd) must have no link.
+    assert!(
+        inlines
+            .iter()
+            .any(|i| i.text.contains("plain") && i.link.is_none()),
+        "text after fieldEnd must not carry the URL; inlines: {inlines:?}"
     );
 }
