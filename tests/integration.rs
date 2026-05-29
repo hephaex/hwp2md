@@ -1430,3 +1430,197 @@ fn ruby_annotation_html_chars_escaped_in_output() {
         "annotation HTML chars must be escaped; got: {markdown:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Ruby edge cases (Sprint 82 P2)
+// ---------------------------------------------------------------------------
+
+/// Empty base text + non-empty annotation must produce a ruby inline.
+/// handlers.rs emits the inline whenever `!base.is_empty() || !annotation.is_empty()`.
+/// MD writer renders `<ruby><rt>한자</rt></ruby>` (empty text between ruby tags).
+#[test]
+fn ruby_empty_base_with_annotation_produces_ruby_inline() {
+    let ruby_xml = r#"<hp:p><hp:run>
+        <hp:ruby>
+            <hp:rubyText>한자</hp:rubyText>
+            <hp:baseText></hp:baseText>
+        </hp:ruby>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(ruby_xml));
+    let markdown = md::write_markdown(&doc, false);
+
+    // The annotation must appear in a <rt> tag even when the base is empty.
+    assert!(
+        markdown.contains("<rt>한자</rt>"),
+        "annotation must appear in <rt> even with empty base; got: {markdown:?}"
+    );
+}
+
+/// Two ruby elements in the same paragraph produce two ruby inlines in order.
+#[test]
+fn ruby_multiple_ruby_in_one_paragraph_both_present() {
+    let ruby_xml = r#"<hp:p><hp:run>
+        <hp:ruby>
+            <hp:rubyText>いち</hp:rubyText>
+            <hp:baseText>一</hp:baseText>
+        </hp:ruby>
+        <hp:ruby>
+            <hp:rubyText>に</hp:rubyText>
+            <hp:baseText>二</hp:baseText>
+        </hp:ruby>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(ruby_xml));
+
+    let ruby_inlines: Vec<_> = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().filter(|i| i.ruby.is_some()).collect::<Vec<_>>())
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .collect();
+
+    assert_eq!(
+        ruby_inlines.len(),
+        2,
+        "expected 2 ruby inlines, got {}; blocks: {:?}",
+        ruby_inlines.len(),
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    assert_eq!(ruby_inlines[0].text, "一");
+    assert_eq!(ruby_inlines[0].ruby.as_deref(), Some("いち"));
+    assert_eq!(ruby_inlines[1].text, "二");
+    assert_eq!(ruby_inlines[1].ruby.as_deref(), Some("に"));
+
+    // Markdown: both ruby elements must appear.
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("<ruby>一<rt>いち</rt></ruby>"),
+        "first ruby missing; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("<ruby>二<rt>に</rt></ruby>"),
+        "second ruby missing; got: {markdown:?}"
+    );
+}
+
+/// Plain text adjacent to a ruby element in the same paragraph must both appear.
+#[test]
+fn ruby_adjacent_plain_text_and_ruby_both_present() {
+    let ruby_xml = r#"<hp:p>
+        <hp:run><hp:t>before </hp:t></hp:run>
+        <hp:run>
+            <hp:ruby>
+                <hp:rubyText>ルビ</hp:rubyText>
+                <hp:baseText>振り仮名</hp:baseText>
+            </hp:ruby>
+        </hp:run>
+        <hp:run><hp:t> after</hp:t></hp:run>
+    </hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(ruby_xml));
+    let markdown = md::write_markdown(&doc, false);
+
+    assert!(
+        markdown.contains("before"),
+        "plain text before ruby must appear; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("<ruby>振り仮名<rt>ルビ</rt></ruby>"),
+        "ruby element must be present; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("after"),
+        "plain text after ruby must appear; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// HWPX hyperlink field begin/end integration (Sprint 82 P3)
+// ---------------------------------------------------------------------------
+
+/// A `<hp:fieldBegin type="HYPERLINK" command="url"/>` … `<hp:fieldEnd/>` sequence
+/// must produce an inline carrying the link URL, rendered as Markdown `[text](url)`.
+#[test]
+fn hwpx_hyperlink_field_begin_end_produces_link_inline() {
+    let hyperlink_xml = r#"<hp:p><hp:run>
+        <hp:fieldBegin type="HYPERLINK" command="https://example.com"/>
+        <hp:t>Click here</hp:t>
+        <hp:fieldEnd/>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(hyperlink_xml));
+
+    let link_inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.link.is_some())
+            } else {
+                None
+            }
+        });
+
+    assert!(
+        link_inline.is_some(),
+        "expected an inline with link; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let link_inline = link_inline.unwrap();
+    assert_eq!(link_inline.text, "Click here", "link text mismatch");
+    assert_eq!(
+        link_inline.link.as_deref(),
+        Some("https://example.com"),
+        "link URL mismatch"
+    );
+
+    // Markdown rendering: [text](url) format.
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("[Click here](https://example.com)"),
+        "markdown must contain [text](url) link; got: {markdown:?}"
+    );
+}
+
+/// Text after `<hp:fieldEnd/>` must NOT carry the hyperlink.
+/// Pins that in_hyperlink is properly cleared on fieldEnd.
+#[test]
+fn hwpx_hyperlink_text_after_field_end_has_no_link() {
+    let hyperlink_xml = r#"<hp:p><hp:run>
+        <hp:fieldBegin type="HYPERLINK" command="https://example.com"/>
+        <hp:t>linked</hp:t>
+        <hp:fieldEnd/>
+        <hp:t> plain</hp:t>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(hyperlink_xml));
+
+    let inlines: Vec<_> = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.as_slice())
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .collect();
+
+    let plain_inlines: Vec<_> = inlines.iter().filter(|i| i.link.is_none()).collect();
+    assert!(
+        plain_inlines.iter().any(|i| i.text.contains("plain")),
+        "text after fieldEnd must have no link; inlines: {inlines:?}"
+    );
+}
