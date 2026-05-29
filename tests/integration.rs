@@ -1404,3 +1404,29 @@ fn ruby_empty_annotation_renders_as_plain_text() {
         "base text must appear in output; got: {markdown:?}"
     );
 }
+
+/// Ruby annotation containing HTML special chars must be escaped in Markdown output.
+/// Pins the `escape_html(annotation)` path in md/writer.rs end-to-end.
+#[test]
+fn ruby_annotation_html_chars_escaped_in_output() {
+    // Annotation contains '<', '>', '&' — should be escaped to &lt;, &gt;, &amp;.
+    let ruby_xml = r#"<hp:p><hp:run>
+        <hp:ruby>
+            <hp:rubyText>&lt;&amp;&gt;</hp:rubyText>
+            <hp:baseText>漢字</hp:baseText>
+        </hp:ruby>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(ruby_xml));
+    let markdown = md::write_markdown(&doc, false);
+
+    // The annotation "<&>" must be escaped; the raw chars must not appear in the rt tag.
+    assert!(
+        markdown.contains("<ruby>漢字<rt>"),
+        "ruby base text must be present; got: {markdown:?}"
+    );
+    assert!(
+        !markdown.contains("<rt><&>"),
+        "annotation HTML chars must be escaped; got: {markdown:?}"
+    );
+}
