@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 78 완료 (하이퍼링크 URL 강건성 + lang-hint 마이그레이션 완료 + 실 파일 리스트 정확도 테스트)
+## 현재 상태: v0.5.0 Sprint 79 완료 (is_control() DEL+C1+TAB/CR/LF strip + scheme plausibility + 테스트 헬퍼)
 
 ### 완료
 
@@ -709,6 +709,28 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 79 — 2026-05-30
+**주제**: parse_hyperlink_url is_control() 업그레이드 + scheme plausibility + 테스트 헬퍼
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/hwp/control/hyperlink.rs` | `is_control()` 로 DEL+C1+TAB/CR/LF strip; scheme `:` plausibility guard; `before_null` 리네임; `make_url_record()` 테스트 헬퍼 추출; 테스트명 개선 +4건 |
+
+### 검증
+- **1476 tests, 0 failures** (커밋 `451f0af`)
+- Clippy: 0 경고
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. MEDIUM 2건(contains(':') 코멘트/강화, 하위호환 영향 문서화), LOW 1건(follow-up에서 TAB/CR/LF 회귀 핀 즉시 처리).
+리뷰 전문: `~/.claude/references/2026-05-30_hwp2md_sprint79_hyperlink_iscontrol_scheme_review.md`
+
+### 관련 커밋
+- `afd4b63` feat(hwp): Sprint 79 — hyperlink is_control + scheme check + test helper
+- `451f0af` fix(hwp): Sprint 79 follow-up — TAB/CR/LF strip regression pin
+
+---
 
 ## Sprint 78 — 2026-05-27
 **주제**: 하이퍼링크 URL 강건성 + lang-hint 마이그레이션 완료 + 실 파일 리스트 정확도 테스트
