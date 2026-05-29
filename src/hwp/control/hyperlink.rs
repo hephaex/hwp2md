@@ -20,8 +20,15 @@ pub(crate) fn parse_hyperlink_url(rec: &Record) -> String {
     let url: String = before_null.chars().filter(|c| !c.is_control()).collect();
     // Minimum scheme plausibility (RFC 3986 §3.1): the part before the first ':'
     // must be non-empty and start with a letter (scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )).
-    // This rejects bare hostnames ("example.com") and Windows paths ("C:\x") while
-    // accepting all real schemes (https, ftp, mailto, file, data, …).
+    // This rejects bare hostnames ("example.com"), digit-led strings ("123:foo"),
+    // and empty-prefix strings (":foo").
+    //
+    // NOTE: single-letter schemes such as "C:" also satisfy RFC 3986 §3.1 and
+    // therefore pass this check.  A Windows drive path ("C:\path\file") is not
+    // rejected here — it is rejected downstream by `url_util::is_safe_url_scheme`
+    // whose explicit allowlist (http/https/ftp/mailto/…) excludes "c:".
+    // Do not tighten this pre-filter beyond the RFC without updating tests; the
+    // two-layer design is intentional.
     // NOTE: this is a loose pre-filter only. The real security gate is
     // `url_util::is_safe_url_scheme`, applied at the convert layer (convert.rs ~line 486),
     // which enforces an explicit allowlist and rejects javascript:/data: etc.

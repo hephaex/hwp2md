@@ -21,6 +21,25 @@ fn control_to_block_image_produces_image_block() {
 }
 
 #[test]
+fn control_to_block_image_bin_data_id_zero_produces_image_0_bin() {
+    // bin_data_id=0 means find_gsotype_bin_id returned 0 (no picture found).
+    // The IR still produces an Image block with src="image_0.bin".
+    // This is a known limitation: the link will be broken, but the block exists.
+    // Regression pin — do not silently drop images with id=0.
+    let ctrl = HwpControl::Image {
+        bin_data_id: 0,
+        width: 0,
+        height: 0,
+    };
+    let doc_info = DocInfo::default();
+    let block = control_to_block(&ctrl, &doc_info).expect("Image control must produce a block");
+    assert!(
+        matches!(block, ir::Block::Image { ref src, .. } if src == "image_0.bin"),
+        "expected Image block with src=image_0.bin for id=0; got {block:?}"
+    );
+}
+
+#[test]
 fn control_to_block_empty_table_produces_table_block() {
     let ctrl = HwpControl::Table {
         row_count: 2,

@@ -1329,3 +1329,78 @@ fn fixture_lang_hint_in_footer_produces_codeblock_ir() {
         "footer CodeBlock code must contain 'footer_code()'; got: {code:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Ruby annotation (Sprint 81 P4) — full-pipeline integration test
+// ---------------------------------------------------------------------------
+
+/// A HWPX `<hp:ruby>` element must survive the full pipeline:
+/// HWPX XML → IR Inline.ruby → Markdown `<ruby>…<rt>…</rt></ruby>`.
+#[test]
+fn ruby_annotation_survives_full_pipeline() {
+    let ruby_xml = r#"<hp:p><hp:run>
+        <hp:ruby>
+            <hp:rubyText>한자</hp:rubyText>
+            <hp:baseText>漢字</hp:baseText>
+        </hp:ruby>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(ruby_xml));
+
+    // IR layer: must have a Paragraph with an inline carrying the ruby annotation.
+    let ruby_inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.ruby.is_some())
+            } else {
+                None
+            }
+        });
+
+    assert!(
+        ruby_inline.is_some(),
+        "expected at least one inline with ruby annotation; got blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let ruby_inline = ruby_inline.unwrap();
+    assert_eq!(ruby_inline.text, "漢字", "base text mismatch");
+    assert_eq!(
+        ruby_inline.ruby.as_deref(),
+        Some("한자"),
+        "annotation text mismatch"
+    );
+
+    // Markdown layer: must render as HTML ruby tags.
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("<ruby>漢字<rt>한자</rt></ruby>"),
+        "markdown must contain <ruby>漢字<rt>한자</rt></ruby>; got: {markdown:?}"
+    );
+}
+
+/// Empty annotation (`<hp:rubyText>` is blank) must not produce a ruby field —
+/// the base text renders as plain text without `<ruby>` tags.
+#[test]
+fn ruby_empty_annotation_renders_as_plain_text() {
+    let ruby_xml = r#"<hp:p><hp:run>
+        <hp:ruby>
+            <hp:rubyText></hp:rubyText>
+            <hp:baseText>漢字</hp:baseText>
+        </hp:ruby>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(ruby_xml));
+
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        !markdown.contains("<ruby>"),
+        "empty annotation must not produce <ruby> tags; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("漢字"),
+        "base text must appear in output; got: {markdown:?}"
+    );
+}

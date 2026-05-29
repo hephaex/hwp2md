@@ -38,12 +38,16 @@ pub(crate) fn parse_gshape_ctrl(records: &[Record], ctrl_idx: usize) -> (u16, u3
 /// Scan `records[start..end]` for a `HWPTAG_GSOTYPE` record and extract the
 /// `BinData` ID.  The ID is a `u16` embedded at a known offset in the record data.
 ///
-/// HWP 5.0 `GSOTYPE` (picture kind = 0) body layout relevant fields:
+/// HWP 5.0 `GSOTYPE` (picture kind = 0) body layout (observed heuristic):
 ///   bytes  0- 3: `GSOType` kind (u32) — 0 = picture, 1 = OLE, ...
-/// For kind 0 (picture), the `BinData` index follows at the end of a fixed-size
-/// header.  In practice the ID is stored at offset 2 inside a nested
-/// `HWPTAG_BEGIN` + 68 (`GSOPicture`) record.  We fall back to scanning for
-/// a plausible non-zero u16 at known candidate offsets.
+///   bytes  4- 5: BinData ID (u16 LE) — used when kind = 0 and value > 0
+///
+/// The official HWP 5.0 specification places the `GSOPicture` sub-struct at a
+/// fixed offset further into the record.  This reader uses offset [4,5] as a
+/// pragmatic approximation that matches commonly observed HWP files.
+/// `candidate > 0` guards against returning a sentinel-zero ID that would
+/// point to no valid BinData entry.  A future revision may need to advance the
+/// offset or add a sub-record walk if real-world files diverge.
 pub(crate) fn find_gsotype_bin_id(records: &[Record], start: usize, end: usize) -> u16 {
     for rec in records.iter().skip(start).take(end.saturating_sub(start)) {
         if rec.tag_id == HWPTAG_GSOTYPE && rec.data.len() >= 4 {
