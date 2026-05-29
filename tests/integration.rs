@@ -2001,19 +2001,18 @@ fn hwpx_img_element_produces_image_block_and_markdown() {
         "expected an Image block; blocks: {:?}",
         doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
     );
-    if let ir::Block::Image { src, .. } = image_block.unwrap() {
-        assert_eq!(src, "photo.png", "Image src mismatch");
-    }
+    let ir::Block::Image { src, alt } = image_block.unwrap() else {
+        unreachable!("already asserted Image variant")
+    };
+    assert_eq!(src, "photo.png", "Image src mismatch");
+    // binaryItemIDRef has no explicit alt attr → default empty string.
+    assert_eq!(alt, "", "Image alt must be empty when not set");
 
-    // Markdown layer: renders as ![alt](src).
+    // Markdown layer: renders as ![](photo.png).
     let markdown = md::write_markdown(&doc, false);
     assert!(
-        markdown.contains("photo.png"),
-        "markdown must reference photo.png; got: {markdown:?}"
-    );
-    assert!(
-        markdown.contains("!["),
-        "markdown must use image syntax ![...]; got: {markdown:?}"
+        markdown.contains("![](photo.png)"),
+        "markdown must render as ![](photo.png); got: {markdown:?}"
     );
 }
 
@@ -2039,8 +2038,9 @@ fn hwpx_img_element_src_attr_also_produces_image_block() {
         "expected an Image block from src= attr; blocks: {:?}",
         doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
     );
-    if let ir::Block::Image { src, alt } = image_block.unwrap() {
-        assert_eq!(src, "inline.png", "Image src mismatch");
-        assert_eq!(alt, "A picture", "Image alt mismatch");
-    }
+    let ir::Block::Image { src, alt } = image_block.unwrap() else {
+        unreachable!("already asserted Image variant")
+    };
+    assert_eq!(src, "inline.png", "Image src mismatch");
+    assert_eq!(alt, "A picture", "Image alt mismatch");
 }
