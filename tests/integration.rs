@@ -1681,6 +1681,16 @@ fn hwpx_footnote_fn_element_produces_footnote_block_and_markdown() {
     assert_eq!(id, "1", "footnote id mismatch");
     assert_eq!(content.len(), 1, "footnote must have exactly one content block");
 
+    // Body paragraph must survive as a separate block alongside the Footnote block.
+    let total_blocks: usize = doc.sections.iter().map(|s| s.blocks.len()).sum();
+    assert_eq!(
+        total_blocks,
+        2,
+        "section must contain body Paragraph + Footnote (2 blocks total); \
+         blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+
     // Markdown layer: must render as [^1]: content
     let markdown = md::write_markdown(&doc, false);
     assert!(
@@ -1777,11 +1787,16 @@ fn hwpx_note_ref_inline_produces_footnote_ref_in_markdown() {
         "footnote_ref must be '1'"
     );
 
-    // Markdown layer: reference renders as [^1].
+    // Markdown layer: reference renders as [^1] (in body) AND [^1]: (definition).
+    // Check occurrence count: body ref contributes one "[^1]", definition contributes
+    // one more "[^1]" (as a prefix of "[^1]:"). Count >= 2 ensures the body ref
+    // is present independently of the definition line.
     let markdown = md::write_markdown(&doc, false);
+    let ref_count = markdown.matches("[^1]").count();
     assert!(
-        markdown.contains("[^1]"),
-        "markdown must contain [^1] footnote reference; got: {markdown:?}"
+        ref_count >= 2,
+        "markdown must contain both [^1] body reference and [^1]: definition; \
+         found {ref_count} occurrence(s); got: {markdown:?}"
     );
     assert!(
         markdown.contains("[^1]:"),
