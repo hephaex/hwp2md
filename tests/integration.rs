@@ -1642,3 +1642,195 @@ fn hwpx_hyperlink_text_after_field_end_has_no_link() {
         "text after fieldEnd must not carry the URL; inlines: {inlines:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Footnote/endnote full-pipeline integration (Sprint 83 P2)
+// ---------------------------------------------------------------------------
+
+/// A `<hp:fn id="N">` element in a HWPX section produces an `ir::Block::Footnote`
+/// with the correct id and content paragraph, and renders as `[^N]: text` in Markdown.
+#[test]
+fn hwpx_footnote_fn_element_produces_footnote_block_and_markdown() {
+    let footnote_xml = r#"
+        <hp:p><hp:run><hp:t>Body text.</hp:t></hp:run></hp:p>
+        <hp:fn id="1">
+            <hp:p><hp:run><hp:t>Note content.</hp:t></hp:run></hp:p>
+        </hp:fn>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(footnote_xml));
+
+    // IR layer: must contain a Footnote block.
+    let footnote = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Footnote { id, content } = b {
+                Some((id.as_str(), content.as_slice()))
+            } else {
+                None
+            }
+        });
+
+    assert!(
+        footnote.is_some(),
+        "expected a Footnote block; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let (id, content) = footnote.unwrap();
+    assert_eq!(id, "1", "footnote id mismatch");
+    assert_eq!(content.len(), 1, "footnote must have exactly one content block");
+
+    // Markdown layer: must render as [^1]: content
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("[^1]:"),
+        "markdown must contain footnote definition [^1]:; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("Note content"),
+        "footnote content text must appear in markdown; got: {markdown:?}"
+    );
+}
+
+/// An endnote (`<hp:en id="N">`) is treated identically to a footnote block.
+/// Both produce `ir::Block::Footnote` and render as `[^N]:` in Markdown.
+#[test]
+fn hwpx_endnote_en_element_produces_footnote_block_and_markdown() {
+    let endnote_xml = r#"
+        <hp:p><hp:run><hp:t>Body text.</hp:t></hp:run></hp:p>
+        <hp:en id="2">
+            <hp:p><hp:run><hp:t>End note text.</hp:t></hp:run></hp:p>
+        </hp:en>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(endnote_xml));
+
+    let footnote = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Footnote { id, .. } = b {
+                Some(id.as_str())
+            } else {
+                None
+            }
+        });
+
+    assert_eq!(
+        footnote,
+        Some("2"),
+        "expected Footnote block with id='2'; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("[^2]:"),
+        "endnote must render as [^2]:; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("End note text"),
+        "endnote content must appear; got: {markdown:?}"
+    );
+}
+
+/// A `<hp:noteRef noteId="N"/>` inline must produce an IR inline with
+/// `footnote_ref = Some("N")`, rendered as `[^N]` in Markdown.
+#[test]
+fn hwpx_note_ref_inline_produces_footnote_ref_in_markdown() {
+    let note_ref_xml = r#"
+        <hp:p>
+            <hp:run>
+                <hp:t>See footnote</hp:t>
+                <hp:noteRef noteId="1"/>
+                <hp:t>.</hp:t>
+            </hp:run>
+        </hp:p>
+        <hp:fn id="1">
+            <hp:p><hp:run><hp:t>Referenced note.</hp:t></hp:run></hp:p>
+        </hp:fn>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(note_ref_xml));
+
+    // IR layer: the paragraph must have an inline with footnote_ref.
+    let ref_inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.footnote_ref.is_some())
+            } else {
+                None
+            }
+        });
+
+    assert!(
+        ref_inline.is_some(),
+        "expected an inline with footnote_ref; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        ref_inline.unwrap().footnote_ref.as_deref(),
+        Some("1"),
+        "footnote_ref must be '1'"
+    );
+
+    // Markdown layer: reference renders as [^1].
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("[^1]"),
+        "markdown must contain [^1] footnote reference; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("[^1]:"),
+        "markdown must contain [^1]: footnote definition; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// PageBreak ctrl variants (Sprint 83 P3)
+// ---------------------------------------------------------------------------
+
+/// `<hp:ctrl id="pageBreak"/>` (camelCase variant) must also produce PageBreak.
+/// Pins the `is_page_break_ctrl` match arm for "pageBreak".
+#[test]
+fn fixture_pagebreak_ctrl_variant_produces_pagebreak_ir() {
+    let body = format!(
+        "{}<hp:p><hp:run><hp:ctrl id=\"pageBreak\"/></hp:run></hp:p>{}",
+        para_xml("before"),
+        para_xml("after"),
+    );
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
+    let has_pagebreak = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(|b| matches!(b, ir::Block::PageBreak));
+    assert!(
+        has_pagebreak,
+        "pageBreak ctrl variant must produce Block::PageBreak"
+    );
+}
+
+/// `<hp:ctrl id="cnpb"/>` (column+page break) must also produce PageBreak.
+/// Pins the `is_page_break_ctrl` match arm for "cnpb".
+#[test]
+fn fixture_cnpb_ctrl_variant_produces_pagebreak_ir() {
+    let body = format!(
+        "{}<hp:p><hp:run><hp:ctrl id=\"cnpb\"/></hp:run></hp:p>{}",
+        para_xml("before"),
+        para_xml("after"),
+    );
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
+    let has_pagebreak = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(|b| matches!(b, ir::Block::PageBreak));
+    assert!(
+        has_pagebreak,
+        "cnpb ctrl variant must produce Block::PageBreak"
+    );
+}
