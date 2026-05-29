@@ -201,14 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 80 로드맵
+## Sprint 81 로드맵
 
-Sprint 79 완료 (2026-05-30). parse_hyperlink_url: is_control() DEL+C1+TAB/CR/LF strip + scheme ':' plausibility; make_url_record() 테스트 헬퍼; 변수명/테스트명 정리.
+Sprint 80 완료 (2026-05-30). RFC 3986 §3.1 scheme prefix 검증 (ALPHA-led, tail ALPHA/DIGIT/+/-/.); moel_01/03/04/05 단방향 → 양방향 밴드 테스트.
 
 - **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지)
-- **P2**: parse_hyperlink_url 추가 강건성 — Sprint 79 리뷰 MEDIUM: contains(':') 코멘트 개선 또는 scheme prefix 패턴 (alpha+colon) 으로 강화
-- **P3**: HWP 5.0 reader Phase 2 — 이미지(BinData) 추출 또는 CTRL_RUBY 강건성
-- **P4**: real_hwp_list_accuracy.rs 밴드 테스트 추가 (moel_01/03/04/05 ordered ≥ 1 → 양방향 밴드)
+- **P2**: HWP 5.0 reader Phase 2 — 이미지(BinData) 추출 실태 감사 (기존 구현 범위 확인 후 갭 처리)
+- **P3**: parse_hyperlink_url M1 follow-up — C:\path 단일-문자 스킴 통과 문제를 두-레이어 아키텍처 주석으로만 문서화 (코드 변경 불필요, 단 test 추가 가능)
+- **P4**: CTRL_RUBY 강건성 감사 — 실 파일 기반 ruby 렌더링 통합 테스트 (기존 35개 단위 테스트 보완)
 
 ## 라이선스
 

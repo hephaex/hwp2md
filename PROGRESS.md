@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 79 완료 (is_control() DEL+C1+TAB/CR/LF strip + scheme plausibility + 테스트 헬퍼)
+## 현재 상태: v0.5.0 Sprint 80 완료 (RFC 3986 scheme 검증 + moel 양방향 밴드 테스트)
 
 ### 완료
 
@@ -709,6 +709,29 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 80 — 2026-05-30
+**주제**: RFC 3986 scheme prefix 검증 + moel_01/03/04/05 양방향 밴드 테스트
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/hwp/control/hyperlink.rs` | RFC 3986 §3.1 scheme 검증: ALPHA-led prefix + tail ALPHA/DIGIT/+/-/.; is_some_and() 적용; 두-레이어 아키텍처 주석; +7 테스트 (digit-led, empty-prefix, plus-led, ftp, mailto, tail-charset) |
+| `tests/real_hwp_list_accuracy.rs` | moel_01/03/04/05: `ordered > 0` → 양방향 % 밴드 (40–75%/45–85%/65–100%/75–100%); 테스트명 *_in_band 갱신 |
+
+### 검증
+- **1482 tests, 0 failures** (커밋 `2a6e8fc`)
+- Clippy: 0 경고
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. M1(단일-문자 스킴 통과, 두-레이어로 문서화됨, 설계상 허용), M2(+/-/. 꼬리 charset 긍정 테스트 누락 → follow-up에서 즉시 처리), LOW 1건(walker 스코프 노트).
+리뷰 전문: `~/.claude/references/2026-05-30_hwp2md_sprint80_rfc3986_scheme_bandtests_review.md`
+
+### 관련 커밋
+- `8704a50` feat(hwp): Sprint 80 — RFC 3986 scheme validation + bidirectional list bands
+- `2a6e8fc` fix(hwp): Sprint 80 follow-up — RFC 3986 tail-charset acceptance test
+
+---
 
 ## Sprint 79 — 2026-05-30
 **주제**: parse_hyperlink_url is_control() 업그레이드 + scheme plausibility + 테스트 헬퍼
