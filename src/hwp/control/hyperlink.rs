@@ -92,6 +92,18 @@ mod tests {
     }
 
     #[test]
+    fn parse_hyperlink_url_tab_cr_lf_stripped() {
+        // TAB/CR/LF are is_control() chars; the old `>= ' '` filter let them through,
+        // creating injection vectors in the Markdown output. Regression pin.
+        let rec = make_url_record("https://ex\t\r\nample.com");
+        assert_eq!(
+            parse_hyperlink_url(&rec),
+            "https://example.com",
+            "TAB/CR/LF must be stripped by is_control()"
+        );
+    }
+
+    #[test]
     fn parse_hyperlink_url_only_null_returns_empty() {
         // URL consists only of null terminator — empty after truncation.
         let rec = make_url_record("\0");
