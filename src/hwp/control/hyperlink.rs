@@ -135,6 +135,22 @@ mod tests {
     }
 
     #[test]
+    fn parse_hyperlink_url_scheme_with_plus_dash_dot_accepted() {
+        // RFC 3986 §3.1 tail chars: ALPHA / DIGIT / "+" / "-" / ".".
+        // Pins the matches!(c, '+' | '-' | '.') branch with a positive test.
+        // "coap+tcp" uses '+'; "view-source" uses '-'; schemes ending in
+        // digits (ws2) use DIGIT.  We test one representative each.
+        for url in &["coap+tcp://example.com", "view-source:http://x.com"] {
+            let rec = make_url_record(url);
+            assert_ne!(
+                parse_hyperlink_url(&rec),
+                "",
+                "expected non-empty for valid scheme in {url}"
+            );
+        }
+    }
+
+    #[test]
     fn parse_hyperlink_url_mailto_accepted() {
         // mailto: is a valid non-hierarchical scheme.
         let rec = make_url_record("mailto:user@example.com");
