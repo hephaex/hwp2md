@@ -18,8 +18,22 @@ pub(crate) fn parse_hyperlink_url(rec: &Record) -> String {
     let before_null = raw.split('\0').next().unwrap_or("");
     // Strip control characters: U+0000–U+001F, DEL (U+007F), and C1 (U+0080–U+009F).
     let url: String = before_null.chars().filter(|c| !c.is_control()).collect();
-    // Minimum scheme plausibility: a URL must contain ':' (e.g. "https:", "file:").
-    if !url.contains(':') {
+    // Minimum scheme plausibility (RFC 3986 §3.1): the part before the first ':'
+    // must be non-empty and start with a letter (scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )).
+    // This rejects bare hostnames ("example.com") and Windows paths ("C:\x") while
+    // accepting all real schemes (https, ftp, mailto, file, data, …).
+    // NOTE: this is a loose pre-filter only. The real security gate is
+    // `url_util::is_safe_url_scheme`, applied at the convert layer (convert.rs ~line 486),
+    // which enforces an explicit allowlist and rejects javascript:/data: etc.
+    let has_valid_scheme = url.find(':').is_some_and(|i| {
+        let prefix = &url[..i];
+        !prefix.is_empty()
+            && prefix.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
+            && prefix
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+    });
+    if !has_valid_scheme {
         return String::new();
     }
     url
@@ -86,9 +100,45 @@ mod tests {
 
     #[test]
     fn parse_hyperlink_url_no_scheme_returns_empty() {
-        // A string without ':' is not a plausible URL — must return empty.
+        // Bare hostname — no ':' at all.
         let rec = make_url_record("example.com");
         assert_eq!(parse_hyperlink_url(&rec), "");
+    }
+
+    #[test]
+    fn parse_hyperlink_url_digit_led_scheme_rejected() {
+        // "123:foo" has a colon but the prefix starts with a digit, not a letter.
+        // RFC 3986 §3.1: scheme must start with ALPHA.
+        let rec = make_url_record("123:foo");
+        assert_eq!(parse_hyperlink_url(&rec), "");
+    }
+
+    #[test]
+    fn parse_hyperlink_url_empty_scheme_prefix_rejected() {
+        // ":foo" — colon with empty prefix (no scheme name at all).
+        let rec = make_url_record(":foo");
+        assert_eq!(parse_hyperlink_url(&rec), "");
+    }
+
+    #[test]
+    fn parse_hyperlink_url_scheme_starting_with_plus_rejected() {
+        // "+foo:bar" — scheme must start with ALPHA, not '+'.
+        let rec = make_url_record("+foo:bar");
+        assert_eq!(parse_hyperlink_url(&rec), "");
+    }
+
+    #[test]
+    fn parse_hyperlink_url_ftp_accepted() {
+        // ftp: is a valid RFC 3986 scheme.
+        let rec = make_url_record("ftp://example.com/file");
+        assert_eq!(parse_hyperlink_url(&rec), "ftp://example.com/file");
+    }
+
+    #[test]
+    fn parse_hyperlink_url_mailto_accepted() {
+        // mailto: is a valid non-hierarchical scheme.
+        let rec = make_url_record("mailto:user@example.com");
+        assert_eq!(parse_hyperlink_url(&rec), "mailto:user@example.com");
     }
 
     #[test]

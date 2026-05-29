@@ -90,58 +90,66 @@ fn count_lists_in_items(item: &ir::ListItem) -> (usize, usize) {
 
 /// moel_01 is a community service center specification document.
 /// It uses numbered list items throughout (법령 정의 목록).
+///
+/// Ordered-list ratio band (40–75 %): baseline Sprint 80 = 105/186 ≈ 56.5 %.
+/// Lower bound detects ordered detection regressing toward zero.
+/// Upper bound detects unordered bullets being misclassified as ordered.
 #[test]
-fn moel_01_has_ordered_lists() {
+fn moel_01_ordered_lists_in_band() {
     let (total, ordered) = list_stats("moel_01_goyang_center");
+    assert!(total > 0, "moel_01: expected at least one list block, got 0");
+    let pct = (ordered as f64) * 100.0 / (total as f64);
     assert!(
-        total > 0,
-        "moel_01: expected at least one list block, got 0"
-    );
-    assert!(
-        ordered > 0,
-        "moel_01: expected at least one ordered list; total={total}, ordered={ordered}"
+        (40.0..=75.0).contains(&pct),
+        "moel_01: ordered ratio {pct:.1}% outside expected band 40–75%; \
+         total={total}, ordered={ordered}"
     );
 }
 
 /// moel_03 is a livelihood loan guideline with numbered definitions.
+///
+/// Ordered-list ratio band (45–85 %): baseline Sprint 80 = 14/22 ≈ 63.6 %.
 #[test]
-fn moel_03_has_ordered_lists() {
+fn moel_03_ordered_lists_in_band() {
     let (total, ordered) = list_stats("moel_03_livelihood_loan");
+    assert!(total > 0, "moel_03: expected at least one list block, got 0");
+    let pct = (ordered as f64) * 100.0 / (total as f64);
     assert!(
-        total > 0,
-        "moel_03: expected at least one list block, got 0"
-    );
-    assert!(
-        ordered > 0,
-        "moel_03: expected at least one ordered list; total={total}, ordered={ordered}"
+        (45.0..=85.0).contains(&pct),
+        "moel_03: ordered ratio {pct:.1}% outside expected band 45–85%; \
+         total={total}, ordered={ordered}"
     );
 }
 
 /// moel_04 is an instructor education regulation with numbered clauses.
+///
+/// Ordered-list ratio band (65–100 %): baseline Sprint 80 = 9/10 = 90.0 %.
+/// Almost entirely ordered; lower bound guards against regression.
 #[test]
-fn moel_04_has_ordered_lists() {
+fn moel_04_ordered_lists_in_band() {
     let (total, ordered) = list_stats("moel_04_instructor_education");
+    assert!(total > 0, "moel_04: expected at least one list block, got 0");
+    let pct = (ordered as f64) * 100.0 / (total as f64);
     assert!(
-        total > 0,
-        "moel_04: expected at least one list block, got 0"
-    );
-    assert!(
-        ordered > 0,
-        "moel_04: expected at least one ordered list; total={total}, ordered={ordered}"
+        (65.0..=100.0).contains(&pct),
+        "moel_04: ordered ratio {pct:.1}% outside expected band 65–100%; \
+         total={total}, ordered={ordered}"
     );
 }
 
 /// moel_05 is a quality management manual with numbered items.
+///
+/// Ordered-list ratio band (75–100 %): baseline Sprint 80 = 15/15 = 100.0 %.
+/// All lists are ordered; lower bound guards against regression.
 #[test]
-fn moel_05_has_ordered_lists() {
+fn moel_05_ordered_lists_in_band() {
     let (total, ordered) = list_stats("moel_05_quality_management");
+    assert!(total > 0, "moel_05: expected at least one list block, got 0");
+    let pct = (ordered as f64) * 100.0 / (total as f64);
     assert!(
-        total > 0,
-        "moel_05: expected at least one list block, got 0"
-    );
-    assert!(
-        ordered > 0,
-        "moel_05: expected at least one ordered list; total={total}, ordered={ordered}"
+        (75.0..=100.0).contains(&pct),
+        "moel_05: ordered ratio {pct:.1}% outside expected band 75–100%; \
+         total={total}, ordered={ordered}"
     );
 }
 
