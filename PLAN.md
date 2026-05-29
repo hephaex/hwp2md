@@ -201,14 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 86 로드맵
+## Sprint 87 로드맵
 
-Sprint 85 완료 (2026-05-30). ol/ul/li 통합 테스트(secondary ingestion path 명시); colspan HTML 폴백(hp:cellSpan 인코딩); empty lang-hint → CodeBlock{language:None} 핀.
+Sprint 86 완료 (2026-05-30). canonical paraPrIDRef=2 ordered/unordered list; hp:equation → Math raw verbatim(eqedit_to_latex 미호출 발견); HR "---" + BlockQuote "> " 렌더링 핀.
 
 - **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지)
-- **P2**: HWPX canonical list (flat hp:p paraPrIDRef/numPrIDRef) 통합 테스트 — 진짜 OWPML 리스트 파이프라인 커버
-- **P3**: HWPX 수식(`<hp:equation>`) 통합 테스트 → IR Math block → LaTeX 렌더링
-- **P4**: HorizontalRule 또는 BlockQuote 통합 테스트
+- **P2**: HWPX table roundtrip 통합 테스트 — IR Table → HWPX write → read_hwpx → IR Table 왕복 검증
+- **P3**: eqedit_to_latex HWPX 경로 조사 — HWPX <hp:equation>이 raw text 반환하는 것이 설계인지 버그인지 감사. 필요하면 수정.
+- **P4**: 중첩 리스트(depth-1, paraPrIDRef="3") 통합 테스트
 
 ## 라이선스
 

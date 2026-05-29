@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 85 완료 (list ol/ul/li + colspan HTML폴백 + no-lang CodeBlock 통합 테스트)
+## 현재 상태: v0.5.0 Sprint 86 완료 (canonical list + equation + HR/BlockQuote 통합 테스트)
 
 ### 완료
 
@@ -709,6 +709,31 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 86 — 2026-05-30
+**주제**: canonical paraPrIDRef list + hp:equation + HR/BlockQuote 통합 테스트
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/integration.rs` | canonical ordered/unordered list(paraPrIDRef=2); hp:equation raw text → Math block → $$; HorizontalRule "---" 순서; BlockQuote "> " 라인 (+5 테스트, follow-up MEDIUM/LOW) |
+
+### 검증
+- **1509 tests, 0 failures** (커밋 `d5a61c7`)
+- Clippy: 0 경고
+
+### 핵심 발견사항
+- HWPX `<hp:equation>` 핸들러는 `eqedit_to_latex`를 호출하지 않음 — element text를 raw로 `tex` 필드에 저장. `eqedit_to_latex`는 HWP 5.0 바이너리 리더 경로에만 연결됨. Sprint 87 P3 감사 대상.
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. MEDIUM(hp:equation 주석 오류 → 즉시 수정), LOW(blockquote "> Quoted text." 강화 → 즉시 수정).
+리뷰 전문: `~/.claude/references/2026-05-30_hwp2md_sprint86_canonical_list_equation_hr_review.md`
+
+### 관련 커밋
+- `9e509d3` feat(hwpx): Sprint 86 — canonical list/equation/HR/blockquote integration tests
+- `d5a61c7` fix(hwpx): Sprint 86 follow-up — equation comment + blockquote assertion
+
+---
 
 ## Sprint 85 — 2026-05-30
 **주제**: ol/ul/li 통합 테스트 + colspan HTML폴백 + no-lang CodeBlock
