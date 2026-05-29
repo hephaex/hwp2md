@@ -2048,6 +2048,12 @@ fn hwpx_img_element_src_attr_also_produces_image_block() {
 // ---------------------------------------------------------------------------
 // Sprint 85 P2: ordered/unordered list integration tests
 // ---------------------------------------------------------------------------
+//
+// NOTE: Real OWPML/HWPX files encode lists as flat <hp:p paraPrIDRef numPrIDRef>
+// paragraphs (handled in flush.rs via group_list_paragraphs). The <ol>/<ul>/<li>
+// form below is a secondary/lenient ingestion path in handlers.rs:81-95.
+// Canonical OWPML list coverage lives in reader_tests_list.rs and
+// real_hwp_list_accuracy.rs; these tests pin the secondary ol/ul/li handler.
 
 /// `<ol><li>` produces `ir::Block::List { ordered: true }` with item text
 /// preserved, and renders as a GFM numbered list in Markdown.
@@ -2078,15 +2084,16 @@ fn hwpx_ol_li_produces_ordered_list_block() {
     };
     assert_eq!(items.len(), 2, "ordered list must have 2 items");
 
-    // Markdown layer: GFM numbered list format.
+    // Markdown layer: GFM numbered list format with correct sequence.
     let markdown = md::write_markdown(&doc, false);
     assert!(
-        markdown.contains("1.") && markdown.contains("First item"),
+        markdown.contains("1. ") && markdown.contains("First item"),
         "markdown must contain '1. First item'; got: {markdown:?}"
     );
+    // Assert the second item uses "2." (not "1.") to verify sequential numbering.
     assert!(
-        markdown.contains("Second item"),
-        "markdown must contain 'Second item'; got: {markdown:?}"
+        markdown.contains("2. ") && markdown.contains("Second item"),
+        "markdown must contain '2. Second item' (sequential); got: {markdown:?}"
     );
 }
 
@@ -2120,11 +2127,12 @@ fn hwpx_ul_li_produces_unordered_list_block() {
     };
     assert_eq!(items.len(), 3, "unordered list must have 3 items");
 
-    // Markdown layer: GFM bullet list format.
+    // Markdown layer: GFM bullet list format. The writer hardcodes "-" as
+    // the unordered marker (writer.rs uses "-".to_string()), never "*".
     let markdown = md::write_markdown(&doc, false);
     assert!(
-        markdown.contains("- Apple") || markdown.contains("* Apple"),
-        "markdown must contain bullet 'Apple'; got: {markdown:?}"
+        markdown.contains("- Apple"),
+        "markdown must contain '- Apple' (hyphen bullet); got: {markdown:?}"
     );
     assert!(
         markdown.contains("Banana") && markdown.contains("Cherry"),
