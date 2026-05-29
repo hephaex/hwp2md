@@ -201,14 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 82 로드맵
+## Sprint 83 로드맵
 
-Sprint 81 완료 (2026-05-30). HWPX ruby 전체 파이프라인 통합 테스트 (annotation+empty+HTML escape); BinData id=0 엣지케이스 핀; GSOTYPE 휴리스틱 문서화; hyperlink C: 단일-문자 두-레이어 주석.
+Sprint 82 완료 (2026-05-30). ruby 엣지케이스 3건(빈 base, 다중 ruby, 주변 텍스트+ruby 순서); HWPX hyperlink fieldBegin/End 2건; P4 audit (ignore 없음, production unwrap 없음).
 
 - **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지)
-- **P2**: ruby 추가 엣지케이스 통합 테스트 (Sprint 81 리뷰 LOW): 빈 base 텍스트 + 비어있지 않은 annotation; 동일 단락 내 다중 ruby; 주변 일반 텍스트 + ruby
-- **P3**: 하이퍼링크 test coverage — target blank 속성이나 HWPX field begin/end 상호작용 테스트
-- **P4**: HWP/HWPX 공통 audit — 기존 회귀 테스트 중 `#[ignore]` 또는 `unwrap()` 패닉 위험 검토
+- **P2**: HWPX footnote/endnote 통합 테스트 — `<hp:fn>`/`<hp:en>` XML fixture → IR Footnote → Markdown `[^id]` 렌더링
+- **P3**: PageBreak 통합 테스트 — `<hp:ctrl id="newPage"/>` → IR Block::PageBreak → MD `<!-- pagebreak -->` 마커
+- **P4**: HWP binary reader regression — moel 실 파일에서 ruby/superscript 추출 정확도 검증 (선택적)
 
 ## 라이선스
 
