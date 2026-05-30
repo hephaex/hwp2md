@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 96 완료 (image split + ir_hwpx_roundtrip/any_inline_in_doc helpers + lossy contracts)
+## 현재 상태: v0.5.0 Sprint 97 완료 (table/code split + any_block_in_doc + H1/H2/H3 heading roundtrip)
 
 ### 완료
 
@@ -709,6 +709,29 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 97 — 2026-05-31
+**주제**: table/code split + any_block_in_doc helper + H1/H2/H3 heading roundtrip
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/integration_table_blocks.rs` | NEW — Sprint 85 P3/P4 colspan+no-lang code 2개 이전 |
+| `tests/fixtures/mod.rs` | `any_block_in_doc(doc, pred)` helper 추가 (top-level 한정) |
+| `tests/integration.rs` | 2개 제거 (-66 lines net) + lossy tests 리팩 + P4 heading roundtrip |
+
+### 검증
+- **1544 tests, 0 failures** (커밋 `eef7368`)
+- Clippy `-D warnings`: clean
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. heading roundtrip 아키텍처 정확 (writer_section.rs:136-149 numeric styleIDRef; parse_hwpx_style_ref:546-558 numeric fallback). any_block_in_doc top-level 스코프 올바름. lossy-contract 리팩 의미 동일. LOW: P4 test comment에 "4" 하드코딩 (PARA_PR_HEADING constant drift 가능성); writer 1-6 clamp 미문서화 — 모두 cosmetic.
+리뷰 전문: `~/.claude/references/2026-05-31_hwp2md_sprint97_table_code_split_heading_roundtrip_review.md`
+
+### 관련 커밋
+- `eef7368` feat(tests): Sprint 97 — table/code split + any_block_in_doc + heading roundtrip
+
+---
 
 ## Sprint 96 — 2026-05-31
 **주제**: image split + roundtrip helpers + BlockQuote/HR lossy contract assertions

@@ -264,14 +264,23 @@ Sprint 95 완료 (2026-05-31). 1541 tests. blocks split + italic/strikethrough/c
 - **P3**: roundtrip helpers — ✅ `ir_hwpx_roundtrip` + `any_inline_in_doc` (top-level paragraphs 한정)
 - **P4**: BlockQuote/HR negative assertion — ✅ 손실 계약 pre+!still 패턴으로 executable화
 
-## Sprint 97 로드맵
+## Sprint 97 완료 (2026-05-31)
 
 Sprint 96 완료 (2026-05-31). 1543 tests. image split + roundtrip helpers + lossy contracts.
 
+- **P1**: 관(subsection) 감지 — BLOCKER 유지 — 이월
+- **P2**: integration_table_blocks.rs 분리 — ✅ colspan + no-lang code block 2개 이전
+- **P3**: `any_block_in_doc` → fixtures/mod.rs — ✅ lossy-contract tests 리팩 (-12 lines)
+- **P4**: 헤딩 roundtrip — ✅ H1/H2/H3 hp:styleIDRef numeric → parse_hwpx_style_ref lossless
+
+## Sprint 98 로드맵
+
+Sprint 97 완료 (2026-05-31). 1544 tests. table/code split + heading roundtrip. integration.rs 2430 lines.
+
 - **P1**: 관(subsection) 감지 — BLOCKER 계속 유지
-- **P2**: integration.rs 추가 분할 — colspan/code-block 섹션 분리 (현재 2496 lines)
-- **P3**: `any_block_in_doc(doc, pred)` helper 추가 — P4 lossy/non-lossy block 검증 패턴
-- **P4**: 헤딩 roundtrip — H1/H2/H3 MD→HWPX→MD 구조 + ATX prefix 보존 검증
+- **P2**: integration.rs 추가 분할 — multi-section/roundtrip 섹션 분리 (Sprint 88 P4 + 89 P4)
+- **P3**: 인라인 서식 추가 roundtrip — underline MD→HWPX→MD + superscript/subscript roundtrip
+- **P4**: Heading H4-H6 roundtrip + 레벨 clamp 확인 (writer clamps to 1-6; H7→H6)
 
 ## 라이선스
 
