@@ -34,6 +34,8 @@ pub struct HwpxFixture {
     /// Optional raw XML that is embedded inside `<hp:footer>` within a
     /// `<hp:headerFooter>` element appended to the section body.
     footer_xml: Option<String>,
+    /// Additional sections beyond section0. Each entry is the raw section XML body.
+    extra_sections: Vec<String>,
 }
 
 impl HwpxFixture {
@@ -45,7 +47,17 @@ impl HwpxFixture {
             bin_data_entries: Vec::new(),
             header_xml: None,
             footer_xml: None,
+            extra_sections: Vec::new(),
         }
+    }
+
+    /// Append a second (or Nth) section to the fixture.
+    /// Each call adds one more section XML file to the HWPX ZIP and registers
+    /// it in the content.hpf manifest.  The first section is always `section0.xml`.
+    #[allow(dead_code)]
+    pub fn add_section(mut self, xml: &str) -> Self {
+        self.extra_sections.push(xml.to_owned());
+        self
     }
 
     pub fn title(mut self, t: &str) -> Self {
@@ -135,9 +147,27 @@ impl HwpxFixture {
         )
         .unwrap();
 
-        // Contents/content.hpf
+        // Contents/content.hpf — list section0 + any extra sections.
         zip.start_file("Contents/content.hpf", deflated).unwrap();
-        zip.write_all(CONTENT_HPF.as_bytes()).unwrap();
+        if self.extra_sections.is_empty() {
+            zip.write_all(CONTENT_HPF.as_bytes()).unwrap();
+        } else {
+            let mut items = String::from(
+                r#"<?xml version="1.0" encoding="UTF-8"?>
+<hp:HWPMLPackage xmlns:hp="http://www.hancom.co.kr/hwpml/2011/packageInfo">
+  <hp:compatibledocument version="1.1"/>
+  <hp:contents>
+    <hp:item href="section0.xml" type="Section"/>"#,
+            );
+            for i in 0..self.extra_sections.len() {
+                items.push_str(&format!(
+                    "\n    <hp:item href=\"section{}.xml\" type=\"Section\"/>",
+                    i + 1
+                ));
+            }
+            items.push_str("\n  </hp:contents>\n</hp:HWPMLPackage>");
+            zip.write_all(items.as_bytes()).unwrap();
+        }
 
         // Contents/section0.xml
         zip.start_file("Contents/section0.xml", deflated).unwrap();
@@ -147,6 +177,14 @@ impl HwpxFixture {
             self.footer_xml.as_deref(),
         );
         zip.write_all(section_xml.as_bytes()).unwrap();
+
+        // Extra sections (section1.xml, section2.xml, …)
+        for (i, body) in self.extra_sections.iter().enumerate() {
+            zip.start_file(format!("Contents/section{}.xml", i + 1), deflated)
+                .unwrap();
+            zip.write_all(build_section_xml_with_hf(body, None, None).as_bytes())
+                .unwrap();
+        }
 
         for (name, data) in &self.bin_data_entries {
             zip.start_file(format!("BinData/{name}"), stored).unwrap();

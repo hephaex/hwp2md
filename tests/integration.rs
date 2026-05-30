@@ -2698,3 +2698,221 @@ fn hwpx_nested_list_depth1_becomes_child_of_parent_item() {
         "order: Parent A < Child < Parent B; got: {markdown:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 88 P2: HWPX inline formatting (bold/italic/underline) integration
+// ---------------------------------------------------------------------------
+
+/// Bold and italic charPr attributes produce the correct IR inline flags
+/// and render as `***text***` in GFM Markdown.
+#[test]
+fn hwpx_charpr_bold_italic_produces_formatted_inline() {
+    let body = styled_run_xml("Hello");
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
+
+    // IR layer: inline must have bold=true, italic=true.
+    let bold_italic_inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.bold && i.italic)
+            } else {
+                None
+            }
+        });
+
+    assert!(
+        bold_italic_inline.is_some(),
+        "expected an inline with bold=true, italic=true; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        bold_italic_inline.unwrap().text,
+        "Hello",
+        "bold+italic inline text mismatch"
+    );
+
+    // Markdown layer: bold+italic → ***Hello***.
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("***Hello***"),
+        "bold+italic must render as ***Hello***; got: {markdown:?}"
+    );
+}
+
+/// Underline charPr produces `<u>text</u>` in Markdown.
+#[test]
+fn hwpx_charpr_underline_produces_html_u_tag() {
+    let underline_xml = r#"<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">
+        <hp:charPr underline="single"/>
+        <hp:t>Underlined</hp:t>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(underline_xml));
+
+    let underline_inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.underline)
+            } else {
+                None
+            }
+        });
+
+    assert!(
+        underline_inline.is_some(),
+        "expected an inline with underline=true; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("<u>Underlined</u>"),
+        "underline must render as <u>Underlined</u>; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 88 P3: HWPX superscript/subscript charPr integration test
+// ---------------------------------------------------------------------------
+//
+// OWPML uses attribute name "supscript" (not "superscript") with values:
+//   supscript="superscript" → superscript mode
+//   supscript="subscript"   → subscript mode
+// The handler is in context/flush.rs:124-126.
+
+/// `supscript="superscript"` charPr → `ir::Inline.superscript=true`
+/// → `<sup>text</sup>` in Markdown.
+#[test]
+fn hwpx_charpr_superscript_produces_sup_html() {
+    let sup_xml = r#"<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">
+        <hp:charPr supscript="superscript"/>
+        <hp:t>2</hp:t>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(sup_xml));
+
+    let sup_inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.superscript)
+            } else {
+                None
+            }
+        });
+
+    assert!(
+        sup_inline.is_some(),
+        "expected an inline with superscript=true; got: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("<sup>2</sup>"),
+        "superscript must render as <sup>2</sup>; got: {markdown:?}"
+    );
+}
+
+/// `supscript="subscript"` charPr → `ir::Inline.subscript=true`
+/// → `<sub>text</sub>` in Markdown.
+#[test]
+fn hwpx_charpr_subscript_produces_sub_html() {
+    let sub_xml = r#"<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">
+        <hp:charPr supscript="subscript"/>
+        <hp:t>i</hp:t>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(sub_xml));
+
+    let sub_inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.subscript)
+            } else {
+                None
+            }
+        });
+
+    assert!(
+        sub_inline.is_some(),
+        "expected an inline with subscript=true; got: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("<sub>i</sub>"),
+        "subscript must render as <sub>i</sub>; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 88 P4: multi-section HWPX document — boundary preservation
+// ---------------------------------------------------------------------------
+
+/// A two-section HWPX document must produce two sections in the IR.
+/// Section boundaries must be preserved: text from section 0 must not
+/// appear in section 1 and vice versa.
+#[test]
+fn hwpx_two_section_document_produces_two_ir_sections() {
+    let (_dir, doc) = read_fixture(
+        HwpxFixture::new()
+            .section(&para_xml("Section one content."))
+            .add_section(&para_xml("Section two content.")),
+    );
+
+    assert_eq!(
+        doc.sections.len(),
+        2,
+        "two-section HWPX must produce 2 IR sections; got {}",
+        doc.sections.len()
+    );
+
+    // Section 0 must contain "Section one content." and nothing from section 1.
+    let sec0_text: String = doc.sections[0]
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        sec0_text.contains("Section one"),
+        "section 0 must contain 'Section one'; got: {sec0_text:?}"
+    );
+    assert!(
+        !sec0_text.contains("Section two"),
+        "section 0 must not bleed into section 1 content; got: {sec0_text:?}"
+    );
+
+    // Section 1 must contain "Section two content.".
+    let sec1_text: String = doc.sections[1]
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(
+        sec1_text.contains("Section two"),
+        "section 1 must contain 'Section two'; got: {sec1_text:?}"
+    );
+}
