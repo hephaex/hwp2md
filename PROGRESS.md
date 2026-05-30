@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 87 완료 (table roundtrip + equation policy + nested list 통합 테스트)
+## 현재 상태: v0.5.0 Sprint 88 완료 (inline formatting + sup/sub + multi-section 통합 테스트)
 
 ### 완료
 
@@ -709,6 +709,29 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 88 — 2026-05-30
+**주제**: bold/italic/underline + sup/sub charPr + HwpxFixture 다중 섹션
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/fixtures/mod.rs` | HwpxFixture: extra_sections Vec + add_section() + 동적 content.hpf |
+| `tests/integration.rs` | bold+italic ***; underline <u>; supscript="superscript"/<sub>; 2-section 경계 (+5 테스트, follow-up M1/M2) |
+
+### 검증
+- **1517 tests, 0 failures** (커밋 `2f3027d`)
+- Clippy: 0 경고
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. M1(2섹션 경계 단방향 → 대칭 assertion), M2(sup/sub 상호 배타성 → &&!other flag). L1: charPrIDRef 헤더 경로 미테스트(known limitation, fixture 미지원).
+리뷰 전문: `~/.claude/references/2026-05-30_hwp2md_sprint88_inline_formatting_multisection_review.md`
+
+### 관련 커밋
+- `9321e3b` feat(hwpx): Sprint 88 — inline formatting + sup/sub + multi-section tests
+- `2f3027d` fix(hwpx): Sprint 88 follow-up — M1/M2 boundary + mutual exclusivity
+
+---
 
 ## Sprint 87 — 2026-05-30
 **주제**: table IR→HWPX→IR roundtrip + equation verbatim 설계 문서화 + depth-1 nested list

@@ -201,14 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 88 로드맵
+## Sprint 89 로드맵
 
-Sprint 87 완료 (2026-05-30). table IR→HWPX→IR roundtrip + 셀 위치 검증; hp:equation verbatim 설계 확인(EQEDIT 아님) + handlers.rs 주석 정확화; depth-1 nested list 통합 테스트.
+Sprint 88 완료 (2026-05-30). bold/italic/underline charPr; supscript 속성 이름 문서화(OWPML 비직관적 명칭); HwpxFixture 다중 섹션 + 경계 보존 테스트.
 
 - **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지)
-- **P2**: HWPX 인라인 서식(bold/italic/underline) 통합 테스트 — charPr 속성 파이프라인
-- **P3**: HWPX superscript/subscript 통합 테스트 — charPr sup/sub → IR inline → HTML Markdown
-- **P4**: HWPX 다중 섹션(multi-section) 통합 테스트 — 섹션 경계 보존 확인
+- **P2**: HWPX strikethrough + color charPr 통합 테스트 — ~~text~~ + span color 렌더링
+- **P3**: HWPX heading + paragraph 혼합 문서 Markdown 렌더링 정확도 테스트
+- **P4**: HWPX writer roundtrip — Markdown → IR → HWPX → IR → Markdown 왕복 안정성
 
 ## 라이선스
 
