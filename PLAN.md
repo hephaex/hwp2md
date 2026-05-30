@@ -255,14 +255,23 @@ Sprint 94 완료 (2026-05-31). 1538 tests. list split + shared read_fixture + ta
 - **P3**: italic/strikethrough roundtrip — ✅ 3-phase 패턴
 - **P4**: code block roundtrip — ✅ blockquote/HR 대체 (lossy encoding 발견)
 
-## Sprint 96 로드맵
+## Sprint 96 완료 (2026-05-31)
 
 Sprint 95 완료 (2026-05-31). 1541 tests. blocks split + italic/strikethrough/code roundtrip.
 
+- **P1**: 관(subsection) 감지 — BLOCKER 유지 — 이월
+- **P2**: integration_image.rs 분리 — ✅ 2 image tests 이전 (Sprint 84 P4)
+- **P3**: roundtrip helpers — ✅ `ir_hwpx_roundtrip` + `any_inline_in_doc` (top-level paragraphs 한정)
+- **P4**: BlockQuote/HR negative assertion — ✅ 손실 계약 pre+!still 패턴으로 executable화
+
+## Sprint 97 로드맵
+
+Sprint 96 완료 (2026-05-31). 1543 tests. image split + roundtrip helpers + lossy contracts.
+
 - **P1**: 관(subsection) 감지 — BLOCKER 계속 유지
-- **P2**: integration.rs 추가 분할 — image/colspan 섹션 (`integration_image.rs`)
-- **P3**: roundtrip helper 추출 — `any_inline(doc, pred)` + `md_hwpx_roundtrip(md)` fixtures 공유
-- **P4**: BlockQuote/HR negative assertion — 손실 계약 실행 가능한 assertion으로 문서화
+- **P2**: integration.rs 추가 분할 — colspan/code-block 섹션 분리 (현재 2496 lines)
+- **P3**: `any_block_in_doc(doc, pred)` helper 추가 — P4 lossy/non-lossy block 검증 패턴
+- **P4**: 헤딩 roundtrip — H1/H2/H3 MD→HWPX→MD 구조 + ATX prefix 보존 검증
 
 ## 라이선스
 

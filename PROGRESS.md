@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 95 완료 (blocks split + italic/strikethrough/code roundtrip + BlockQuote/HR lossy encoding 발견)
+## 현재 상태: v0.5.0 Sprint 96 완료 (image split + ir_hwpx_roundtrip/any_inline_in_doc helpers + lossy contracts)
 
 ### 완료
 
@@ -709,6 +709,30 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 96 — 2026-05-31
+**주제**: image split + roundtrip helpers + BlockQuote/HR lossy contract assertions
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/integration_image.rs` | NEW — Sprint 84 P4 image 2개 이전 |
+| `tests/fixtures/mod.rs` | `ir_hwpx_roundtrip` + `any_inline_in_doc(top-level only)` helpers 추가 |
+| `tests/integration.rs` | image 2개 제거 (-64 lines net) + italic/strikethrough 테스트 helper 사용 리팩 + BlockQuote/HR 손실 계약 테스트 2개 추가 |
+
+### 검증
+- **1543 tests, 0 failures** (커밋 `3b8b500`)
+- Clippy `-D warnings`: clean
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. `ir_hwpx_roundtrip` return NamedTempFile 안전 확인 (read_hwpx가 helper 내부에서 완료). `any_inline_in_doc` top-level 한정 적절 (italic/strikethrough는 top-level paragraph 용). BlockQuote/HR negative assertion의 pre+!still 패턴 설계 정확 (parser regression도 감지). LOW: doc comment 개선 → follow-up으로 즉시 반영.
+리뷰 전문: `~/.claude/references/2026-05-31_hwp2md_sprint96_image_split_helpers_lossy_contracts_review.md`
+
+### 관련 커밋
+- `dd081bc` feat(tests): Sprint 96 — image split + roundtrip helpers + lossy-encoding contracts
+- `3b8b500` docs(tests): Sprint 96 follow-up — tighten any_inline_in_doc doc comment
+
+---
 
 ## Sprint 95 — 2026-05-31
 **주제**: blocks test split + italic/strikethrough/code roundtrip + BlockQuote/HR lossy encoding 발견
