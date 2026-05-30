@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 93 완료 (footnote split + paren URL + bold-italic link + unordered list roundtrip)
+## 현재 상태: v0.5.0 Sprint 94 완료 (list split + shared read_fixture + table roundtrip)
 
 ### 완료
 
@@ -709,6 +709,31 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 94 — 2026-05-31
+**주제**: list test split + shared read_fixture + table MD→HWPX→MD roundtrip
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/fixtures/mod.rs` | `pub fn read_fixture` 추가 — 모든 test binary 공유 (fully-qualified hwp2md::hwpx) |
+| `tests/integration_list.rs` | NEW — Sprint 85/86/87 list 5개 이전 |
+| `tests/integration.rs` | list 섹션 제거 (2719→2504 lines) + P4 table roundtrip + follow-up (2-column+조합) |
+| `tests/integration_{formatting,hyperlink,footnote}.rs` | local `fn read_fixture` 제거 → fixtures:: import |
+
+### 검증
+- **1538 tests, 0 failures** (커밋 `77b8d79`)
+- Clippy `-D warnings`: clean
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. fully-qualified hwp2md::hwpx (not `use`) 설계 정확 — unused_imports 경고 방지. `#[allow(dead_code)]` per-fn 일관성 설명. MEDIUM: table roundtrip에 2-column separator + Alice<90<Bob 조합 assertion 추가 → 즉시 follow-up 반영.
+리뷰 전문: `~/.claude/references/2026-05-31_hwp2md_sprint94_list_split_read_fixture_table_roundtrip_review.md`
+
+### 관련 커밋
+- `84cab2c` feat(tests): Sprint 94 — list split + shared read_fixture + table roundtrip
+- `77b8d79` fix(tests): Sprint 94 follow-up — strengthen table roundtrip assertions
+
+---
 
 ## Sprint 93 — 2026-05-31
 **주제**: footnote test split + paren URL angle-bracket + bold-italic+link + unordered list roundtrip

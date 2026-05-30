@@ -237,14 +237,23 @@ Sprint 92 완료 (2026-05-30). 1534 tests. hyperlink split + formatted link + li
 - **P3**: 경계 테스트 — ✅ bold+italic+link `[***t***](url)`, paren URL `[t](<url>)` angle-bracket
 - **P4**: unordered list roundtrip — ✅ `Block::List { ordered: false }` structural pin
 
-## Sprint 94 로드맵
+## Sprint 94 완료 (2026-05-31)
 
 Sprint 93 완료 (2026-05-31). 1537 tests. footnote split + paren URL + unordered list roundtrip.
 
+- **P1**: 관(subsection) 감지 — BLOCKER 유지 — 이월
+- **P2**: integration_list.rs 분리 — ✅ 5 list tests 이전 (2719 → 2504 lines)
+- **P3**: read_fixture → fixtures/mod.rs — ✅ pub fn 공유, 모든 4개 test file에서 local copy 제거
+- **P4**: Table MD→HWPX→MD roundtrip — ✅ Block::Table 구조 + 2-column separator + Alice<90<Bob 조합
+
+## Sprint 95 로드맵
+
+Sprint 94 완료 (2026-05-31). 1538 tests. list split + shared read_fixture + table roundtrip. integration.rs 2504 lines.
+
 - **P1**: 관(subsection) 감지 — BLOCKER 계속 유지
-- **P2**: integration.rs 추가 분할 — list 또는 image 섹션 (`integration_list.rs` 또는 `integration_image.rs`)
-- **P3**: `read_fixture` 공유 — `tests/fixtures/mod.rs`로 이동 (4번째 test binary 생성 계기)
-- **P4**: Table MD→HWPX→MD roundtrip — `Block::Table` 구조 + 셀 내용 보존 검증
+- **P2**: integration.rs 추가 분할 — equation/HR/blockquote 섹션 (`integration_blocks.rs`)
+- **P3**: 인라인 서식 roundtrip — bold MD→HWPX→MD 이미 커버; italic/strikethrough roundtrip 추가
+- **P4**: Image MD→HWPX→MD roundtrip — 이미지 alt text 보존 검증
 
 ## 라이선스
 
