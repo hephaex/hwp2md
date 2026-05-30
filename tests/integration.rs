@@ -2885,6 +2885,17 @@ fn md_to_hwpx_to_md_roundtrip_preserves_ordered_list() {
     // HWPX → IR (re-read).
     let read_back = hwpx::read_hwpx(tmp.path()).expect("read_hwpx");
 
+    // IR must still contain an ordered list — not degraded to plain paragraphs.
+    let still_list = read_back
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(|b| matches!(b, ir::Block::List { ordered: true, .. }));
+    assert!(
+        still_list,
+        "ordered list must survive HWPX roundtrip as a list block, not flatten to paragraphs"
+    );
+
     // IR → MD (second pass).
     let final_md = md::write_markdown(&read_back, false);
 
