@@ -1,0 +1,67 @@
+name: Conversion Bug
+description: HWP/HWPX 파일 변환 오류를 보고합니다
+labels: ["conversion-bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        HWP 또는 HWPX 파일 변환 시 발생하는 오류를 보고해 주세요.
+        파일을 첨부하면 CI가 자동으로 변환을 시도하고 결과를 코멘트로 게시합니다.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 설명
+      description: 어떤 문제가 발생했는지 설명해 주세요
+      placeholder: "예: 표가 깨져서 나옵니다, 수식이 누락됩니다"
+    validations:
+      required: true
+
+  - type: textarea
+    id: file
+    attributes:
+      label: HWP/HWPX 파일
+      description: |
+        문제가 발생하는 HWP 또는 HWPX 파일을 여기에 드래그하여 첨부해 주세요.
+        ZIP으로 압축하여 첨부해도 됩니다.
+      placeholder: "파일을 여기에 드래그하세요"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 결과
+      description: 정상적으로 변환되면 어떻게 보여야 하는지 설명해 주세요
+      placeholder: "예: 2x3 표가 정상적으로 Markdown 테이블로 변환되어야 합니다"
+    validations:
+      required: false
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 실제 결과
+      description: 실제로 어떻게 변환되었는지 (에러 메시지 포함)
+      placeholder: "예: 'Error: unsupported control type' 에러가 발생합니다"
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: hwp2md 버전
+      description: "`hwp2md --version` 출력 결과"
+      placeholder: "0.5.0"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: format
+    attributes:
+      label: 파일 형식
+      options:
+        - HWP (한글 5.0 바이너리)
+        - HWPX (OOXML 기반)
+        - 모름
+    validations:
+      required: true

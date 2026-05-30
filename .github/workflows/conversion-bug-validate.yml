@@ -1,0 +1,157 @@
+name: Validate Conversion Bug
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  validate:
+    if: contains(github.event.label.name, 'conversion-bug')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.88.0"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build hwp2md
+        run: cargo build --release
+
+      - name: Extract attachments from issue body
+        id: extract
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+            // Match GitHub-hosted attachment URLs (uploaded files)
+            const urlPattern = /https:\/\/github\.com\/[^\s)]+\.(hwp|hwpx|zip)/gi;
+            // Also match user-content URLs
+            const userContentPattern = /https:\/\/github\.user-content\.com\/[^\s)]+/gi;
+
+            const urls = [
+              ...(body.match(urlPattern) || []),
+              ...(body.match(userContentPattern) || [])
+            ];
+
+            core.setOutput('urls', JSON.stringify(urls));
+            core.setOutput('count', urls.length);
+            console.log(`Found ${urls.length} attachment(s): ${urls.join(', ')}`);
+
+      - name: Download and validate attachments
+        id: validate
+        if: steps.extract.outputs.count != '0'
+        shell: bash
+        run: |
+          set +e
+          URLS='${{ steps.extract.outputs.urls }}'
+          RESULTS=""
+          PASS=0
+          FAIL=0
+
+          mkdir -p /tmp/hwp-validate
+
+          echo "$URLS" | jq -r '.[]' | while read -r url; do
+            FILENAME=$(basename "$url" | sed 's/?.*//')
+            echo "Downloading: $FILENAME"
+
+            if curl -sL --max-time 30 --max-filesize 52428800 -o "/tmp/hwp-validate/$FILENAME" "$url"; then
+              # If ZIP, extract first
+              if [[ "$FILENAME" == *.zip ]]; then
+                unzip -o -d /tmp/hwp-validate/extracted "/tmp/hwp-validate/$FILENAME" 2>/dev/null
+                FILES=$(find /tmp/hwp-validate/extracted -name "*.hwp" -o -name "*.hwpx" 2>/dev/null)
+              else
+                FILES="/tmp/hwp-validate/$FILENAME"
+              fi
+
+              for f in $FILES; do
+                BASENAME=$(basename "$f")
+                echo "--- Validating: $BASENAME ---"
+
+                # Run with timeout and memory limit
+                RESULT=$(timeout 30 ./target/release/hwp2md "$f" 2>&1)
+                EXIT_CODE=$?
+
+                if [ $EXIT_CODE -eq 0 ]; then
+                  # Truncate output for comment (max 2000 chars)
+                  PREVIEW=$(echo "$RESULT" | head -50 | cut -c1-200)
+                  LINE_COUNT=$(echo "$RESULT" | wc -l)
+                  echo "PASS|$BASENAME|$LINE_COUNT lines|$PREVIEW" >> /tmp/hwp-validate/results.txt
+                else
+                  ERROR=$(echo "$RESULT" | tail -10)
+                  echo "FAIL|$BASENAME|exit $EXIT_CODE|$ERROR" >> /tmp/hwp-validate/results.txt
+                fi
+              done
+            else
+              echo "FAIL|$FILENAME|download failed|Could not download file" >> /tmp/hwp-validate/results.txt
+            fi
+          done
+
+          # Build summary
+          if [ -f /tmp/hwp-validate/results.txt ]; then
+            echo "has_results=true" >> "$GITHUB_OUTPUT"
+            cat /tmp/hwp-validate/results.txt
+          else
+            echo "has_results=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post results as comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const count = parseInt('${{ steps.extract.outputs.count }}');
+
+            let comment = '## 🔍 자동 변환 검증 결과\n\n';
+
+            if (count === 0) {
+              comment += '⚠️ 이슈 본문에서 HWP/HWPX 파일 첨부를 찾지 못했습니다.\n';
+              comment += '파일을 드래그하여 첨부한 후 `conversion-bug` 라벨을 다시 추가해 주세요.\n';
+            } else {
+              try {
+                const results = fs.readFileSync('/tmp/hwp-validate/results.txt', 'utf8').trim();
+                if (results) {
+                  const lines = results.split('\n');
+                  comment += '| 파일 | 결과 | 상세 |\n';
+                  comment += '|------|------|------|\n';
+
+                  for (const line of lines) {
+                    const [status, filename, info, detail] = line.split('|');
+                    const icon = status === 'PASS' ? '✅' : '❌';
+                    const safeDetail = (detail || '').substring(0, 100).replace(/[|]/g, '\\|');
+                    comment += `| ${filename} | ${icon} ${info} | ${safeDetail} |\n`;
+                  }
+
+                  const failures = lines.filter(l => l.startsWith('FAIL'));
+                  if (failures.length > 0) {
+                    comment += '\n### 실패 상세\n\n';
+                    for (const line of failures) {
+                      const [, filename, , detail] = line.split('|');
+                      comment += `<details><summary>${filename}</summary>\n\n\`\`\`\n${detail || 'No details'}\n\`\`\`\n</details>\n\n`;
+                    }
+                  }
+                } else {
+                  comment += '변환 결과가 없습니다.\n';
+                }
+              } catch (e) {
+                comment += `검증 중 오류 발생: ${e.message}\n`;
+              }
+            }
+
+            comment += '\n---\n*hwp2md CI 자동 검증*';
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: comment,
+            });
