@@ -228,14 +228,23 @@ Sprint 91 완료 (2026-05-30). 1530 tests. formatting split + 3 combination test
 - **P3**: 인라인 링크 + 포맷 조합 테스트 — ✅ bold+link `[**t**](url)`, italic+link `[*t*](url)`, color+link `[<span>t</span>](url)`
 - **P4**: MD→HWPX→MD 리스트 왕복 — ✅ ordered list IR-structural assertion + text presence + ordering
 
-## Sprint 93 로드맵
+## Sprint 93 완료 (2026-05-31)
 
 Sprint 92 완료 (2026-05-30). 1534 tests. hyperlink split + formatted link + list roundtrip.
 
+- **P1**: 관(subsection) 감지 — BLOCKER 유지 — 이월
+- **P2**: integration_footnote.rs 분리 — ✅ 5 footnote/noteRef tests (2913 → 2719 lines)
+- **P3**: 경계 테스트 — ✅ bold+italic+link `[***t***](url)`, paren URL `[t](<url>)` angle-bracket
+- **P4**: unordered list roundtrip — ✅ `Block::List { ordered: false }` structural pin
+
+## Sprint 94 로드맵
+
+Sprint 93 완료 (2026-05-31). 1537 tests. footnote split + paren URL + unordered list roundtrip.
+
 - **P1**: 관(subsection) 감지 — BLOCKER 계속 유지
-- **P2**: integration.rs 추가 분할 — footnote/endnote 테스트 `integration_footnote.rs` 분리
-- **P3**: 미진한 경계 테스트 — bold+italic+link `[***t***](url)`, link URL containing `)` → `[t](<url>)` angle-bracket form
-- **P4**: unordered list MD→HWPX→MD roundtrip + `Block::List { ordered: false }` structural assertion
+- **P2**: integration.rs 추가 분할 — list 또는 image 섹션 (`integration_list.rs` 또는 `integration_image.rs`)
+- **P3**: `read_fixture` 공유 — `tests/fixtures/mod.rs`로 이동 (4번째 test binary 생성 계기)
+- **P4**: Table MD→HWPX→MD roundtrip — `Block::Table` 구조 + 셀 내용 보존 검증
 
 ## 라이선스
 

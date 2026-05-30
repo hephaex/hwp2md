@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 92 완료 (hyperlink split + formatted links + list roundtrip)
+## 현재 상태: v0.5.0 Sprint 93 완료 (footnote split + paren URL + bold-italic link + unordered list roundtrip)
 
 ### 완료
 
@@ -709,6 +709,29 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 93 — 2026-05-31
+**주제**: footnote test split + paren URL angle-bracket + bold-italic+link + unordered list roundtrip
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/integration_footnote.rs` | NEW — Sprint 83/84 footnote/noteRef 5개 이전 |
+| `tests/integration_hyperlink.rs` | Sprint 93 P3 신규 2개 (bold+italic+link, paren URL → angle-bracket) |
+| `tests/integration.rs` | footnote 섹션 제거 (2913 → 2719 lines) + P4 unordered list roundtrip 추가 |
+
+### 검증
+- **1537 tests, 0 failures** (커밋 `b373a05`)
+- Clippy `-D warnings`: clean
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH/MEDIUM 없음. bold+italic+link 비공허성 확인 (writer.rs:249 `&&` 브랜치). paren URL 음성 assertion 비공허 (`<>` 가 substring 매칭 차단). unordered list roundtrip 아키텍처 정확 (numPrIDRef 부재 → ordered=false). footnote 추출 clean. LOW: read_fixture 3개 binary 복사 → 4번째 생성 시 fixtures/mod.rs 이동.
+리뷰 전문: `~/.claude/references/2026-05-31_hwp2md_sprint93_footnote_split_paren_url_unordered_list_review.md`
+
+### 관련 커밋
+- `b373a05` feat(tests): Sprint 93 — footnote split + bold-italic link + paren URL + unordered list roundtrip
+
+---
 
 ## Sprint 92 — 2026-05-30
 **주제**: hyperlink test split + formatted link (bold/italic/color+link) + ordered list roundtrip
