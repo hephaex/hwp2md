@@ -201,14 +201,14 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 89 로드맵
+## Sprint 90 로드맵
 
-Sprint 88 완료 (2026-05-30). bold/italic/underline charPr; supscript 속성 이름 문서화(OWPML 비직관적 명칭); HwpxFixture 다중 섹션 + 경계 보존 테스트.
+Sprint 89 완료 (2026-05-30). strikeout ~~text~~ + color #span; H1/H2 순서+레벨 이중 핀; MD→HWPX→MD bold/heading 왕복 안정성.
 
 - **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지)
-- **P2**: HWPX strikethrough + color charPr 통합 테스트 — ~~text~~ + span color 렌더링
-- **P3**: HWPX heading + paragraph 혼합 문서 Markdown 렌더링 정확도 테스트
-- **P4**: HWPX writer roundtrip — Markdown → IR → HWPX → IR → Markdown 왕복 안정성
+- **P2**: HWPX inline link 통합 테스트 — hyperlink fieldBegin + text + fieldEnd → [text](url) Markdown
+- **P3**: 복합 인라인 서식 통합 테스트 — bold+underline, bold+italic+color 동시 적용
+- **P4**: 긴 문서 통합 테스트 — 많은 섹션/블록/인라인을 가진 복잡 픽스처 Markdown 검증
 
 ## 라이선스
 

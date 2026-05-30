@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 88 완료 (inline formatting + sup/sub + multi-section 통합 테스트)
+## 현재 상태: v0.5.0 Sprint 89 완료 (strikethrough/color + heading order + MD→HWPX→MD roundtrip)
 
 ### 완료
 
@@ -709,6 +709,28 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 89 — 2026-05-30
+**주제**: strikethrough/color charPr + heading 순서/레벨 + MD→HWPX→MD roundtrip
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/integration.rs` | strikeout~~text~~; color #FF0000 → span; black → no-span; H1/H2 순서+레벨 이중 핀; MD→HWPX→MD bold+heading 왕복 (+5 테스트, follow-up H1 레벨 guard) |
+
+### 검증
+- **1522 tests, 0 failures** (커밋 `78dc80e`)
+- Clippy: 0 경고
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH/MEDIUM 없음. LOW: H1 레벨 guard 누락 → 즉시 추가. 기타 LOW는 모두 latent fragility 또는 optional hardening.
+리뷰 전문: `~/.claude/references/2026-05-30_hwp2md_sprint89_strikethrough_color_heading_roundtrip_review.md`
+
+### 관련 커밋
+- `a58d09e` feat(hwpx): Sprint 89 — strikethrough/color + heading order + MD→HWPX→MD roundtrip
+- `78dc80e` fix(hwpx): Sprint 89 follow-up — add symmetric H1 level guard
+
+---
 
 ## Sprint 88 — 2026-05-30
 **주제**: bold/italic/underline + sup/sub charPr + HwpxFixture 다중 섹션
