@@ -2803,7 +2803,7 @@ fn hwpx_charpr_superscript_produces_sup_html() {
         .flat_map(|s| &s.blocks)
         .find_map(|b| {
             if let ir::Block::Paragraph { inlines } = b {
-                inlines.iter().find(|i| i.superscript)
+                inlines.iter().find(|i| i.superscript && !i.subscript)
             } else {
                 None
             }
@@ -2838,7 +2838,7 @@ fn hwpx_charpr_subscript_produces_sub_html() {
         .flat_map(|s| &s.blocks)
         .find_map(|b| {
             if let ir::Block::Paragraph { inlines } = b {
-                inlines.iter().find(|i| i.subscript)
+                inlines.iter().find(|i| i.subscript && !i.superscript)
             } else {
                 None
             }
@@ -2914,5 +2914,10 @@ fn hwpx_two_section_document_produces_two_ir_sections() {
     assert!(
         sec1_text.contains("Section two"),
         "section 1 must contain 'Section two'; got: {sec1_text:?}"
+    );
+    // Symmetric: section 1 must not bleed section 0 content (forward direction).
+    assert!(
+        !sec1_text.contains("Section one"),
+        "section 1 must not bleed section 0 content; got: {sec1_text:?}"
     );
 }
