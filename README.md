@@ -2,7 +2,6 @@
 
 [![Crates.io](https://img.shields.io/crates/v/hwp2md.svg)](https://crates.io/crates/hwp2md)
 [![CI](https://github.com/hephaex/hwp2md/actions/workflows/ci.yml/badge.svg)](https://github.com/hephaex/hwp2md/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/hephaex/hwp2md/graph/badge.svg)](https://codecov.io/gh/hephaex/hwp2md)
 [![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 
 > [English](README.en.md)
