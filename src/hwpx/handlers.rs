@@ -283,6 +283,12 @@ pub(super) fn handle_end_element(
         }
         "equation" | "hp:equation" | "eqEdit" | "hp:eqEdit" => {
             if !ctx.equation_text.is_empty() {
+                // DESIGN: HWPX equation text is stored verbatim as `tex`, without
+                // calling `eqedit_to_latex`.  HWPX files store equation content in
+                // a format that is already usable as Markdown math (plain LaTeX or
+                // LaTeX-compatible notation).  The HWP 5.0 binary reader path
+                // (hwp/convert.rs) applies `eqedit_to_latex` to EQEDIT script, but
+                // that transformation is specific to the HWP 5.0 binary encoding.
                 let tex = std::mem::take(&mut ctx.equation_text);
                 staged.push(StagedBlock::Plain(ir::Block::Math { display: true, tex }));
             }

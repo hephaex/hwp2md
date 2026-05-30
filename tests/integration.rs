@@ -2473,3 +2473,217 @@ fn ir_block_quote_renders_as_quoted_text_in_markdown() {
         "BlockQuote must render as '> Quoted text.' line; got: {markdown:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 87 P2: Table roundtrip (IR → HWPX write → read_hwpx → IR)
+// ---------------------------------------------------------------------------
+
+/// An IR table survives a write→read round-trip through HWPX format:
+/// the table structure (row/cell count, column count, cell text) must be
+/// preserved after `write_hwpx` + `read_hwpx`.
+#[test]
+fn hwpx_table_roundtrip_preserves_structure() {
+    let doc = ir::Document {
+        metadata: ir::Metadata::default(),
+        sections: vec![ir::Section {
+            blocks: vec![ir::Block::Table {
+                rows: vec![
+                    ir::TableRow {
+                        cells: vec![
+                            ir::TableCell {
+                                blocks: vec![ir::Block::Paragraph {
+                                    inlines: vec![ir::Inline::plain("R0C0".to_string())],
+                                }],
+                                colspan: 1,
+                                rowspan: 1,
+                            },
+                            ir::TableCell {
+                                blocks: vec![ir::Block::Paragraph {
+                                    inlines: vec![ir::Inline::plain("R0C1".to_string())],
+                                }],
+                                colspan: 1,
+                                rowspan: 1,
+                            },
+                        ],
+                        is_header: true,
+                    },
+                    ir::TableRow {
+                        cells: vec![
+                            ir::TableCell {
+                                blocks: vec![ir::Block::Paragraph {
+                                    inlines: vec![ir::Inline::plain("R1C0".to_string())],
+                                }],
+                                colspan: 1,
+                                rowspan: 1,
+                            },
+                            ir::TableCell {
+                                blocks: vec![ir::Block::Paragraph {
+                                    inlines: vec![ir::Inline::plain("R1C1".to_string())],
+                                }],
+                                colspan: 1,
+                                rowspan: 1,
+                            },
+                        ],
+                        is_header: false,
+                    },
+                ],
+                col_count: 2,
+                inner_margin: None,
+            }],
+            ..Default::default()
+        }],
+        assets: Vec::new(),
+    };
+
+    let tmp = tempfile::NamedTempFile::new().expect("temp file");
+    hwpx::write_hwpx(&doc, tmp.path(), None).expect("write_hwpx");
+    let read_back = hwpx::read_hwpx(tmp.path()).expect("read_hwpx");
+
+    // Must contain a table block.
+    let table_block = read_back
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::Table { .. }));
+
+    assert!(
+        table_block.is_some(),
+        "table must survive HWPX roundtrip; blocks: {:?}",
+        read_back.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let ir::Block::Table { rows, col_count, .. } = table_block.unwrap() else {
+        unreachable!()
+    };
+    assert_eq!(*col_count, 2, "col_count must be 2 after roundtrip");
+    assert_eq!(rows.len(), 2, "row count must be 2 after roundtrip");
+
+    // Cell text must be preserved.
+    let markdown = md::write_markdown(&read_back, false);
+    assert!(
+        markdown.contains("R0C0") && markdown.contains("R0C1"),
+        "first row cells must survive; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("R1C0") && markdown.contains("R1C1"),
+        "second row cells must survive; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 87 P3: HWPX equation verbatim storage design documentation test
+// ---------------------------------------------------------------------------
+
+/// Documents that <hp:equation> content is stored verbatim (not passed through
+/// eqedit_to_latex). This is a design contract test: if the behavior changes,
+/// this test must be reviewed along with any EQEDIT-specific syntax in existing
+/// HWPX files. See comment in handlers.rs for rationale.
+#[test]
+fn hwpx_equation_eqedit_syntax_stored_verbatim_not_converted() {
+    // "a over b" is EQEDIT syntax for a fraction. eqedit_to_latex would convert
+    // this to "\frac{a}{b}". In HWPX, it is stored verbatim.
+    let eq_xml = r#"<hp:equation>a over b</hp:equation>"#;
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(eq_xml));
+
+    let math_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::Math { .. }));
+
+    assert!(
+        math_block.is_some(),
+        "expected Math block; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let ir::Block::Math { tex, .. } = math_block.unwrap() else {
+        unreachable!()
+    };
+    // HWPX verbatim: stored as "a over b", NOT converted to "\frac{a}{b}".
+    assert_eq!(
+        tex.as_str(),
+        "a over b",
+        "HWPX equation text must be stored verbatim; if this fails, \
+         the equation handler now calls eqedit_to_latex — update this test \
+         and the design comment in handlers.rs"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 87 P4: nested list (depth-1, paraPrIDRef="3") integration test
+// ---------------------------------------------------------------------------
+
+/// A depth-1 item (`paraPrIDRef="3"`) immediately following a depth-0 item
+/// (`paraPrIDRef="2"`) must appear as a child of that item, not a new top-level
+/// item. Tests the `build_list` depth folding logic (flush.rs:379-415).
+#[test]
+fn hwpx_nested_list_depth1_becomes_child_of_parent_item() {
+    // Pattern: top → nested → top (should produce 2 top-level items, second with a child)
+    let list_xml = r#"
+        <hp:p paraPrIDRef="2"><hp:run><hp:t>Parent A</hp:t></hp:run></hp:p>
+        <hp:p paraPrIDRef="3"><hp:run><hp:t>Child of A</hp:t></hp:run></hp:p>
+        <hp:p paraPrIDRef="2"><hp:run><hp:t>Parent B</hp:t></hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(list_xml));
+
+    let list_block = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::List { .. }));
+
+    assert!(
+        list_block.is_some(),
+        "expected Block::List; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    let ir::Block::List { items, .. } = list_block.unwrap() else {
+        unreachable!()
+    };
+
+    // Must have exactly 2 top-level items (not 3 — depth-1 is a child).
+    assert_eq!(
+        items.len(),
+        2,
+        "depth-1 item must be a child, not a 3rd top-level item; items: {items:?}"
+    );
+
+    // First item must have exactly 1 child.
+    let parent_a = &items[0];
+    assert_eq!(
+        parent_a.children.len(),
+        1,
+        "Parent A must have 1 child; children: {:?}",
+        parent_a.children
+    );
+
+    // Second item must have no children.
+    assert_eq!(
+        items[1].children.len(),
+        0,
+        "Parent B must have no children; children: {:?}",
+        items[1].children
+    );
+
+    // Markdown layer: verify nested list renders with indented bullet.
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("Parent A"),
+        "Parent A must appear; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("Child of A"),
+        "Child must appear; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("Parent B"),
+        "Parent B must appear; got: {markdown:?}"
+    );
+    // Child must appear after Parent A but before Parent B.
+    let pos_a = markdown.find("Parent A").unwrap();
+    let pos_child = markdown.find("Child of A").unwrap();
+    let pos_b = markdown.find("Parent B").unwrap();
+    assert!(
+        pos_a < pos_child && pos_child < pos_b,
+        "order: Parent A < Child < Parent B; got: {markdown:?}"
+    );
+}
