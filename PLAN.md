@@ -201,14 +201,23 @@ HWPX XML 파서 정확도 향상.
 - MD → HWP (바이너리)는 지원하지 않음 — HWPX만 출력
 - 한글 수식 → LaTeX 변환은 기본적인 수준만 지원
 
-## Sprint 90 로드맵
+## Sprint 90 완료 (2026-05-30)
 
 Sprint 89 완료 (2026-05-30). strikeout ~~text~~ + color #span; H1/H2 순서+레벨 이중 핀; MD→HWPX→MD bold/heading 왕복 안정성.
 
-- **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지)
-- **P2**: HWPX inline link 통합 테스트 — hyperlink fieldBegin + text + fieldEnd → [text](url) Markdown
-- **P3**: 복합 인라인 서식 통합 테스트 — bold+underline, bold+italic+color 동시 적용
-- **P4**: 긴 문서 통합 테스트 — 많은 섹션/블록/인라인을 가진 복잡 픽스처 Markdown 검증
+- **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 유지) — 이월
+- **P2**: HWPX inline link 통합 테스트 — ✅ multiple links (URL isolation), unsafe URL (writer gate pin)
+- **P3**: 복합 인라인 서식 통합 테스트 — ✅ bold+underline → `<u>**text**</u>`, bold+italic+color → `<span>***text***</span>`
+- **P4**: 긴 문서 통합 테스트 — ✅ H1/para/H2/code/para IR 위치 순서 + Markdown ATX 순서
+
+## Sprint 91 로드맵
+
+Sprint 90 완료 (2026-05-30). 1527 tests. hyperlink URL isolation + unsafe gate pin; combined inline formatting; complex doc ordering.
+
+- **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 계속 유지)
+- **P2**: integration.rs 분할 — 현재 3400+ lines; `integration_hyperlink.rs`, `integration_formatting.rs`, `integration_blocks.rs` 등으로 분리
+- **P3**: strikethrough + underline 동시 charPr 통합 테스트 (~~`<u>text</u>`~~) — 렌더링 중첩 순서 핀
+- **P4**: HWP 5.0 binary reader — CTRL_RUBY 강건성 또는 BinData 이미지 추출
 
 ## 라이선스
 

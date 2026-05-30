@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 89 완료 (strikethrough/color + heading order + MD→HWPX→MD roundtrip)
+## 현재 상태: v0.5.0 Sprint 90 완료 (hyperlink URL isolation + combined inline formatting + complex doc ordering)
 
 ### 완료
 
@@ -709,6 +709,28 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 90 — 2026-05-30
+**주제**: hyperlink URL isolation + unsafe URL writer gate + combined inline formatting + complex doc ordering
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/integration.rs` | multiple links (URL isolation); javascript: unsafe URL drop (writer gate pin); bold+underline `<u>**t**</u>`; bold+italic+color `<span>***t***</span>`; complex doc ordering H1/para/H2/code/para (+5 테스트, follow-up assertion tightening) |
+
+### 검증
+- **1527 tests, 0 failures** (커밋 `0fc2827`)
+- Clippy: 0 경고
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. MEDIUM×2: and_text vacuous pass 가능성 → unconditional assert 추가; unsafe URL IR assertion 누락 → writer gate를 직접 핀. 즉시 follow-up 반영.
+리뷰 전문: `~/.claude/references/2026-05-30_hwp2md_sprint90_hyperlink_formatting_ordering_review.md`
+
+### 관련 커밋
+- `de1fea1` feat(hwpx): Sprint 90 — hyperlink edge cases + combined formatting + complex doc ordering
+- `0fc2827` fix(tests): Sprint 90 follow-up — tighten hyperlink test assertions
+
+---
 
 ## Sprint 89 — 2026-05-30
 **주제**: strikethrough/color charPr + heading 순서/레벨 + MD→HWPX→MD roundtrip
