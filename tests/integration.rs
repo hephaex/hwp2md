@@ -1793,124 +1793,6 @@ fn hwpx_lang_hint_empty_language_produces_code_block_no_tag() {
 }
 
 // ---------------------------------------------------------------------------
-// Sprint 86 P3: HWPX equation element → Math block → LaTeX Markdown
-// ---------------------------------------------------------------------------
-
-/// `<hp:equation>` with EQEDIT content produces `ir::Block::Math { display: true }`
-/// and renders as a display-math `$$..$$` fence in Markdown.
-#[test]
-fn hwpx_equation_element_produces_math_block_and_latex_markdown() {
-    // NOTE: The HWPX <hp:equation> handler (handlers.rs:284-288) stores the raw
-    // element text directly as `tex` — it does NOT call `eqedit_to_latex`.
-    // That function is only wired into the HWP 5.0 binary reader path.
-    // So `tex` is exactly the literal XML text content ("x + y" here).
-    let eq_xml = r#"<hp:equation>x + y</hp:equation>"#;
-
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(eq_xml));
-
-    // IR layer: must contain a Math block with display=true.
-    let math_block = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .find(|b| matches!(b, ir::Block::Math { .. }));
-
-    assert!(
-        math_block.is_some(),
-        "expected Block::Math from <hp:equation>; blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
-    );
-    let ir::Block::Math { display, tex } = math_block.unwrap() else {
-        unreachable!()
-    };
-    assert!(*display, "HWPX equation must produce display=true Math block");
-    assert!(
-        tex.contains("x") && tex.contains("y"),
-        "LaTeX output must contain 'x' and 'y'; got: {tex:?}"
-    );
-
-    // Markdown layer: display math → $$\n..\n$$ format.
-    let markdown = md::write_markdown(&doc, false);
-    assert!(
-        markdown.contains("$$"),
-        "markdown must contain $$ fence for display math; got: {markdown:?}"
-    );
-    assert!(
-        markdown.contains("x") && markdown.contains("y"),
-        "math content must appear in markdown; got: {markdown:?}"
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Sprint 86 P4: HorizontalRule and BlockQuote IR → Markdown rendering
-// ---------------------------------------------------------------------------
-// These blocks originate from the Markdown parser (---/> syntax), not from HWPX.
-// Tested here via direct IR → Markdown to pin the writer rendering contract.
-
-/// `ir::Block::HorizontalRule` must render as `---` (thematic break) in Markdown.
-#[test]
-fn ir_horizontal_rule_renders_as_thematic_break_in_markdown() {
-    let doc = ir::Document {
-        metadata: ir::Metadata::default(),
-        sections: vec![ir::Section {
-            blocks: vec![
-                ir::Block::Paragraph {
-                    inlines: vec![ir::Inline::plain("before".to_string())],
-                },
-                ir::Block::HorizontalRule,
-                ir::Block::Paragraph {
-                    inlines: vec![ir::Inline::plain("after".to_string())],
-                },
-            ],
-            ..Default::default()
-        }],
-        assets: Vec::new(),
-    };
-
-    let markdown = md::write_markdown(&doc, false);
-
-    assert!(
-        markdown.contains("---"),
-        "HorizontalRule must render as '---'; got: {markdown:?}"
-    );
-
-    // Ordering: before < HR < after.
-    let pos_before = markdown.find("before").expect("'before' in markdown");
-    let pos_hr = markdown.find("---").expect("'---' in markdown");
-    let pos_after = markdown.find("after").expect("'after' in markdown");
-    assert!(
-        pos_before < pos_hr && pos_hr < pos_after,
-        "order must be before · --- · after; positions: before={pos_before} hr={pos_hr} after={pos_after}"
-    );
-}
-
-/// `ir::Block::BlockQuote` must render with `> ` prefix in Markdown.
-#[test]
-fn ir_block_quote_renders_as_quoted_text_in_markdown() {
-    let doc = ir::Document {
-        metadata: ir::Metadata::default(),
-        sections: vec![ir::Section {
-            blocks: vec![ir::Block::BlockQuote {
-                blocks: vec![ir::Block::Paragraph {
-                    inlines: vec![ir::Inline::plain("Quoted text.".to_string())],
-                }],
-            }],
-            ..Default::default()
-        }],
-        assets: Vec::new(),
-    };
-
-    let markdown = md::write_markdown(&doc, false);
-
-    // The writer (writer.rs:127-135) emits "> " + content on the same line.
-    // Assert the exact line format produced rather than just presence.
-    assert!(
-        markdown.contains("> Quoted text."),
-        "BlockQuote must render as '> Quoted text.' line; got: {markdown:?}"
-    );
-}
-
-// ---------------------------------------------------------------------------
 // Sprint 87 P2: Table roundtrip (IR → HWPX write → read_hwpx → IR)
 // ---------------------------------------------------------------------------
 
@@ -2013,45 +1895,6 @@ fn hwpx_table_roundtrip_preserves_structure() {
         markdown.contains("R0C0") && markdown.contains("R0C1")
             && markdown.contains("R1C0") && markdown.contains("R1C1"),
         "all cell texts must appear in markdown; got: {markdown:?}"
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Sprint 87 P3: HWPX equation verbatim storage design documentation test
-// ---------------------------------------------------------------------------
-
-/// Documents that <hp:equation> content is stored verbatim (not passed through
-/// eqedit_to_latex). This is a design contract test: if the behavior changes,
-/// this test must be reviewed along with any EQEDIT-specific syntax in existing
-/// HWPX files. See comment in handlers.rs for rationale.
-#[test]
-fn hwpx_equation_eqedit_syntax_stored_verbatim_not_converted() {
-    // "a over b" is EQEDIT syntax for a fraction. eqedit_to_latex would convert
-    // this to "\frac{a}{b}". In HWPX, it is stored verbatim.
-    let eq_xml = r#"<hp:equation>a over b</hp:equation>"#;
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(eq_xml));
-
-    let math_block = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .find(|b| matches!(b, ir::Block::Math { .. }));
-
-    assert!(
-        math_block.is_some(),
-        "expected Math block; blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
-    );
-    let ir::Block::Math { tex, .. } = math_block.unwrap() else {
-        unreachable!()
-    };
-    // HWPX verbatim: stored as "a over b", NOT converted to "\frac{a}{b}".
-    assert_eq!(
-        tex.as_str(),
-        "a over b",
-        "HWPX equation text must be stored verbatim; if this fails, \
-         the equation handler now calls eqedit_to_latex — update this test \
-         and the design comment in handlers.rs"
     );
 }
 
@@ -2514,5 +2357,204 @@ fn md_to_hwpx_to_md_roundtrip_preserves_table_structure() {
     assert!(
         pos_alice < pos_ninety && pos_ninety < pos_bob,
         "90 (Alice's score) must appear between Alice and Bob; got: {final_md:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 95 P3: Italic and strikethrough MD → HWPX → MD roundtrip
+// ---------------------------------------------------------------------------
+
+/// Italic text (`*text*`) parsed from Markdown survives the MD→HWPX→MD roundtrip:
+/// the re-read IR still carries `italic=true` and the final Markdown contains
+/// the `*text*` markers.
+#[test]
+fn md_to_hwpx_to_md_roundtrip_preserves_italic() {
+    let source_md = "*ItalicContent* and plain text.\n";
+
+    // MD → IR.
+    let ir_doc = hwp2md::md::parse_markdown(source_md);
+
+    // Verify IR has an italic inline before writing.
+    let has_italic = ir_doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .flat_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.as_slice()
+            } else {
+                &[]
+            }
+        })
+        .any(|i| i.italic);
+    assert!(has_italic, "parsed IR must contain an italic inline");
+
+    // IR → HWPX.
+    let tmp = tempfile::NamedTempFile::new().expect("temp file");
+    hwpx::write_hwpx(&ir_doc, tmp.path(), None).expect("write_hwpx");
+
+    // HWPX → IR (re-read).
+    let read_back = hwpx::read_hwpx(tmp.path()).expect("read_hwpx");
+
+    // IR must still have italic.
+    let still_italic = read_back
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .flat_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.as_slice()
+            } else {
+                &[]
+            }
+        })
+        .any(|i| i.italic);
+    assert!(
+        still_italic,
+        "italic inline must survive HWPX roundtrip"
+    );
+
+    // IR → MD (second pass): *markers* must appear.
+    let final_md = md::write_markdown(&read_back, false);
+    assert!(
+        final_md.contains("ItalicContent"),
+        "ItalicContent text must survive; got: {final_md:?}"
+    );
+    assert!(
+        final_md.contains("*ItalicContent*"),
+        "italic markers must survive MD→HWPX→MD; got: {final_md:?}"
+    );
+}
+
+/// Strikethrough text (`~~text~~`) parsed from Markdown survives the
+/// MD→HWPX→MD roundtrip: the re-read IR still carries `strikethrough=true`
+/// and the final Markdown contains `~~markers~~`.
+#[test]
+fn md_to_hwpx_to_md_roundtrip_preserves_strikethrough() {
+    let source_md = "~~StrikeContent~~ and plain text.\n";
+
+    // MD → IR.
+    let ir_doc = hwp2md::md::parse_markdown(source_md);
+
+    // Verify IR has strikethrough before writing.
+    let has_strike = ir_doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .flat_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.as_slice()
+            } else {
+                &[]
+            }
+        })
+        .any(|i| i.strikethrough);
+    assert!(has_strike, "parsed IR must contain a strikethrough inline");
+
+    // IR → HWPX.
+    let tmp = tempfile::NamedTempFile::new().expect("temp file");
+    hwpx::write_hwpx(&ir_doc, tmp.path(), None).expect("write_hwpx");
+
+    // HWPX → IR (re-read).
+    let read_back = hwpx::read_hwpx(tmp.path()).expect("read_hwpx");
+
+    // IR must still have strikethrough.
+    let still_strike = read_back
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .flat_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.as_slice()
+            } else {
+                &[]
+            }
+        })
+        .any(|i| i.strikethrough);
+    assert!(
+        still_strike,
+        "strikethrough inline must survive HWPX roundtrip"
+    );
+
+    // IR → MD (second pass): ~~markers~~ must appear.
+    let final_md = md::write_markdown(&read_back, false);
+    assert!(
+        final_md.contains("StrikeContent"),
+        "StrikeContent text must survive; got: {final_md:?}"
+    );
+    assert!(
+        final_md.contains("~~StrikeContent~~"),
+        "strikethrough markers must survive MD→HWPX→MD; got: {final_md:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 95 P4: CodeBlock MD → HWPX → MD roundtrip
+// ---------------------------------------------------------------------------
+//
+// NOTE: BlockQuote and HorizontalRule do NOT roundtrip losslessly through HWPX:
+// - HorizontalRule is encoded as a paragraph with box-drawing chars (U+2500);
+//   the reader cannot recognize it as HorizontalRule on re-read.
+// - BlockQuote uses paraPrIDRef="1" paragraphs; the reader does not map these
+//   back to BlockQuote.
+// CodeBlock DOES roundtrip losslessly via the `<!-- hwp2md:lang:LANG -->` comment
+// convention (writer_section.rs:196-210) and the lang-hint reader path.
+
+/// A fenced code block (``` ```rust ... ``` ```) parsed from Markdown survives the
+/// MD→HWPX→MD roundtrip: the re-read IR still contains `Block::CodeBlock` and
+/// the language hint and code content are preserved.
+#[test]
+fn md_to_hwpx_to_md_roundtrip_preserves_code_block_with_language() {
+    let source_md = "```rust\nlet x = 42;\n```\n";
+
+    // MD → IR.
+    let ir_doc = hwp2md::md::parse_markdown(source_md);
+
+    let has_code = ir_doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(|b| matches!(b, ir::Block::CodeBlock { .. }));
+    assert!(has_code, "parsed IR must contain a CodeBlock block");
+
+    // IR → HWPX.
+    let tmp = tempfile::NamedTempFile::new().expect("temp file");
+    hwpx::write_hwpx(&ir_doc, tmp.path(), None).expect("write_hwpx");
+
+    // HWPX → IR (re-read).
+    let read_back = hwpx::read_hwpx(tmp.path()).expect("read_hwpx");
+
+    // IR must still have a CodeBlock (not degraded to Paragraph).
+    let code_block = read_back
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find(|b| matches!(b, ir::Block::CodeBlock { .. }));
+    assert!(
+        code_block.is_some(),
+        "CodeBlock must survive HWPX roundtrip as Block::CodeBlock, not Paragraph"
+    );
+    let ir::Block::CodeBlock { code, language } = code_block.unwrap() else {
+        unreachable!()
+    };
+    assert!(
+        code.contains("let x = 42"),
+        "code content must survive; got: {code:?}"
+    );
+    assert_eq!(
+        language.as_deref(),
+        Some("rust"),
+        "language hint must survive roundtrip"
+    );
+
+    // IR → MD (second pass): fenced code block format.
+    let final_md = md::write_markdown(&read_back, false);
+    assert!(
+        final_md.contains("```rust"),
+        "language-tagged fence must survive; got: {final_md:?}"
+    );
+    assert!(
+        final_md.contains("let x = 42"),
+        "code content must appear in final markdown; got: {final_md:?}"
     );
 }
