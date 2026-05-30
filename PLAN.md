@@ -246,14 +246,23 @@ Sprint 93 완료 (2026-05-31). 1537 tests. footnote split + paren URL + unordere
 - **P3**: read_fixture → fixtures/mod.rs — ✅ pub fn 공유, 모든 4개 test file에서 local copy 제거
 - **P4**: Table MD→HWPX→MD roundtrip — ✅ Block::Table 구조 + 2-column separator + Alice<90<Bob 조합
 
-## Sprint 95 로드맵
+## Sprint 95 완료 (2026-05-31)
 
-Sprint 94 완료 (2026-05-31). 1538 tests. list split + shared read_fixture + table roundtrip. integration.rs 2504 lines.
+Sprint 94 완료 (2026-05-31). 1538 tests. list split + shared read_fixture + table roundtrip.
+
+- **P1**: 관(subsection) 감지 — BLOCKER 유지 — 이월
+- **P2**: integration_blocks.rs 분리 — ✅ 4 block tests 이전 (equation×2, HR, blockquote)
+- **P3**: italic/strikethrough roundtrip — ✅ 3-phase 패턴
+- **P4**: code block roundtrip — ✅ blockquote/HR 대체 (lossy encoding 발견)
+
+## Sprint 96 로드맵
+
+Sprint 95 완료 (2026-05-31). 1541 tests. blocks split + italic/strikethrough/code roundtrip.
 
 - **P1**: 관(subsection) 감지 — BLOCKER 계속 유지
-- **P2**: integration.rs 추가 분할 — equation/HR/blockquote 섹션 (`integration_blocks.rs`)
-- **P3**: 인라인 서식 roundtrip — bold MD→HWPX→MD 이미 커버; italic/strikethrough roundtrip 추가
-- **P4**: Image MD→HWPX→MD roundtrip — 이미지 alt text 보존 검증
+- **P2**: integration.rs 추가 분할 — image/colspan 섹션 (`integration_image.rs`)
+- **P3**: roundtrip helper 추출 — `any_inline(doc, pred)` + `md_hwpx_roundtrip(md)` fixtures 공유
+- **P4**: BlockQuote/HR negative assertion — 손실 계약 실행 가능한 assertion으로 문서화
 
 ## 라이선스
 

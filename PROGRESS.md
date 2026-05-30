@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 94 완료 (list split + shared read_fixture + table roundtrip)
+## 현재 상태: v0.5.0 Sprint 95 완료 (blocks split + italic/strikethrough/code roundtrip + BlockQuote/HR lossy encoding 발견)
 
 ### 완료
 
@@ -709,6 +709,28 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 95 — 2026-05-31
+**주제**: blocks test split + italic/strikethrough/code roundtrip + BlockQuote/HR lossy encoding 발견
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/integration_blocks.rs` | NEW — Sprint 86/87 equation×2 + HR + blockquote 4개 이전 |
+| `tests/integration.rs` | 4개 제거 (→ blocks) + P3 italic/strikethrough roundtrip + P4 code block roundtrip 추가 |
+
+### 검증
+- **1541 tests, 0 failures** (커밋 `d9a613c`)
+- Clippy `-D warnings`: clean
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. BlockQuote/HR lossy encoding 발견 (HorizontalRule=U+2500×19 paragraph, BlockQuote=paraPrIDRef="1" — reader 복원 불가). CodeBlock은 XML comment sentinel로 lossless 왕복. 3-phase roundtrip 패턴 정확 (pre-write IR + post-read structural + final MD marker). MEDIUM: inline 추출 boilerplate 중복, LOW: lossy 케이스 negative assertion 향후 검토.
+리뷰 전문: `~/.claude/references/2026-05-31_hwp2md_sprint95_blocks_split_italic_strike_code_roundtrip_review.md`
+
+### 관련 커밋
+- `d9a613c` feat(tests): Sprint 95 — blocks split + italic/strikethrough/code roundtrip
+
+---
 
 ## Sprint 94 — 2026-05-31
 **주제**: list test split + shared read_fixture + table MD→HWPX→MD roundtrip
