@@ -8,6 +8,9 @@ Cargo.lock
 .vscode/
 *.iml
 
+# Soul memory (local only)
+.memory/
+
 # Test outputs
 output/
 *.hwp
