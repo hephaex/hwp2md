@@ -210,14 +210,23 @@ Sprint 89 완료 (2026-05-30). strikeout ~~text~~ + color #span; H1/H2 순서+�
 - **P3**: 복합 인라인 서식 통합 테스트 — ✅ bold+underline → `<u>**text**</u>`, bold+italic+color → `<span>***text***</span>`
 - **P4**: 긴 문서 통합 테스트 — ✅ H1/para/H2/code/para IR 위치 순서 + Markdown ATX 순서
 
-## Sprint 91 로드맵
+## Sprint 91 완료 (2026-05-30)
 
 Sprint 90 완료 (2026-05-30). 1527 tests. hyperlink URL isolation + unsafe gate pin; combined inline formatting; complex doc ordering.
 
-- **P1**: 관(subsection) 감지 — 대형 법령 픽스처 확보 시 검토 (BLOCKER 계속 유지)
-- **P2**: integration.rs 분할 — 현재 3400+ lines; `integration_hyperlink.rs`, `integration_formatting.rs`, `integration_blocks.rs` 등으로 분리
-- **P3**: strikethrough + underline 동시 charPr 통합 테스트 (~~`<u>text</u>`~~) — 렌더링 중첩 순서 핀
-- **P4**: HWP 5.0 binary reader — CTRL_RUBY 강건성 또는 BinData 이미지 추출
+- **P1**: 관(subsection) 감지 — BLOCKER 유지 — 이월
+- **P2**: integration.rs 분할 — ✅ `integration_formatting.rs` 분리 (3418 → 3075 lines, -343 lines)
+- **P3**: charPr 조합 테스트 — ✅ strikethrough+underline `<u>~~t~~</u>`, bold+strikethrough `~~**t**~~`, italic+underline `<u>*t*</u>`
+- **P4**: CTRL_RUBY/BinData — 이미 충분히 커버됨, 스킵
+
+## Sprint 92 로드맵
+
+Sprint 91 완료 (2026-05-30). 1530 tests. formatting split + 3 combination tests. integration.rs still 3075 lines.
+
+- **P1**: 관(subsection) 감지 — BLOCKER 계속 유지
+- **P2**: integration.rs 추가 분할 — `integration_hyperlink.rs` 분리 (Sprint 82/90 hyperlink tests)
+- **P3**: 인라인 링크 + 포맷 조합 테스트 — bold hyperlink, color hyperlink (링크 안 인라인 서식)
+- **P4**: MD → HWPX → MD roundtrip 확장 — 테이블, 리스트 왕복 안정성
 
 ## 라이선스
 

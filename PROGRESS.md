@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 90 완료 (hyperlink URL isolation + combined inline formatting + complex doc ordering)
+## 현재 상태: v0.5.0 Sprint 91 완료 (formatting test split + charPr combination tests)
 
 ### 완료
 
@@ -709,6 +709,29 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 91 — 2026-05-30
+**주제**: integration.rs formatting test split + charPr 조합 테스트 3종
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/integration_formatting.rs` | NEW — Sprint 88-90 formatting 테스트 9개 이전 + Sprint 91 P3 신규 3개 (strikethrough+underline, bold+strikethrough, italic+underline) |
+| `tests/integration.rs` | formatting 섹션 제거 (3418 → 3075 lines, -343 lines) |
+
+### 검증
+- **1530 tests, 0 failures** (커밋 `1bc9b04`)
+- Clippy `-D warnings`: clean
+- `#[allow(dead_code)]` on mod fixtures: 올바른 설계 (5개 test binary가 다른 helpers subset 사용)
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH/MEDIUM 없음. `#[allow(dead_code)]` mod-level approach 검증: fixtures/mod.rs에서 per-fn allow보다 안정적 (binary별 다른 helpers subset 사용 churn 흡수). `read_fixture` 3줄 복사는 coupling 없음 우선으로 올바른 결정.
+리뷰 전문: `~/.claude/references/2026-05-30_hwp2md_sprint91_formatting_split_combination_review.md`
+
+### 관련 커밋
+- `1bc9b04` feat(tests): Sprint 91 — formatting test split + 3 new combination tests
+
+---
 
 ## Sprint 90 — 2026-05-30
 **주제**: hyperlink URL isolation + unsafe URL writer gate + combined inline formatting + complex doc ordering
