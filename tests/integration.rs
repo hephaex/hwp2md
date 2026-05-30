@@ -3130,3 +3130,279 @@ fn md_to_hwpx_to_md_roundtrip_preserves_structure() {
         "bold must survive MD→HWPX→MD; got: {final_md:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 90 P2: HWPX hyperlink edge cases
+// ---------------------------------------------------------------------------
+
+/// Two hyperlinks in one paragraph each carry their own URL with no bleed
+/// from the first link into the second or the plain text between them.
+#[test]
+fn hwpx_hyperlink_multiple_links_in_same_paragraph() {
+    let xml = r#"<hp:p><hp:run>
+        <hp:fieldBegin type="HYPERLINK" command="https://first.com"/>
+        <hp:t>First</hp:t>
+        <hp:fieldEnd/>
+    </hp:run><hp:run>
+        <hp:t> and </hp:t>
+    </hp:run><hp:run>
+        <hp:fieldBegin type="HYPERLINK" command="https://second.com"/>
+        <hp:t>Second</hp:t>
+        <hp:fieldEnd/>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(xml));
+
+    let inlines: Vec<&ir::Inline> = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.as_slice())
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .collect();
+
+    let first = inlines.iter().find(|i| i.text.contains("First"));
+    let and_text = inlines.iter().find(|i| i.text.contains("and"));
+    let second = inlines.iter().find(|i| i.text.contains("Second"));
+
+    assert!(first.is_some(), "expected inline with 'First'");
+    assert!(second.is_some(), "expected inline with 'Second'");
+
+    assert_eq!(
+        first.unwrap().link.as_deref(),
+        Some("https://first.com"),
+        "'First' inline must carry first URL"
+    );
+    assert_eq!(
+        second.unwrap().link.as_deref(),
+        Some("https://second.com"),
+        "'Second' inline must carry second URL"
+    );
+    if let Some(mid) = and_text {
+        assert!(
+            mid.link.is_none(),
+            "plain text between links must have no URL; got: {:?}",
+            mid.link
+        );
+    }
+
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("[First](https://first.com)"),
+        "markdown must contain first link; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("[Second](https://second.com)"),
+        "markdown must contain second link; got: {markdown:?}"
+    );
+}
+
+/// A HYPERLINK with a javascript: URL is stored in the IR (no panic) but the
+/// Markdown writer must drop the link syntax, emitting only the label text.
+#[test]
+fn hwpx_hyperlink_unsafe_url_drops_link_syntax() {
+    let xml = r#"<hp:p><hp:run>
+        <hp:fieldBegin type="HYPERLINK" command="javascript:alert(1)"/>
+        <hp:t>click</hp:t>
+        <hp:fieldEnd/>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(xml));
+
+    let link_inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.text.contains("click"))
+            } else {
+                None
+            }
+        });
+
+    assert!(link_inline.is_some(), "expected inline with text 'click'");
+    // IR may carry the raw URL — that is fine; the writer filters it.
+    // The important assertion is on the rendered Markdown.
+
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        !markdown.contains("javascript:"),
+        "javascript: URL must not appear in markdown output; got: {markdown:?}"
+    );
+    assert!(
+        !markdown.contains("[click]("),
+        "unsafe URL must not produce [text](url) syntax; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("click"),
+        "label text must still be present; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 90 P3: Combined inline formatting integration tests
+// ---------------------------------------------------------------------------
+
+/// `bold="true" underline="single"` applied together produces an inline with
+/// both flags set; Markdown renders as `<u>**text**</u>` (underline wraps bold).
+#[test]
+fn hwpx_charpr_bold_underline_combined_produces_wrapped_markdown() {
+    let xml = r#"<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">
+        <hp:charPr bold="true" underline="single"/>
+        <hp:t>BoldUnderline</hp:t>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(xml));
+
+    let inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.text.contains("BoldUnderline"))
+            } else {
+                None
+            }
+        });
+
+    assert!(inline.is_some(), "expected BoldUnderline inline");
+    let inline = inline.unwrap();
+    assert!(inline.bold, "bold must be true");
+    assert!(inline.underline, "underline must be true");
+
+    let markdown = md::write_markdown(&doc, false);
+    // Rendering order: bold → then underline wraps → <u>**BoldUnderline**</u>
+    assert!(
+        markdown.contains("<u>**BoldUnderline**</u>"),
+        "bold+underline must render as <u>**text**</u>; got: {markdown:?}"
+    );
+}
+
+/// `bold="true" italic="true" color="0000FF"` applied together produces bold,
+/// italic, and color in the IR; Markdown renders
+/// `<span style="color:#0000FF">***text***</span>`.
+#[test]
+fn hwpx_charpr_bold_italic_color_combined_produces_span_with_markers() {
+    let xml = r#"<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">
+        <hp:charPr bold="true" italic="true" color="0000FF"/>
+        <hp:t>BlueItalicBold</hp:t>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(xml));
+
+    let inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.text.contains("BlueItalicBold"))
+            } else {
+                None
+            }
+        });
+
+    assert!(inline.is_some(), "expected BlueItalicBold inline");
+    let inline = inline.unwrap();
+    assert!(inline.bold, "bold must be true");
+    assert!(inline.italic, "italic must be true");
+    assert_eq!(
+        inline.color.as_deref(),
+        Some("#0000FF"),
+        "color must be #0000FF"
+    );
+
+    let markdown = md::write_markdown(&doc, false);
+    // Rendering order: bold+italic → ***text*** → color wraps → <span>***text***</span>
+    assert!(
+        markdown.contains("<span style=\"color:#0000FF\">***BlueItalicBold***</span>"),
+        "bold+italic+color must render as <span>***text***</span>; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 90 P4: Complex/long document fixture ordering test
+// ---------------------------------------------------------------------------
+
+/// A fixture containing H1 → paragraph → H2 → code block → paragraph in
+/// sequence must produce IR blocks in that exact order, and the Markdown
+/// output must reflect the same ordering.
+#[test]
+fn hwpx_complex_document_mixed_blocks_ordering() {
+    let h1 = heading_xml(1, "Main Title");
+    let intro = para_xml("Introduction text");
+    let h2 = heading_xml(2, "Section One");
+    let code_block = format!(
+        r#"{}<hp:p paraPrIDRef="0"><hp:run><hp:t>let x = 1;</hp:t></hp:run></hp:p>"#,
+        lang_hint_comment("rust")
+    );
+    let body = para_xml("Body text after code");
+
+    let xml = format!("{h1}{intro}{h2}{code_block}{body}");
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&xml));
+
+    let blocks: Vec<&ir::Block> = doc.sections.iter().flat_map(|s| &s.blocks).collect();
+
+    // Verify at least 5 blocks (H1, para, H2, code, para).
+    assert!(
+        blocks.len() >= 5,
+        "expected ≥5 blocks; got {}: {blocks:?}",
+        blocks.len()
+    );
+
+    // Find positions of each expected block.
+    let pos_h1 = blocks.iter().position(|b| {
+        matches!(b, ir::Block::Heading { level: 1, .. })
+    });
+    let pos_intro = blocks.iter().position(|b| {
+        matches!(b, ir::Block::Paragraph { inlines } if
+            inlines.iter().any(|i| i.text.contains("Introduction")))
+    });
+    let pos_h2 = blocks.iter().position(|b| {
+        matches!(b, ir::Block::Heading { level: 2, .. })
+    });
+    let pos_code = blocks.iter().position(|b| {
+        matches!(b, ir::Block::CodeBlock { code, .. } if code.contains("let x"))
+    });
+    let pos_body = blocks.iter().position(|b| {
+        matches!(b, ir::Block::Paragraph { inlines } if
+            inlines.iter().any(|i| i.text.contains("Body text")))
+    });
+
+    assert!(pos_h1.is_some(), "expected H1 block");
+    assert!(pos_intro.is_some(), "expected intro paragraph block");
+    assert!(pos_h2.is_some(), "expected H2 block");
+    assert!(pos_code.is_some(), "expected code block");
+    assert!(pos_body.is_some(), "expected body paragraph block");
+
+    let (h1i, ii, h2i, ci, bi) = (
+        pos_h1.unwrap(),
+        pos_intro.unwrap(),
+        pos_h2.unwrap(),
+        pos_code.unwrap(),
+        pos_body.unwrap(),
+    );
+
+    assert!(
+        h1i < ii && ii < h2i && h2i < ci && ci < bi,
+        "expected H1 < intro < H2 < code < body; positions: H1={h1i}, intro={ii}, H2={h2i}, code={ci}, body={bi}"
+    );
+
+    // Markdown layer: headings must use correct ATX prefix.
+    let markdown = md::write_markdown(&doc, false);
+    let pos_md_h1 = markdown.find("# Main Title").expect("# Main Title in markdown");
+    let pos_md_h2 = markdown.find("## Section One").expect("## Section One in markdown");
+    let pos_md_code = markdown.find("let x = 1;").expect("code in markdown");
+    assert!(
+        pos_md_h1 < pos_md_h2 && pos_md_h2 < pos_md_code,
+        "markdown ordering: H1 < H2 < code; got: {markdown:?}"
+    );
+}
