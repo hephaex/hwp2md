@@ -2557,15 +2557,26 @@ fn hwpx_table_roundtrip_preserves_structure() {
     assert_eq!(*col_count, 2, "col_count must be 2 after roundtrip");
     assert_eq!(rows.len(), 2, "row count must be 2 after roundtrip");
 
-    // Cell text must be preserved.
+    // Per-cell position assertions: verify the text appears in the correct
+    // structural position, not just anywhere in the document.
+    fn cell_text(cell: &ir::TableCell) -> String {
+        cell.blocks.iter().filter_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                Some(inlines.iter().map(|i| i.text.as_str()).collect::<String>())
+            } else { None }
+        }).collect()
+    }
+    assert_eq!(cell_text(&rows[0].cells[0]), "R0C0", "row0 col0 text mismatch");
+    assert_eq!(cell_text(&rows[0].cells[1]), "R0C1", "row0 col1 text mismatch");
+    assert_eq!(cell_text(&rows[1].cells[0]), "R1C0", "row1 col0 text mismatch");
+    assert_eq!(cell_text(&rows[1].cells[1]), "R1C1", "row1 col1 text mismatch");
+
+    // Markdown layer: all four cell values appear in output.
     let markdown = md::write_markdown(&read_back, false);
     assert!(
-        markdown.contains("R0C0") && markdown.contains("R0C1"),
-        "first row cells must survive; got: {markdown:?}"
-    );
-    assert!(
-        markdown.contains("R1C0") && markdown.contains("R1C1"),
-        "second row cells must survive; got: {markdown:?}"
+        markdown.contains("R0C0") && markdown.contains("R0C1")
+            && markdown.contains("R1C0") && markdown.contains("R1C1"),
+        "all cell texts must appear in markdown; got: {markdown:?}"
     );
 }
 

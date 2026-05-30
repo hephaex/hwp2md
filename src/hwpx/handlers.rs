@@ -284,11 +284,15 @@ pub(super) fn handle_end_element(
         "equation" | "hp:equation" | "eqEdit" | "hp:eqEdit" => {
             if !ctx.equation_text.is_empty() {
                 // DESIGN: HWPX equation text is stored verbatim as `tex`, without
-                // calling `eqedit_to_latex`.  HWPX files store equation content in
-                // a format that is already usable as Markdown math (plain LaTeX or
-                // LaTeX-compatible notation).  The HWP 5.0 binary reader path
-                // (hwp/convert.rs) applies `eqedit_to_latex` to EQEDIT script, but
-                // that transformation is specific to the HWP 5.0 binary encoding.
+                // calling `eqedit_to_latex`.  This is a policy choice, not a
+                // consequence of HWPX equations already being valid LaTeX — a
+                // Hancom-authored HWPX file can contain EQEDIT script syntax (e.g.
+                // "a over b") that is NOT valid LaTeX.  The HWP 5.0 binary reader
+                // (hwp/convert.rs:464) applies `eqedit_to_latex` because the binary
+                // format's equation storage always uses EQEDIT encoding; HWPX does
+                // not have that guarantee, so we pass text through untransformed.
+                // See the integration test `hwpx_equation_eqedit_syntax_stored_verbatim_not_converted`
+                // which pins this behavior.
                 let tex = std::mem::take(&mut ctx.equation_text);
                 staged.push(StagedBlock::Plain(ir::Block::Math { display: true, tex }));
             }
