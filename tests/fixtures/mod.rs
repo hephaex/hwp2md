@@ -415,3 +415,20 @@ pub fn any_inline_in_doc(
         })
         .any(pred)
 }
+
+/// Return `true` if any top-level block in `doc` satisfies `pred`.
+///
+/// Scans all sections → top-level blocks only.  Does not recurse into
+/// `List` items, `BlockQuote` contents, or table cells.  Use in roundtrip
+/// tests to check that a block type (e.g. `Block::Heading`, `Block::CodeBlock`)
+/// is present or absent after the HWPX hop.
+#[allow(dead_code)]
+pub fn any_block_in_doc(
+    doc: &hwp2md::ir::Document,
+    pred: impl Fn(&hwp2md::ir::Block) -> bool,
+) -> bool {
+    doc.sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(pred)
+}

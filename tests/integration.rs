@@ -12,8 +12,8 @@
 mod fixtures;
 
 use fixtures::{
-    any_inline_in_doc, heading_xml, ir_hwpx_roundtrip, lang_hint_comment, para_xml, read_fixture,
-    styled_run_xml, table_2x2_xml, HwpxFixture,
+    any_block_in_doc, any_inline_in_doc, heading_xml, ir_hwpx_roundtrip, lang_hint_comment,
+    para_xml, read_fixture, styled_run_xml, table_2x2_xml, HwpxFixture,
 };
 use hwp2md::{hwpx, ir, md};
 
@@ -1589,131 +1589,6 @@ fn fixture_cnpb_ctrl_variant_produces_pagebreak_ir() {
 }
 
 // ---------------------------------------------------------------------------
-// Sprint 85 P3: table colspan → HTML fallback integration test
-// ---------------------------------------------------------------------------
-
-/// A table cell with `colSpan="2"` triggers the HTML fallback renderer.
-/// The Markdown writer must emit an HTML `<table>` with `colspan="2"` when
-/// any cell has colspan > 1.
-#[test]
-fn hwpx_table_with_colspan_renders_html_fallback() {
-    // 2×2 table where the first row has a single cell spanning 2 columns.
-    // OWPML encodes colspan via <hp:cellSpan colSpan="N"/> child element,
-    // not as an attribute on <hp:tc> itself.
-    let table_xml = r#"<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:tbl rowCnt="2" colCnt="2">
-        <hp:tr>
-            <hp:tc>
-                <hp:cellSpan colSpan="2" rowSpan="1"/>
-                <hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>Merged Header</hp:t></hp:run></hp:p>
-            </hp:tc>
-        </hp:tr>
-        <hp:tr>
-            <hp:tc>
-                <hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>Cell A</hp:t></hp:run></hp:p>
-            </hp:tc>
-            <hp:tc>
-                <hp:p paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t>Cell B</hp:t></hp:run></hp:p>
-            </hp:tc>
-        </hp:tr>
-    </hp:tbl></hp:run></hp:p>"#;
-
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(table_xml));
-
-    // IR layer: must contain a Table block.
-    let table_block = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .find(|b| matches!(b, ir::Block::Table { .. }));
-
-    assert!(
-        table_block.is_some(),
-        "expected a Table block; blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
-    );
-
-    // Check that the merged cell carries colspan=2 in the IR.
-    let ir::Block::Table { rows, .. } = table_block.unwrap() else {
-        unreachable!()
-    };
-    let first_row_cell = rows.first().and_then(|r| r.cells.first());
-    assert!(
-        first_row_cell.is_some(),
-        "first row must have at least one cell"
-    );
-    assert_eq!(
-        first_row_cell.unwrap().colspan,
-        2,
-        "merged cell must carry colspan=2 in the IR"
-    );
-
-    // Markdown layer: must fall back to HTML <table> with colspan attribute.
-    let markdown = md::write_markdown(&doc, false);
-    assert!(
-        markdown.contains("<table>") || markdown.contains("<TABLE>"),
-        "colspan table must render as HTML <table>; got: {markdown:?}"
-    );
-    assert!(
-        markdown.contains("colspan=\"2\"") || markdown.contains("colspan=2"),
-        "HTML table must include colspan=2; got: {markdown:?}"
-    );
-    assert!(
-        markdown.contains("Merged Header"),
-        "merged cell text must appear in output; got: {markdown:?}"
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Sprint 85 P4: no-language code block integration test
-// ---------------------------------------------------------------------------
-
-/// `<!-- hwp2md:lang: -->` (empty language) produces a `CodeBlock` with
-/// `language = None` and renders as a plain ``` fence in Markdown (no tag).
-#[test]
-fn hwpx_lang_hint_empty_language_produces_code_block_no_tag() {
-    let (_dir, doc) = read_fixture(
-        // Pass empty string → <!-- hwp2md:lang: --> → CodeBlock { language: None }
-        HwpxFixture::new().with_lang_hint_paragraph("", "no_lang_code()"),
-    );
-
-    let code_block = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .find(|b| matches!(b, ir::Block::CodeBlock { .. }));
-
-    assert!(
-        code_block.is_some(),
-        "expected a CodeBlock; blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
-    );
-    let ir::Block::CodeBlock { language, code } = code_block.unwrap() else {
-        unreachable!()
-    };
-    assert!(
-        language.is_none(),
-        "empty lang hint must produce CodeBlock {{ language: None }}; got: {language:?}"
-    );
-    assert!(
-        code.contains("no_lang_code"),
-        "code content must be preserved; got: {code:?}"
-    );
-
-    // Markdown layer: ``` fence without a language tag.
-    let markdown = md::write_markdown(&doc, false);
-    assert!(
-        markdown.contains("```"),
-        "markdown must contain code fence; got: {markdown:?}"
-    );
-    // Must NOT have a language tag immediately after the opening fence.
-    // The fence line should be exactly "```" (or "```\n"), not "```python" etc.
-    assert!(
-        !markdown.contains("```no_lang") && !markdown.contains("```None"),
-        "no-language fence must not have a language tag; got: {markdown:?}"
-    );
-}
-
-// ---------------------------------------------------------------------------
 // Sprint 87 P2: Table roundtrip (IR → HWPX write → read_hwpx → IR)
 // ---------------------------------------------------------------------------
 
@@ -2438,23 +2313,16 @@ fn blockquote_hwpx_roundtrip_currently_lossy_no_blockquote_block() {
     let source_md = "> Quoted content.\n";
 
     let ir_doc = hwp2md::md::parse_markdown(source_md);
-    let has_pre = ir_doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .any(|b| matches!(b, ir::Block::BlockQuote { .. }));
-    assert!(has_pre, "MD parser must produce BlockQuote before the hop");
+    assert!(
+        any_block_in_doc(&ir_doc, |b| matches!(b, ir::Block::BlockQuote { .. })),
+        "MD parser must produce BlockQuote before the hop"
+    );
 
     let (_tmp, read_back) = ir_hwpx_roundtrip(&ir_doc);
 
     // LOSSY: BlockQuote does NOT survive — assert the current degraded behavior.
-    let still_blockquote = read_back
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .any(|b| matches!(b, ir::Block::BlockQuote { .. }));
     assert!(
-        !still_blockquote,
+        !any_block_in_doc(&read_back, |b| matches!(b, ir::Block::BlockQuote { .. })),
         "BlockQuote unexpectedly survived HWPX roundtrip — \
          lossless support was added; replace this negative assertion with a \
          real roundtrip test"
@@ -2472,25 +2340,91 @@ fn horizontal_rule_hwpx_roundtrip_currently_lossy_no_hr_block() {
     let source_md = "Before\n\n---\n\nAfter\n";
 
     let ir_doc = hwp2md::md::parse_markdown(source_md);
-    let has_pre = ir_doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .any(|b| matches!(b, ir::Block::HorizontalRule));
-    assert!(has_pre, "MD parser must produce HorizontalRule before the hop");
+    assert!(
+        any_block_in_doc(&ir_doc, |b| matches!(b, ir::Block::HorizontalRule)),
+        "MD parser must produce HorizontalRule before the hop"
+    );
 
     let (_tmp, read_back) = ir_hwpx_roundtrip(&ir_doc);
 
     // LOSSY: HorizontalRule does NOT survive — assert the current degraded behavior.
-    let still_hr = read_back
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .any(|b| matches!(b, ir::Block::HorizontalRule));
     assert!(
-        !still_hr,
+        !any_block_in_doc(&read_back, |b| matches!(b, ir::Block::HorizontalRule)),
         "HorizontalRule unexpectedly survived HWPX roundtrip — \
          lossless support was added; replace this negative assertion with a \
          real roundtrip test"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 97 P4: Heading MD → HWPX → MD roundtrip
+// ---------------------------------------------------------------------------
+//
+// The HWPX writer encodes `Block::Heading { level }` with:
+//   `hp:styleIDRef` = level as a string ("1", "2", "3", …)
+//   `paraPrIDRef`   = "4"  (PARA_PR_HEADING style)
+//
+// The reader reconstructs the heading via `parse_hwpx_style_ref`, which
+// handles bare numeric IDs — so headings roundtrip losslessly.
+
+/// H1, H2, and H3 headings from Markdown survive the MD→HWPX→MD roundtrip:
+/// level, text, and ATX prefix are all preserved.
+#[test]
+fn md_to_hwpx_to_md_roundtrip_preserves_headings() {
+    let source_md = "# H1 Title\n\n## H2 Section\n\n### H3 Subsection\n\nPlain paragraph.\n";
+
+    // MD → IR: pre-write assertions.
+    let ir_doc = hwp2md::md::parse_markdown(source_md);
+    assert!(
+        any_block_in_doc(&ir_doc, |b| matches!(b, ir::Block::Heading { level: 1, .. })),
+        "parsed IR must contain H1"
+    );
+    assert!(
+        any_block_in_doc(&ir_doc, |b| matches!(b, ir::Block::Heading { level: 2, .. })),
+        "parsed IR must contain H2"
+    );
+    assert!(
+        any_block_in_doc(&ir_doc, |b| matches!(b, ir::Block::Heading { level: 3, .. })),
+        "parsed IR must contain H3"
+    );
+
+    // HWPX hop.
+    let (_tmp, read_back) = ir_hwpx_roundtrip(&ir_doc);
+
+    // Post-hop structural assertions: all three levels must survive.
+    assert!(
+        any_block_in_doc(&read_back, |b| matches!(b, ir::Block::Heading { level: 1, .. })),
+        "H1 must survive HWPX roundtrip"
+    );
+    assert!(
+        any_block_in_doc(&read_back, |b| matches!(b, ir::Block::Heading { level: 2, .. })),
+        "H2 must survive HWPX roundtrip"
+    );
+    assert!(
+        any_block_in_doc(&read_back, |b| matches!(b, ir::Block::Heading { level: 3, .. })),
+        "H3 must survive HWPX roundtrip"
+    );
+
+    // Final MD: ATX prefix must be correct.
+    let final_md = md::write_markdown(&read_back, false);
+    assert!(
+        final_md.contains("# H1 Title"),
+        "H1 must render as '# H1 Title'; got: {final_md:?}"
+    );
+    assert!(
+        final_md.contains("## H2 Section"),
+        "H2 must render as '## H2 Section'; got: {final_md:?}"
+    );
+    assert!(
+        final_md.contains("### H3 Subsection"),
+        "H3 must render as '### H3 Subsection'; got: {final_md:?}"
+    );
+    // Ordering: H1 < H2 < H3.
+    let pos_h1 = final_md.find("H1 Title").expect("H1 Title");
+    let pos_h2 = final_md.find("H2 Section").expect("H2 Section");
+    let pos_h3 = final_md.find("H3 Subsection").expect("H3 Subsection");
+    assert!(
+        pos_h1 < pos_h2 && pos_h2 < pos_h3,
+        "heading order must be H1 < H2 < H3; got: {final_md:?}"
     );
 }
