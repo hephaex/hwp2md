@@ -2494,11 +2494,25 @@ fn md_to_hwpx_to_md_roundtrip_preserves_table_structure() {
         );
     }
 
+    // 2-column GFM shape must be preserved (header separator row).
+    // A degenerate 1-column or no-separator table would fail this.
+    assert!(
+        final_md.contains("| --- | --- |") || final_md.contains("|---|---|"),
+        "final markdown must contain a 2-column GFM separator row; got: {final_md:?}"
+    );
+
     // Row ordering: Alice before Bob.
     let pos_alice = final_md.find("Alice").expect("Alice");
     let pos_bob = final_md.find("Bob").expect("Bob");
     assert!(
         pos_alice < pos_bob,
         "Alice row must precede Bob row; got: {final_md:?}"
+    );
+
+    // Column association: Alice's score (90) must appear after Alice, before Bob.
+    let pos_ninety = final_md.find("90").expect("90");
+    assert!(
+        pos_alice < pos_ninety && pos_ninety < pos_bob,
+        "90 (Alice's score) must appear between Alice and Bob; got: {final_md:?}"
     );
 }
