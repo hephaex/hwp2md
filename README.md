@@ -278,6 +278,10 @@ tests/             Integration tests
 - Headers and footers in HWP 5.0 binary files are skipped; HWPX headers/footers are fully supported.
 - Writing back to the binary HWP 5.0 format (MD -> HWP) is not supported; only HWPX output is available.
 
+## Reporting Conversion Bugs
+
+If `hwp2md` fails to convert your HWP/HWPX file correctly, please [open an issue](https://github.com/hephaex/hwp2md/issues/new?template=conversion-bug.yml) using the **Conversion Bug** template. Attach the file that causes the problem — CI will automatically attempt the conversion and post the result as a comment on your issue.
+
 ## Contributing
 
 Bug reports and pull requests are welcome at <https://github.com/hephaex/hwp2md>.
