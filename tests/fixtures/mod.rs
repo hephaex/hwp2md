@@ -361,3 +361,17 @@ pub fn styled_run_xml(text: &str) -> String {
         xml_escape(text)
     )
 }
+
+/// Write an `HwpxFixture` to a temp file and parse it with `hwpx::read_hwpx`.
+///
+/// Returns the `TempDir` (kept alive so the file is not deleted) and the
+/// parsed `ir::Document`.  Shared across all integration test binaries so
+/// the 3-line helper is not duplicated in each file.
+#[allow(dead_code)]
+pub fn read_fixture(
+    fixture: HwpxFixture,
+) -> (tempfile::TempDir, hwp2md::ir::Document) {
+    let (dir, path) = fixture.write_to_tempfile();
+    let doc = hwp2md::hwpx::read_hwpx(&path).expect("read_hwpx failed");
+    (dir, doc)
+}

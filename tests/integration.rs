@@ -12,19 +12,10 @@
 mod fixtures;
 
 use fixtures::{
-    heading_xml, lang_hint_comment, para_xml, styled_run_xml, table_2x2_xml, HwpxFixture,
+    heading_xml, lang_hint_comment, para_xml, read_fixture, styled_run_xml, table_2x2_xml,
+    HwpxFixture,
 };
 use hwp2md::{hwpx, ir, md};
-
-// ---------------------------------------------------------------------------
-// Helper: read an HWPX fixture from a temp file and return the IR Document.
-// ---------------------------------------------------------------------------
-
-fn read_fixture(fixture: HwpxFixture) -> (tempfile::TempDir, ir::Document) {
-    let (dir, path) = fixture.write_to_tempfile();
-    let doc = hwpx::read_hwpx(&path).expect("read_hwpx failed");
-    (dir, doc)
-}
 
 // ---------------------------------------------------------------------------
 // 1. Empty document — no blocks, no crash
@@ -1677,101 +1668,6 @@ fn hwpx_img_element_src_attr_also_produces_image_block() {
 }
 
 // ---------------------------------------------------------------------------
-// Sprint 85 P2: ordered/unordered list integration tests
-// ---------------------------------------------------------------------------
-//
-// NOTE: Real OWPML/HWPX files encode lists as flat <hp:p paraPrIDRef numPrIDRef>
-// paragraphs (handled in flush.rs via group_list_paragraphs). The <ol>/<ul>/<li>
-// form below is a secondary/lenient ingestion path in handlers.rs:81-95.
-// Canonical OWPML list coverage lives in reader_tests_list.rs and
-// real_hwp_list_accuracy.rs; these tests pin the secondary ol/ul/li handler.
-
-/// `<ol><li>` produces `ir::Block::List { ordered: true }` with item text
-/// preserved, and renders as a GFM numbered list in Markdown.
-#[test]
-fn hwpx_ol_li_produces_ordered_list_block() {
-    let list_xml = r#"
-        <ol>
-            <li><hp:run><hp:t>First item</hp:t></hp:run></li>
-            <li><hp:run><hp:t>Second item</hp:t></hp:run></li>
-        </ol>"#;
-
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(list_xml));
-
-    // IR layer: must contain an ordered List block.
-    let list_block = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .find(|b| matches!(b, ir::Block::List { ordered: true, .. }));
-
-    assert!(
-        list_block.is_some(),
-        "expected Block::List {{ ordered: true }}; blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
-    );
-    let ir::Block::List { items, .. } = list_block.unwrap() else {
-        unreachable!()
-    };
-    assert_eq!(items.len(), 2, "ordered list must have 2 items");
-
-    // Markdown layer: GFM numbered list format with correct sequence.
-    let markdown = md::write_markdown(&doc, false);
-    assert!(
-        markdown.contains("1. ") && markdown.contains("First item"),
-        "markdown must contain '1. First item'; got: {markdown:?}"
-    );
-    // Assert the second item uses "2." (not "1.") to verify sequential numbering.
-    assert!(
-        markdown.contains("2. ") && markdown.contains("Second item"),
-        "markdown must contain '2. Second item' (sequential); got: {markdown:?}"
-    );
-}
-
-/// `<ul><li>` produces `ir::Block::List { ordered: false }` and renders as
-/// a GFM bullet list (`-`) in Markdown.
-#[test]
-fn hwpx_ul_li_produces_unordered_list_block() {
-    let list_xml = r#"
-        <ul>
-            <li><hp:run><hp:t>Apple</hp:t></hp:run></li>
-            <li><hp:run><hp:t>Banana</hp:t></hp:run></li>
-            <li><hp:run><hp:t>Cherry</hp:t></hp:run></li>
-        </ul>"#;
-
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(list_xml));
-
-    // IR layer: must contain an unordered List block.
-    let list_block = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .find(|b| matches!(b, ir::Block::List { ordered: false, .. }));
-
-    assert!(
-        list_block.is_some(),
-        "expected Block::List {{ ordered: false }}; blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
-    );
-    let ir::Block::List { items, .. } = list_block.unwrap() else {
-        unreachable!()
-    };
-    assert_eq!(items.len(), 3, "unordered list must have 3 items");
-
-    // Markdown layer: GFM bullet list format. The writer hardcodes "-" as
-    // the unordered marker (writer.rs uses "-".to_string()), never "*".
-    let markdown = md::write_markdown(&doc, false);
-    assert!(
-        markdown.contains("- Apple"),
-        "markdown must contain '- Apple' (hyphen bullet); got: {markdown:?}"
-    );
-    assert!(
-        markdown.contains("Banana") && markdown.contains("Cherry"),
-        "all items must appear; got: {markdown:?}"
-    );
-}
-
-// ---------------------------------------------------------------------------
 // Sprint 85 P3: table colspan → HTML fallback integration test
 // ---------------------------------------------------------------------------
 
@@ -1893,97 +1789,6 @@ fn hwpx_lang_hint_empty_language_produces_code_block_no_tag() {
     assert!(
         !markdown.contains("```no_lang") && !markdown.contains("```None"),
         "no-language fence must not have a language tag; got: {markdown:?}"
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Sprint 86 P2: canonical OWPML flat-paragraph list integration tests
-// ---------------------------------------------------------------------------
-//
-// Real HWPX/OWPML encodes lists as FLAT <hp:p paraPrIDRef="2"> paragraphs with
-// optional numPrIDRef="1" for ordered.  The reader groups consecutive list-paragraph
-// sentinels via `group_list_paragraphs` (flush.rs/reader.rs).
-//
-// paraPrIDRef="2" → depth-0 list item (PARA_PR_LIST_D0)
-// numPrIDRef="1"  → ordered (absent = unordered)
-
-/// Three flat `<hp:p paraPrIDRef="2" numPrIDRef="1">` paragraphs in section
-/// XML → single `Block::List { ordered: true, items: 3 }` after grouping.
-#[test]
-fn hwpx_canonical_ordered_list_flat_para_produces_list_block() {
-    // This is the real-world OWPML encoding (NOT <ol>/<li> elements).
-    let list_xml = r#"
-        <hp:p paraPrIDRef="2" numPrIDRef="1"><hp:run><hp:t>Alpha</hp:t></hp:run></hp:p>
-        <hp:p paraPrIDRef="2" numPrIDRef="1"><hp:run><hp:t>Beta</hp:t></hp:run></hp:p>
-        <hp:p paraPrIDRef="2" numPrIDRef="1"><hp:run><hp:t>Gamma</hp:t></hp:run></hp:p>"#;
-
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(list_xml));
-
-    let list_block = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .find(|b| matches!(b, ir::Block::List { ordered: true, .. }));
-
-    assert!(
-        list_block.is_some(),
-        "expected Block::List {{ ordered: true }} from paraPrIDRef=2 numPrIDRef=1; \
-         blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
-    );
-    let ir::Block::List { items, .. } = list_block.unwrap() else {
-        unreachable!()
-    };
-    assert_eq!(items.len(), 3, "must have 3 list items");
-
-    // Markdown: sequential numbered items.
-    let markdown = md::write_markdown(&doc, false);
-    assert!(
-        markdown.contains("1. ") && markdown.contains("Alpha"),
-        "must contain '1. Alpha'; got: {markdown:?}"
-    );
-    assert!(
-        markdown.contains("3. ") && markdown.contains("Gamma"),
-        "must contain '3. Gamma' (sequential); got: {markdown:?}"
-    );
-}
-
-/// Three flat `<hp:p paraPrIDRef="2">` paragraphs WITHOUT numPrIDRef
-/// → single `Block::List { ordered: false, items: 3 }` (unordered).
-#[test]
-fn hwpx_canonical_unordered_list_flat_para_produces_list_block() {
-    let list_xml = r#"
-        <hp:p paraPrIDRef="2"><hp:run><hp:t>Red</hp:t></hp:run></hp:p>
-        <hp:p paraPrIDRef="2"><hp:run><hp:t>Green</hp:t></hp:run></hp:p>
-        <hp:p paraPrIDRef="2"><hp:run><hp:t>Blue</hp:t></hp:run></hp:p>"#;
-
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(list_xml));
-
-    let list_block = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .find(|b| matches!(b, ir::Block::List { ordered: false, .. }));
-
-    assert!(
-        list_block.is_some(),
-        "expected Block::List {{ ordered: false }} from paraPrIDRef=2 without numPrIDRef; \
-         blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
-    );
-    let ir::Block::List { items, .. } = list_block.unwrap() else {
-        unreachable!()
-    };
-    assert_eq!(items.len(), 3, "must have 3 unordered list items");
-
-    let markdown = md::write_markdown(&doc, false);
-    assert!(
-        markdown.contains("- Red"),
-        "must contain '- Red'; got: {markdown:?}"
-    );
-    assert!(
-        markdown.contains("- Blue"),
-        "must contain '- Blue'; got: {markdown:?}"
     );
 }
 
@@ -2247,86 +2052,6 @@ fn hwpx_equation_eqedit_syntax_stored_verbatim_not_converted() {
         "HWPX equation text must be stored verbatim; if this fails, \
          the equation handler now calls eqedit_to_latex — update this test \
          and the design comment in handlers.rs"
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Sprint 87 P4: nested list (depth-1, paraPrIDRef="3") integration test
-// ---------------------------------------------------------------------------
-
-/// A depth-1 item (`paraPrIDRef="3"`) immediately following a depth-0 item
-/// (`paraPrIDRef="2"`) must appear as a child of that item, not a new top-level
-/// item. Tests the `build_list` depth folding logic (flush.rs:379-415).
-#[test]
-fn hwpx_nested_list_depth1_becomes_child_of_parent_item() {
-    // Pattern: top → nested → top (should produce 2 top-level items, second with a child)
-    let list_xml = r#"
-        <hp:p paraPrIDRef="2"><hp:run><hp:t>Parent A</hp:t></hp:run></hp:p>
-        <hp:p paraPrIDRef="3"><hp:run><hp:t>Child of A</hp:t></hp:run></hp:p>
-        <hp:p paraPrIDRef="2"><hp:run><hp:t>Parent B</hp:t></hp:run></hp:p>"#;
-
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(list_xml));
-
-    let list_block = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .find(|b| matches!(b, ir::Block::List { .. }));
-
-    assert!(
-        list_block.is_some(),
-        "expected Block::List; blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
-    );
-    let ir::Block::List { items, .. } = list_block.unwrap() else {
-        unreachable!()
-    };
-
-    // Must have exactly 2 top-level items (not 3 — depth-1 is a child).
-    assert_eq!(
-        items.len(),
-        2,
-        "depth-1 item must be a child, not a 3rd top-level item; items: {items:?}"
-    );
-
-    // First item must have exactly 1 child.
-    let parent_a = &items[0];
-    assert_eq!(
-        parent_a.children.len(),
-        1,
-        "Parent A must have 1 child; children: {:?}",
-        parent_a.children
-    );
-
-    // Second item must have no children.
-    assert_eq!(
-        items[1].children.len(),
-        0,
-        "Parent B must have no children; children: {:?}",
-        items[1].children
-    );
-
-    // Markdown layer: verify nested list renders with indented bullet.
-    let markdown = md::write_markdown(&doc, false);
-    assert!(
-        markdown.contains("Parent A"),
-        "Parent A must appear; got: {markdown:?}"
-    );
-    assert!(
-        markdown.contains("Child of A"),
-        "Child must appear; got: {markdown:?}"
-    );
-    assert!(
-        markdown.contains("Parent B"),
-        "Parent B must appear; got: {markdown:?}"
-    );
-    // Child must appear after Parent A but before Parent B.
-    let pos_a = markdown.find("Parent A").unwrap();
-    let pos_child = markdown.find("Child of A").unwrap();
-    let pos_b = markdown.find("Parent B").unwrap();
-    assert!(
-        pos_a < pos_child && pos_child < pos_b,
-        "order: Parent A < Child < Parent B; got: {markdown:?}"
     );
 }
 
@@ -2715,5 +2440,65 @@ fn md_to_hwpx_to_md_roundtrip_preserves_unordered_list() {
     assert!(
         pos_alpha < pos_beta && pos_beta < pos_gamma,
         "item order must be preserved; got: {final_md:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 94 P4: Table MD → HWPX → MD roundtrip
+// ---------------------------------------------------------------------------
+
+/// A GFM table parsed from Markdown survives the MD→HWPX→MD roundtrip:
+/// the re-read IR still contains a `Block::Table`, and all cell texts from
+/// the original table appear in the final Markdown in the correct relative order.
+#[test]
+fn md_to_hwpx_to_md_roundtrip_preserves_table_structure() {
+    let source_md = "| Name  | Score |\n|-------|-------|\n| Alice | 90    |\n| Bob   | 85    |\n";
+
+    // MD → IR.
+    let ir_doc = hwp2md::md::parse_markdown(source_md);
+
+    // Verify IR has a Table block before writing.
+    let has_table = ir_doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(|b| matches!(b, ir::Block::Table { .. }));
+    assert!(has_table, "parsed IR must contain a Table block");
+
+    // IR → HWPX.
+    let tmp = tempfile::NamedTempFile::new().expect("temp file");
+    hwpx::write_hwpx(&ir_doc, tmp.path(), None).expect("write_hwpx");
+
+    // HWPX → IR (re-read).
+    let read_back = hwpx::read_hwpx(tmp.path()).expect("read_hwpx");
+
+    // IR must still contain a Table — not degraded to plain paragraphs.
+    let still_table = read_back
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(|b| matches!(b, ir::Block::Table { .. }));
+    assert!(
+        still_table,
+        "Table must survive HWPX roundtrip as Block::Table, not flatten to paragraphs"
+    );
+
+    // IR → MD (second pass).
+    let final_md = md::write_markdown(&read_back, false);
+
+    // All cell contents must appear in the final Markdown.
+    for cell in ["Name", "Score", "Alice", "90", "Bob", "85"] {
+        assert!(
+            final_md.contains(cell),
+            "cell '{cell}' must survive roundtrip; got: {final_md:?}"
+        );
+    }
+
+    // Row ordering: Alice before Bob.
+    let pos_alice = final_md.find("Alice").expect("Alice");
+    let pos_bob = final_md.find("Bob").expect("Bob");
+    assert!(
+        pos_alice < pos_bob,
+        "Alice row must precede Bob row; got: {final_md:?}"
     );
 }

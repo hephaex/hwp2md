@@ -11,14 +11,8 @@
 #[allow(dead_code)]
 mod fixtures;
 
-use fixtures::HwpxFixture;
-use hwp2md::{hwpx, ir, md};
-
-fn read_fixture(fixture: HwpxFixture) -> (tempfile::TempDir, ir::Document) {
-    let (dir, path) = fixture.write_to_tempfile();
-    let doc = hwpx::read_hwpx(&path).expect("read_hwpx failed");
-    (dir, doc)
-}
+use fixtures::{read_fixture, HwpxFixture};
+use hwp2md::{ir, md};
 
 // ---------------------------------------------------------------------------
 // Sprint 83 P2: Footnote/endnote full-pipeline integration
