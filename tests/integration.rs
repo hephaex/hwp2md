@@ -2921,3 +2921,202 @@ fn hwpx_two_section_document_produces_two_ir_sections() {
         "section 1 must not bleed section 0 content; got: {sec1_text:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 89 P2: strikethrough + color charPr integration tests
+// ---------------------------------------------------------------------------
+
+/// `strikeout="single"` charPr → `ir::Inline.strikethrough=true` → `~~text~~`.
+#[test]
+fn hwpx_charpr_strikeout_produces_gfm_strikethrough() {
+    let strike_xml = r#"<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">
+        <hp:charPr strikeout="single"/>
+        <hp:t>Deleted text</hp:t>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(strike_xml));
+
+    let strike_inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.strikethrough)
+            } else {
+                None
+            }
+        });
+
+    assert!(
+        strike_inline.is_some(),
+        "expected inline with strikethrough=true; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    assert_eq!(strike_inline.unwrap().text, "Deleted text");
+
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("~~Deleted text~~"),
+        "strikeout must render as ~~Deleted text~~; got: {markdown:?}"
+    );
+}
+
+/// Non-black `color` charPr → `<span style="color:#RRGGBB">text</span>` in Markdown.
+/// Black (#000000) is treated as "no color" and does not emit a span.
+#[test]
+fn hwpx_charpr_non_black_color_produces_span_html() {
+    let color_xml = r#"<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">
+        <hp:charPr color="FF0000"/>
+        <hp:t>Red text</hp:t>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(color_xml));
+
+    let colored_inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.color.is_some())
+            } else {
+                None
+            }
+        });
+
+    assert!(
+        colored_inline.is_some(),
+        "expected inline with color set; blocks: {:?}",
+        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
+    );
+    // Color stored as #RRGGBB uppercase.
+    assert_eq!(
+        colored_inline.unwrap().color.as_deref(),
+        Some("#FF0000"),
+        "color must be stored as #FF0000"
+    );
+
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("<span style=\"color:#FF0000\">Red text</span>"),
+        "non-black color must render as <span>; got: {markdown:?}"
+    );
+}
+
+/// Black color (#000000) must NOT produce a span in Markdown output.
+/// The reader treats black as "no color" (apply_charpr_attrs sets color to None).
+#[test]
+fn hwpx_charpr_black_color_produces_no_span() {
+    let black_xml = r#"<hp:p paraPrIDRef="0"><hp:run charPrIDRef="0">
+        <hp:charPr color="000000"/>
+        <hp:t>Black text</hp:t>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(black_xml));
+
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        !markdown.contains("<span"),
+        "black color must not produce a <span>; got: {markdown:?}"
+    );
+    assert!(
+        markdown.contains("Black text"),
+        "text must still appear; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 89 P3: heading+paragraph ordering precision test
+// ---------------------------------------------------------------------------
+
+/// H1 → paragraph → H2 → paragraph must appear in that exact order in Markdown,
+/// with correct ATX prefix levels (`#`, `##`) and correct position relative to text.
+#[test]
+fn hwpx_heading_paragraph_interleaved_preserves_order_and_levels() {
+    let body = format!(
+        "{}{}{}{}",
+        heading_xml(1, "Main Title"),
+        para_xml("Intro text."),
+        heading_xml(2, "Sub Section"),
+        para_xml("Body content."),
+    );
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&body));
+    let markdown = md::write_markdown(&doc, false);
+
+    // All four pieces must be present.
+    for expected in &["# Main Title", "## Sub Section", "Intro text.", "Body content."] {
+        assert!(
+            markdown.contains(expected),
+            "'{expected}' must appear in markdown; got: {markdown:?}"
+        );
+    }
+
+    // Ordering: H1 < intro < H2 < body.
+    let pos_h1 = markdown.find("# Main Title").unwrap();
+    let pos_intro = markdown.find("Intro text.").unwrap();
+    let pos_h2 = markdown.find("## Sub Section").unwrap();
+    let pos_body = markdown.find("Body content.").unwrap();
+
+    assert!(
+        pos_h1 < pos_intro && pos_intro < pos_h2 && pos_h2 < pos_body,
+        "order must be: H1 < intro < H2 < body; positions: {pos_h1},{pos_intro},{pos_h2},{pos_body}"
+    );
+
+    // H2 prefix must not be promoted to H1 (must use "## " not "# ").
+    let h2_line = markdown
+        .lines()
+        .find(|l| l.contains("Sub Section"))
+        .unwrap_or("");
+    assert!(
+        h2_line.starts_with("## "),
+        "H2 must start with '## ', not promoted to H1; got: {h2_line:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 89 P4: MD → IR → HWPX → IR → MD roundtrip stability
+// ---------------------------------------------------------------------------
+
+/// Markdown → parse → write_hwpx → read_hwpx → write_markdown:
+/// Key structural elements (heading level, bold text, paragraph) must
+/// survive the HWPX hop intact.
+#[test]
+fn md_to_hwpx_to_md_roundtrip_preserves_structure() {
+    // Source Markdown with heading, bold paragraph, and plain paragraph.
+    let source_md = "# Round Trip\n\n**Bold content** here.\n\nPlain paragraph.\n";
+
+    // MD → IR.
+    let ir_doc = hwp2md::md::parse_markdown(source_md);
+
+    // IR → HWPX file.
+    let tmp = tempfile::NamedTempFile::new().expect("temp file");
+    hwpx::write_hwpx(&ir_doc, tmp.path(), None).expect("write_hwpx");
+
+    // HWPX → IR (re-read).
+    let read_back = hwpx::read_hwpx(tmp.path()).expect("read_hwpx");
+
+    // IR → MD (second pass).
+    let final_md = md::write_markdown(&read_back, false);
+
+    // H1 heading must survive.
+    assert!(
+        final_md.contains("# Round Trip"),
+        "H1 heading must survive MD→HWPX→MD; got: {final_md:?}"
+    );
+
+    // "Round Trip" before "Bold content" before "Plain paragraph" (ordering).
+    let pos_heading = final_md.find("Round Trip").expect("heading text");
+    let pos_bold = final_md.find("Bold content").expect("bold text");
+    let pos_plain = final_md.find("Plain paragraph").expect("plain text");
+    assert!(
+        pos_heading < pos_bold && pos_bold < pos_plain,
+        "order must be heading < bold < plain; got: {final_md:?}"
+    );
+
+    // "Bold content" must retain bold markers (** ... **).
+    assert!(
+        final_md.contains("**Bold content**"),
+        "bold must survive MD→HWPX→MD; got: {final_md:?}"
+    );
+}
