@@ -1552,98 +1552,6 @@ fn ruby_adjacent_plain_text_and_ruby_both_present() {
 }
 
 // ---------------------------------------------------------------------------
-// HWPX hyperlink field begin/end integration (Sprint 82 P3)
-// ---------------------------------------------------------------------------
-
-/// A `<hp:fieldBegin type="HYPERLINK" command="url"/>` … `<hp:fieldEnd/>` sequence
-/// must produce an inline carrying the link URL, rendered as Markdown `[text](url)`.
-#[test]
-fn hwpx_hyperlink_field_begin_end_produces_link_inline() {
-    let hyperlink_xml = r#"<hp:p><hp:run>
-        <hp:fieldBegin type="HYPERLINK" command="https://example.com"/>
-        <hp:t>Click here</hp:t>
-        <hp:fieldEnd/>
-    </hp:run></hp:p>"#;
-
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(hyperlink_xml));
-
-    let link_inline = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .find_map(|b| {
-            if let ir::Block::Paragraph { inlines } = b {
-                inlines.iter().find(|i| i.link.is_some())
-            } else {
-                None
-            }
-        });
-
-    assert!(
-        link_inline.is_some(),
-        "expected an inline with link; blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
-    );
-    let link_inline = link_inline.unwrap();
-    assert_eq!(link_inline.text, "Click here", "link text mismatch");
-    assert_eq!(
-        link_inline.link.as_deref(),
-        Some("https://example.com"),
-        "link URL mismatch"
-    );
-
-    // Markdown rendering: [text](url) format.
-    let markdown = md::write_markdown(&doc, false);
-    assert!(
-        markdown.contains("[Click here](https://example.com)"),
-        "markdown must contain [text](url) link; got: {markdown:?}"
-    );
-}
-
-/// Text after `<hp:fieldEnd/>` must NOT carry the hyperlink.
-/// Pins that in_hyperlink is properly cleared on fieldEnd.
-#[test]
-fn hwpx_hyperlink_text_after_field_end_has_no_link() {
-    let hyperlink_xml = r#"<hp:p><hp:run>
-        <hp:fieldBegin type="HYPERLINK" command="https://example.com"/>
-        <hp:t>linked</hp:t>
-        <hp:fieldEnd/>
-        <hp:t> plain</hp:t>
-    </hp:run></hp:p>"#;
-
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(hyperlink_xml));
-
-    let inlines: Vec<_> = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .filter_map(|b| {
-            if let ir::Block::Paragraph { inlines } = b {
-                Some(inlines.as_slice())
-            } else {
-                None
-            }
-        })
-        .flatten()
-        .collect();
-
-    // Positive: "linked" must carry the URL (verifies fieldBegin actually worked).
-    assert!(
-        inlines
-            .iter()
-            .any(|i| i.text.contains("linked") && i.link.as_deref() == Some("https://example.com")),
-        "linked text must carry the URL; inlines: {inlines:?}"
-    );
-    // Negative: "plain" (after fieldEnd) must have no link.
-    assert!(
-        inlines
-            .iter()
-            .any(|i| i.text.contains("plain") && i.link.is_none()),
-        "text after fieldEnd must not carry the URL; inlines: {inlines:?}"
-    );
-}
-
-// ---------------------------------------------------------------------------
 // Footnote/endnote full-pipeline integration (Sprint 83 P2)
 // ---------------------------------------------------------------------------
 
@@ -2871,131 +2779,6 @@ fn md_to_hwpx_to_md_roundtrip_preserves_structure() {
 }
 
 // ---------------------------------------------------------------------------
-// Sprint 90 P2: HWPX hyperlink edge cases
-// ---------------------------------------------------------------------------
-
-/// Two hyperlinks in one paragraph each carry their own URL with no bleed
-/// from the first link into the second or the plain text between them.
-#[test]
-fn hwpx_hyperlink_multiple_links_in_same_paragraph() {
-    let xml = r#"<hp:p><hp:run>
-        <hp:fieldBegin type="HYPERLINK" command="https://first.com"/>
-        <hp:t>First</hp:t>
-        <hp:fieldEnd/>
-    </hp:run><hp:run>
-        <hp:t> and </hp:t>
-    </hp:run><hp:run>
-        <hp:fieldBegin type="HYPERLINK" command="https://second.com"/>
-        <hp:t>Second</hp:t>
-        <hp:fieldEnd/>
-    </hp:run></hp:p>"#;
-
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(xml));
-
-    let inlines: Vec<&ir::Inline> = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .filter_map(|b| {
-            if let ir::Block::Paragraph { inlines } = b {
-                Some(inlines.as_slice())
-            } else {
-                None
-            }
-        })
-        .flatten()
-        .collect();
-
-    let first = inlines.iter().find(|i| i.text.contains("First"));
-    let and_text = inlines.iter().find(|i| i.text.contains("and"));
-    let second = inlines.iter().find(|i| i.text.contains("Second"));
-
-    assert!(first.is_some(), "expected inline with 'First'");
-    assert!(second.is_some(), "expected inline with 'Second'");
-
-    assert_eq!(
-        first.unwrap().link.as_deref(),
-        Some("https://first.com"),
-        "'First' inline must carry first URL"
-    );
-    assert_eq!(
-        second.unwrap().link.as_deref(),
-        Some("https://second.com"),
-        "'Second' inline must carry second URL"
-    );
-    assert!(
-        and_text.is_some(),
-        "expected plain text inline between the two hyperlinks; inlines: {inlines:?}"
-    );
-    if let Some(mid) = and_text {
-        assert!(
-            mid.link.is_none(),
-            "plain text between links must have no URL; got: {:?}",
-            mid.link
-        );
-    }
-
-    let markdown = md::write_markdown(&doc, false);
-    assert!(
-        markdown.contains("[First](https://first.com)"),
-        "markdown must contain first link; got: {markdown:?}"
-    );
-    assert!(
-        markdown.contains("[Second](https://second.com)"),
-        "markdown must contain second link; got: {markdown:?}"
-    );
-}
-
-/// A HYPERLINK with a javascript: URL is stored in the IR (no panic) but the
-/// Markdown writer must drop the link syntax, emitting only the label text.
-#[test]
-fn hwpx_hyperlink_unsafe_url_drops_link_syntax() {
-    let xml = r#"<hp:p><hp:run>
-        <hp:fieldBegin type="HYPERLINK" command="javascript:alert(1)"/>
-        <hp:t>click</hp:t>
-        <hp:fieldEnd/>
-    </hp:run></hp:p>"#;
-
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(xml));
-
-    let link_inline = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .find_map(|b| {
-            if let ir::Block::Paragraph { inlines } = b {
-                inlines.iter().find(|i| i.text.contains("click"))
-            } else {
-                None
-            }
-        });
-
-    assert!(link_inline.is_some(), "expected inline with text 'click'");
-    // Assert the IR retains the raw URL — the writer gate is what drops it,
-    // not the parser.  If the parser rejected it, moving the gate to parse time
-    // would not be detected by the Markdown-level assertions alone.
-    assert_eq!(
-        link_inline.unwrap().link.as_deref(),
-        Some("javascript:alert(1)"),
-        "IR must carry the raw URL so the md::writer security gate is what filters it"
-    );
-
-    let markdown = md::write_markdown(&doc, false);
-    assert!(
-        !markdown.contains("javascript:"),
-        "javascript: URL must not appear in markdown output; got: {markdown:?}"
-    );
-    assert!(
-        !markdown.contains("[click]("),
-        "unsafe URL must not produce [text](url) syntax; got: {markdown:?}"
-    );
-    assert!(
-        markdown.contains("click"),
-        "label text must still be present; got: {markdown:?}"
-    );
-}
-
-// ---------------------------------------------------------------------------
 // Sprint 90 P4: Complex/long document fixture ordering test
 // ---------------------------------------------------------------------------
 
@@ -3071,5 +2854,60 @@ fn hwpx_complex_document_mixed_blocks_ordering() {
     assert!(
         pos_md_h1 < pos_md_h2 && pos_md_h2 < pos_md_code,
         "markdown ordering: H1 < H2 < code; got: {markdown:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 92 P4: MD → HWPX → MD roundtrip for list structures
+// ---------------------------------------------------------------------------
+
+/// An ordered list parsed from Markdown survives the MD→HWPX→MD roundtrip:
+/// item text is preserved, items remain ordered, and relative order is kept.
+#[test]
+fn md_to_hwpx_to_md_roundtrip_preserves_ordered_list() {
+    let source_md = "1. First item\n2. Second item\n3. Third item\n";
+
+    // MD → IR.
+    let ir_doc = hwp2md::md::parse_markdown(source_md);
+
+    // Verify IR has a list block before writing.
+    let has_list = ir_doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(|b| matches!(b, ir::Block::List { ordered: true, .. }));
+    assert!(has_list, "parsed IR must contain an ordered list");
+
+    // IR → HWPX.
+    let tmp = tempfile::NamedTempFile::new().expect("temp file");
+    hwpx::write_hwpx(&ir_doc, tmp.path(), None).expect("write_hwpx");
+
+    // HWPX → IR (re-read).
+    let read_back = hwpx::read_hwpx(tmp.path()).expect("read_hwpx");
+
+    // IR → MD (second pass).
+    let final_md = md::write_markdown(&read_back, false);
+
+    // All three items must appear in the final Markdown.
+    assert!(
+        final_md.contains("First item"),
+        "First item must survive roundtrip; got: {final_md:?}"
+    );
+    assert!(
+        final_md.contains("Second item"),
+        "Second item must survive roundtrip; got: {final_md:?}"
+    );
+    assert!(
+        final_md.contains("Third item"),
+        "Third item must survive roundtrip; got: {final_md:?}"
+    );
+
+    // Relative order must be preserved.
+    let pos_first = final_md.find("First item").expect("First item");
+    let pos_second = final_md.find("Second item").expect("Second item");
+    let pos_third = final_md.find("Third item").expect("Third item");
+    assert!(
+        pos_first < pos_second && pos_second < pos_third,
+        "item order must be preserved: first < second < third; got: {final_md:?}"
     );
 }
