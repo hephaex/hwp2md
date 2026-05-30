@@ -1,6 +1,6 @@
 # hwp2md — Progress
 
-## 현재 상태: v0.5.0 Sprint 91 완료 (formatting test split + charPr combination tests)
+## 현재 상태: v0.5.0 Sprint 92 완료 (hyperlink split + formatted links + list roundtrip)
 
 ### 완료
 
@@ -709,6 +709,30 @@ fn collect_inline_text(inlines: Vec<ir::Inline>) -> String {
 - S1: `String::with_capacity` 사전 할당 가능 — 벤치마크 압박 없어 불필요
 - S2: `#[inline]` on collect_inline_text — 컴파일러 자동 처리
 리뷰 전문: `~/.claude/references/2026-05-26_sprint71_flush_rs_docstring_collect_inline_text_review.md`
+
+## Sprint 92 — 2026-05-30
+**주제**: hyperlink test split + formatted link (bold/italic/color+link) + ordered list roundtrip
+
+### 변경사항
+| 파일 | 변경 내용 |
+|------|----------|
+| `tests/integration_hyperlink.rs` | NEW — Sprint 82/90 hyperlink 4개 이전 + Sprint 92 P3 신규 3개 (bold+link, italic+link, color+link) |
+| `tests/integration.rs` | hyperlink 섹션 제거 (3075 → 2913 lines) + P4 ordered list roundtrip 추가 |
+
+### 검증
+- **1534 tests, 0 failures** (커밋 `13b3259`)
+- Clippy `-D warnings`: clean
+- Follow-up: `still_list` assertion added — ordered list 구조가 HWPX 왕복 후에도 유지됨을 핀
+
+### 리뷰 요약 (opus)
+APPROVE. CRITICAL/HIGH 없음. SUGGESTION: list roundtrip test가 text presence만 확인 → `Block::List { ordered: true }` structural assertion 추가로 수정. bold/italic/color+link 테스트가 실제 handler 동작(charPr+fieldBegin 조합)을 검증함을 확인. link wrapping은 writer에서 LAST 적용.
+리뷰 전문: `~/.claude/references/2026-05-30_hwp2md_sprint92_hyperlink_split_formatted_link_review.md`
+
+### 관련 커밋
+- `8375280` feat(tests): Sprint 92 — hyperlink test split + formatted link + list roundtrip
+- `13b3259` fix(tests): Sprint 92 follow-up — assert list-ness survives HWPX roundtrip
+
+---
 
 ## Sprint 91 — 2026-05-30
 **주제**: integration.rs formatting test split + charPr 조합 테스트 3종

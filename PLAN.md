@@ -219,14 +219,23 @@ Sprint 90 완료 (2026-05-30). 1527 tests. hyperlink URL isolation + unsafe gate
 - **P3**: charPr 조합 테스트 — ✅ strikethrough+underline `<u>~~t~~</u>`, bold+strikethrough `~~**t**~~`, italic+underline `<u>*t*</u>`
 - **P4**: CTRL_RUBY/BinData — 이미 충분히 커버됨, 스킵
 
-## Sprint 92 로드맵
+## Sprint 92 완료 (2026-05-30)
 
 Sprint 91 완료 (2026-05-30). 1530 tests. formatting split + 3 combination tests. integration.rs still 3075 lines.
 
+- **P1**: 관(subsection) 감지 — BLOCKER 유지 — 이월
+- **P2**: integration_hyperlink.rs 분리 — ✅ 4 hyperlink tests 이전 (3075 → 2913 lines)
+- **P3**: 인라인 링크 + 포맷 조합 테스트 — ✅ bold+link `[**t**](url)`, italic+link `[*t*](url)`, color+link `[<span>t</span>](url)`
+- **P4**: MD→HWPX→MD 리스트 왕복 — ✅ ordered list IR-structural assertion + text presence + ordering
+
+## Sprint 93 로드맵
+
+Sprint 92 완료 (2026-05-30). 1534 tests. hyperlink split + formatted link + list roundtrip.
+
 - **P1**: 관(subsection) 감지 — BLOCKER 계속 유지
-- **P2**: integration.rs 추가 분할 — `integration_hyperlink.rs` 분리 (Sprint 82/90 hyperlink tests)
-- **P3**: 인라인 링크 + 포맷 조합 테스트 — bold hyperlink, color hyperlink (링크 안 인라인 서식)
-- **P4**: MD → HWPX → MD roundtrip 확장 — 테이블, 리스트 왕복 안정성
+- **P2**: integration.rs 추가 분할 — footnote/endnote 테스트 `integration_footnote.rs` 분리
+- **P3**: 미진한 경계 테스트 — bold+italic+link `[***t***](url)`, link URL containing `)` → `[t](<url>)` angle-bracket form
+- **P4**: unordered list MD→HWPX→MD roundtrip + `Block::List { ordered: false }` structural assertion
 
 ## 라이선스
 
