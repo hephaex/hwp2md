@@ -391,11 +391,13 @@ pub fn ir_hwpx_roundtrip(
     (tmp, read_back)
 }
 
-/// Return `true` if any `ir::Inline` in any paragraph of `doc` satisfies `pred`.
+/// Return `true` if any `ir::Inline` in any **top-level paragraph** of `doc` satisfies `pred`.
 ///
-/// Scans all sections → blocks → Paragraph inlines.  Non-Paragraph blocks
-/// (Heading, CodeBlock, etc.) are skipped.  Use in roundtrip tests to verify
-/// that an inline attribute (italic, strikethrough, …) survives the HWPX hop.
+/// Scans all sections → top-level blocks → Paragraph inlines.
+/// **Does NOT recurse** into List items, BlockQuote blocks, or table cells —
+/// inlines nested in those blocks are invisible to this helper.
+/// Use in roundtrip tests to verify that an inline attribute (italic,
+/// strikethrough, …) in a top-level paragraph survives the HWPX hop.
 #[allow(dead_code)]
 pub fn any_inline_in_doc(
     doc: &hwp2md::ir::Document,
