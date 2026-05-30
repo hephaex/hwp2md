@@ -3072,6 +3072,16 @@ fn hwpx_heading_paragraph_interleaved_preserves_order_and_levels() {
         h2_line.starts_with("## "),
         "H2 must start with '## ', not promoted to H1; got: {h2_line:?}"
     );
+
+    // H1 prefix must not be demoted to H2 (must use "# " not "## ").
+    let h1_line = markdown
+        .lines()
+        .find(|l| l.contains("Main Title"))
+        .unwrap_or("");
+    assert!(
+        h1_line.starts_with("# ") && !h1_line.starts_with("## "),
+        "H1 must start with '# ' (not '## '); got: {h1_line:?}"
+    );
 }
 
 // ---------------------------------------------------------------------------
