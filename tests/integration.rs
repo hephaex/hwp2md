@@ -3184,6 +3184,10 @@ fn hwpx_hyperlink_multiple_links_in_same_paragraph() {
         Some("https://second.com"),
         "'Second' inline must carry second URL"
     );
+    assert!(
+        and_text.is_some(),
+        "expected plain text inline between the two hyperlinks; inlines: {inlines:?}"
+    );
     if let Some(mid) = and_text {
         assert!(
             mid.link.is_none(),
@@ -3228,8 +3232,14 @@ fn hwpx_hyperlink_unsafe_url_drops_link_syntax() {
         });
 
     assert!(link_inline.is_some(), "expected inline with text 'click'");
-    // IR may carry the raw URL — that is fine; the writer filters it.
-    // The important assertion is on the rendered Markdown.
+    // Assert the IR retains the raw URL — the writer gate is what drops it,
+    // not the parser.  If the parser rejected it, moving the gate to parse time
+    // would not be detected by the Markdown-level assertions alone.
+    assert_eq!(
+        link_inline.unwrap().link.as_deref(),
+        Some("javascript:alert(1)"),
+        "IR must carry the raw URL so the md::writer security gate is what filters it"
+    );
 
     let markdown = md::write_markdown(&doc, false);
     assert!(
