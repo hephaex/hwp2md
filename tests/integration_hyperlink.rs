@@ -372,3 +372,100 @@ fn hwpx_hyperlink_colored_text_renders_as_span_link() {
         "color link must render as [<span>text</span>](url); got: {markdown:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 93 P3: Additional hyperlink edge cases
+// ---------------------------------------------------------------------------
+
+/// `bold="true" italic="true"` charPr inside a hyperlink produces
+/// `[***BoldItalicLink***](url)` — the bold+italic branch of the writer.
+#[test]
+fn hwpx_hyperlink_bold_italic_text_renders_as_bold_italic_link() {
+    let xml = r#"<hp:p><hp:run charPrIDRef="0">
+        <hp:charPr bold="true" italic="true"/>
+        <hp:fieldBegin type="HYPERLINK" command="https://bolditalic.example.com"/>
+        <hp:t>BoldItalicLink</hp:t>
+        <hp:fieldEnd/>
+    </hp:run></hp:p>"#;
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(xml));
+
+    let inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.text.contains("BoldItalicLink"))
+            } else {
+                None
+            }
+        });
+
+    assert!(inline.is_some(), "expected BoldItalicLink inline");
+    let inline = inline.unwrap();
+    assert!(inline.bold, "bold must be true");
+    assert!(inline.italic, "italic must be true");
+    assert_eq!(
+        inline.link.as_deref(),
+        Some("https://bolditalic.example.com"),
+        "link URL must be set"
+    );
+
+    // Writer order: bold+italic → ***text*** → link wraps → [***text***](url)
+    let markdown = md::write_markdown(&doc, false);
+    assert!(
+        markdown.contains("[***BoldItalicLink***](https://bolditalic.example.com)"),
+        "bold+italic link must render as [***text***](url); got: {markdown:?}"
+    );
+}
+
+/// A hyperlink URL containing `)` must use the angle-bracket form
+/// `[text](<url>)` to prevent Markdown parsers from ending the link early.
+/// Pins the `url.contains(')')` branch in src/md/writer.rs.
+#[test]
+fn hwpx_hyperlink_url_with_closing_paren_uses_angle_bracket_form() {
+    let url = "https://example.com/path(1)";
+    let xml = format!(
+        r#"<hp:p><hp:run>
+        <hp:fieldBegin type="HYPERLINK" command="{url}"/>
+        <hp:t>ParenLink</hp:t>
+        <hp:fieldEnd/>
+    </hp:run></hp:p>"#
+    );
+
+    let (_dir, doc) = read_fixture(HwpxFixture::new().section(&xml));
+
+    let inline = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .find_map(|b| {
+            if let ir::Block::Paragraph { inlines } = b {
+                inlines.iter().find(|i| i.link.is_some())
+            } else {
+                None
+            }
+        });
+
+    assert!(inline.is_some(), "expected a link inline");
+    assert_eq!(
+        inline.unwrap().link.as_deref(),
+        Some(url),
+        "IR must carry the URL with the paren"
+    );
+
+    // Writer must use [text](<url>) angle-bracket form when URL contains ')'.
+    let markdown = md::write_markdown(&doc, false);
+    let expected = format!("[ParenLink](<{url}>)");
+    assert!(
+        markdown.contains(&expected),
+        "URL with ')' must use angle-bracket form; got: {markdown:?}"
+    );
+    // Standard form [text](url) must NOT be used (it would break parsers).
+    let plain_form = format!("[ParenLink]({url})");
+    assert!(
+        !markdown.contains(&plain_form),
+        "plain [text](url) form must not be used for URL with ')'; got: {markdown:?}"
+    );
+}
