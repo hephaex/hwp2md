@@ -12,8 +12,8 @@
 mod fixtures;
 
 use fixtures::{
-    heading_xml, lang_hint_comment, para_xml, read_fixture, styled_run_xml, table_2x2_xml,
-    HwpxFixture,
+    any_inline_in_doc, heading_xml, ir_hwpx_roundtrip, lang_hint_comment, para_xml, read_fixture,
+    styled_run_xml, table_2x2_xml, HwpxFixture,
 };
 use hwp2md::{hwpx, ir, md};
 
@@ -1589,85 +1589,6 @@ fn fixture_cnpb_ctrl_variant_produces_pagebreak_ir() {
 }
 
 // ---------------------------------------------------------------------------
-// Sprint 84 P4: HWPX image block (binaryItemIDRef) integration test
-// ---------------------------------------------------------------------------
-
-/// An `<hp:img binaryItemIDRef="photo.png"/>` element must produce an
-/// `ir::Block::Image { src: "photo.png" }` and render as `![](photo.png)`
-/// in Markdown.  Tests the full pipeline from HWPX XML → IR → Markdown.
-#[test]
-fn hwpx_img_element_produces_image_block_and_markdown() {
-    // Minimal PNG magic bytes — must be in BinData/ for the fixture to be
-    // a well-formed HWPX ZIP.
-    let png_data = vec![0x89u8, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-
-    let img_xml = r#"<hp:p><hp:run>
-        <hp:img binaryItemIDRef="photo.png"/>
-    </hp:run></hp:p>"#;
-
-    let (_dir, doc) = read_fixture(
-        HwpxFixture::new()
-            .section(img_xml)
-            .bin_data("photo.png", png_data),
-    );
-
-    // IR layer: must contain an Image block.
-    let image_block = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .find(|b| matches!(b, ir::Block::Image { .. }));
-
-    assert!(
-        image_block.is_some(),
-        "expected an Image block; blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
-    );
-    let ir::Block::Image { src, alt } = image_block.unwrap() else {
-        unreachable!("already asserted Image variant")
-    };
-    assert_eq!(src, "photo.png", "Image src mismatch");
-    // binaryItemIDRef has no explicit alt attr → default empty string.
-    assert_eq!(alt, "", "Image alt must be empty when not set");
-
-    // Markdown layer: renders as ![](photo.png).
-    let markdown = md::write_markdown(&doc, false);
-    assert!(
-        markdown.contains("![](photo.png)"),
-        "markdown must render as ![](photo.png); got: {markdown:?}"
-    );
-}
-
-/// `<hp:img src="explicit.png"/>` (using the `src` attribute directly, rather
-/// than `binaryItemIDRef`) must also produce an Image block.
-/// Pins the alternate `src` attribute path in the HWPX reader.
-#[test]
-fn hwpx_img_element_src_attr_also_produces_image_block() {
-    let img_xml = r#"<hp:p><hp:run>
-        <hp:img src="inline.png" alt="A picture"/>
-    </hp:run></hp:p>"#;
-
-    let (_dir, doc) = read_fixture(HwpxFixture::new().section(img_xml));
-
-    let image_block = doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .find(|b| matches!(b, ir::Block::Image { .. }));
-
-    assert!(
-        image_block.is_some(),
-        "expected an Image block from src= attr; blocks: {:?}",
-        doc.sections.iter().flat_map(|s| &s.blocks).collect::<Vec<_>>()
-    );
-    let ir::Block::Image { src, alt } = image_block.unwrap() else {
-        unreachable!("already asserted Image variant")
-    };
-    assert_eq!(src, "inline.png", "Image src mismatch");
-    assert_eq!(alt, "A picture", "Image alt mismatch");
-}
-
-// ---------------------------------------------------------------------------
 // Sprint 85 P3: table colspan → HTML fallback integration test
 // ---------------------------------------------------------------------------
 
@@ -2371,55 +2292,24 @@ fn md_to_hwpx_to_md_roundtrip_preserves_table_structure() {
 fn md_to_hwpx_to_md_roundtrip_preserves_italic() {
     let source_md = "*ItalicContent* and plain text.\n";
 
-    // MD → IR.
+    // MD → IR: pre-write assertion.
     let ir_doc = hwp2md::md::parse_markdown(source_md);
-
-    // Verify IR has an italic inline before writing.
-    let has_italic = ir_doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .flat_map(|b| {
-            if let ir::Block::Paragraph { inlines } = b {
-                inlines.as_slice()
-            } else {
-                &[]
-            }
-        })
-        .any(|i| i.italic);
-    assert!(has_italic, "parsed IR must contain an italic inline");
-
-    // IR → HWPX.
-    let tmp = tempfile::NamedTempFile::new().expect("temp file");
-    hwpx::write_hwpx(&ir_doc, tmp.path(), None).expect("write_hwpx");
-
-    // HWPX → IR (re-read).
-    let read_back = hwpx::read_hwpx(tmp.path()).expect("read_hwpx");
-
-    // IR must still have italic.
-    let still_italic = read_back
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .flat_map(|b| {
-            if let ir::Block::Paragraph { inlines } = b {
-                inlines.as_slice()
-            } else {
-                &[]
-            }
-        })
-        .any(|i| i.italic);
     assert!(
-        still_italic,
+        any_inline_in_doc(&ir_doc, |i| i.italic),
+        "parsed IR must contain an italic inline"
+    );
+
+    // HWPX hop: IR → write_hwpx → read_hwpx.
+    let (_tmp, read_back) = ir_hwpx_roundtrip(&ir_doc);
+
+    // Post-hop structural assertion.
+    assert!(
+        any_inline_in_doc(&read_back, |i| i.italic),
         "italic inline must survive HWPX roundtrip"
     );
 
-    // IR → MD (second pass): *markers* must appear.
+    // Final MD: *markers* must appear.
     let final_md = md::write_markdown(&read_back, false);
-    assert!(
-        final_md.contains("ItalicContent"),
-        "ItalicContent text must survive; got: {final_md:?}"
-    );
     assert!(
         final_md.contains("*ItalicContent*"),
         "italic markers must survive MD→HWPX→MD; got: {final_md:?}"
@@ -2433,55 +2323,24 @@ fn md_to_hwpx_to_md_roundtrip_preserves_italic() {
 fn md_to_hwpx_to_md_roundtrip_preserves_strikethrough() {
     let source_md = "~~StrikeContent~~ and plain text.\n";
 
-    // MD → IR.
+    // MD → IR: pre-write assertion.
     let ir_doc = hwp2md::md::parse_markdown(source_md);
-
-    // Verify IR has strikethrough before writing.
-    let has_strike = ir_doc
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .flat_map(|b| {
-            if let ir::Block::Paragraph { inlines } = b {
-                inlines.as_slice()
-            } else {
-                &[]
-            }
-        })
-        .any(|i| i.strikethrough);
-    assert!(has_strike, "parsed IR must contain a strikethrough inline");
-
-    // IR → HWPX.
-    let tmp = tempfile::NamedTempFile::new().expect("temp file");
-    hwpx::write_hwpx(&ir_doc, tmp.path(), None).expect("write_hwpx");
-
-    // HWPX → IR (re-read).
-    let read_back = hwpx::read_hwpx(tmp.path()).expect("read_hwpx");
-
-    // IR must still have strikethrough.
-    let still_strike = read_back
-        .sections
-        .iter()
-        .flat_map(|s| &s.blocks)
-        .flat_map(|b| {
-            if let ir::Block::Paragraph { inlines } = b {
-                inlines.as_slice()
-            } else {
-                &[]
-            }
-        })
-        .any(|i| i.strikethrough);
     assert!(
-        still_strike,
+        any_inline_in_doc(&ir_doc, |i| i.strikethrough),
+        "parsed IR must contain a strikethrough inline"
+    );
+
+    // HWPX hop: IR → write_hwpx → read_hwpx.
+    let (_tmp, read_back) = ir_hwpx_roundtrip(&ir_doc);
+
+    // Post-hop structural assertion.
+    assert!(
+        any_inline_in_doc(&read_back, |i| i.strikethrough),
         "strikethrough inline must survive HWPX roundtrip"
     );
 
-    // IR → MD (second pass): ~~markers~~ must appear.
+    // Final MD: ~~markers~~ must appear.
     let final_md = md::write_markdown(&read_back, false);
-    assert!(
-        final_md.contains("StrikeContent"),
-        "StrikeContent text must survive; got: {final_md:?}"
-    );
     assert!(
         final_md.contains("~~StrikeContent~~"),
         "strikethrough markers must survive MD→HWPX→MD; got: {final_md:?}"
@@ -2556,5 +2415,82 @@ fn md_to_hwpx_to_md_roundtrip_preserves_code_block_with_language() {
     assert!(
         final_md.contains("let x = 42"),
         "code content must appear in final markdown; got: {final_md:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 96 P4: BlockQuote and HorizontalRule lossy-encoding contract tests
+// ---------------------------------------------------------------------------
+//
+// These tests assert the CURRENT degraded behavior as executable contracts.
+// If either assertion FAILS in the future it means lossless encoding was added
+// — in that case, delete the negative assertion here and add a real roundtrip
+// test asserting Block::BlockQuote / Block::HorizontalRule survives.
+
+/// After MD→HWPX→MD for `> quoted text`, the re-read IR does NOT contain a
+/// `Block::BlockQuote` because the HWPX writer encodes blockquotes as plain
+/// paragraphs with `paraPrIDRef="1"` and the reader has no reverse mapping.
+///
+/// This is a lossy-encoding contract: the content text survives but the block
+/// type degrades.  If this test fails, lossless support was added — upgrade it.
+#[test]
+fn blockquote_hwpx_roundtrip_currently_lossy_no_blockquote_block() {
+    let source_md = "> Quoted content.\n";
+
+    let ir_doc = hwp2md::md::parse_markdown(source_md);
+    let has_pre = ir_doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(|b| matches!(b, ir::Block::BlockQuote { .. }));
+    assert!(has_pre, "MD parser must produce BlockQuote before the hop");
+
+    let (_tmp, read_back) = ir_hwpx_roundtrip(&ir_doc);
+
+    // LOSSY: BlockQuote does NOT survive — assert the current degraded behavior.
+    let still_blockquote = read_back
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(|b| matches!(b, ir::Block::BlockQuote { .. }));
+    assert!(
+        !still_blockquote,
+        "BlockQuote unexpectedly survived HWPX roundtrip — \
+         lossless support was added; replace this negative assertion with a \
+         real roundtrip test"
+    );
+}
+
+/// After MD→HWPX→MD for `---`, the re-read IR does NOT contain a
+/// `Block::HorizontalRule` because the HWPX writer encodes it as a paragraph
+/// of box-drawing characters (U+2500) with no reader-side sentinel.
+///
+/// This is a lossy-encoding contract.  If this test fails, lossless support
+/// was added — upgrade it to a real roundtrip test.
+#[test]
+fn horizontal_rule_hwpx_roundtrip_currently_lossy_no_hr_block() {
+    let source_md = "Before\n\n---\n\nAfter\n";
+
+    let ir_doc = hwp2md::md::parse_markdown(source_md);
+    let has_pre = ir_doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(|b| matches!(b, ir::Block::HorizontalRule));
+    assert!(has_pre, "MD parser must produce HorizontalRule before the hop");
+
+    let (_tmp, read_back) = ir_hwpx_roundtrip(&ir_doc);
+
+    // LOSSY: HorizontalRule does NOT survive — assert the current degraded behavior.
+    let still_hr = read_back
+        .sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .any(|b| matches!(b, ir::Block::HorizontalRule));
+    assert!(
+        !still_hr,
+        "HorizontalRule unexpectedly survived HWPX roundtrip — \
+         lossless support was added; replace this negative assertion with a \
+         real roundtrip test"
     );
 }

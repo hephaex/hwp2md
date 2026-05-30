@@ -375,3 +375,41 @@ pub fn read_fixture(
     let doc = hwp2md::hwpx::read_hwpx(&path).expect("read_hwpx failed");
     (dir, doc)
 }
+
+/// Write an IR document to HWPX and read it back.
+///
+/// Returns the `NamedTempFile` (kept alive so the file is not deleted) and
+/// the re-parsed `ir::Document`.  Use this as the "HWPX hop" step in
+/// MD→HWPX→MD roundtrip tests to eliminate boilerplate.
+#[allow(dead_code)]
+pub fn ir_hwpx_roundtrip(
+    ir_doc: &hwp2md::ir::Document,
+) -> (tempfile::NamedTempFile, hwp2md::ir::Document) {
+    let tmp = tempfile::NamedTempFile::new().expect("temp file");
+    hwp2md::hwpx::write_hwpx(ir_doc, tmp.path(), None).expect("write_hwpx");
+    let read_back = hwp2md::hwpx::read_hwpx(tmp.path()).expect("read_hwpx");
+    (tmp, read_back)
+}
+
+/// Return `true` if any `ir::Inline` in any paragraph of `doc` satisfies `pred`.
+///
+/// Scans all sections → blocks → Paragraph inlines.  Non-Paragraph blocks
+/// (Heading, CodeBlock, etc.) are skipped.  Use in roundtrip tests to verify
+/// that an inline attribute (italic, strikethrough, …) survives the HWPX hop.
+#[allow(dead_code)]
+pub fn any_inline_in_doc(
+    doc: &hwp2md::ir::Document,
+    pred: impl Fn(&hwp2md::ir::Inline) -> bool,
+) -> bool {
+    doc.sections
+        .iter()
+        .flat_map(|s| &s.blocks)
+        .flat_map(|b| {
+            if let hwp2md::ir::Block::Paragraph { inlines } = b {
+                inlines.as_slice()
+            } else {
+                &[]
+            }
+        })
+        .any(pred)
+}
